@@ -1,4 +1,4 @@
-Welcome to the |PROJECT_NAME| documentation!
+Welcome to the |configzen| documentation!
 ===================================
 
 .. toctree::

@@ -1,4 +1,4 @@
-# PROJECT_NAME
+# configzen
 
 ## Setup
 ## License
