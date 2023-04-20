@@ -1,0 +1,7 @@
+test:
+  config:
+  - one
+  - two
+  dicts:
+  - innerdict: test
+  example: 8
