@@ -1,4 +1,6 @@
+import functools
 import importlib
+from collections.abc import ByteString, MutableMapping, Coroutine
 from typing import Any, ClassVar
 
 
@@ -6,28 +8,135 @@ class Engine:
     name: ClassVar[str]
     _registry = {}
 
-    def load(self, serialized_data: bytes | str, defaults: dict[str, Any] | None = None):
+    def load(
+        self,
+        blob: str | ByteString,
+        defaults: MutableMapping[str, Any] | None = None
+    ) -> MutableMapping[str, Any]:
+        """
+        Load a config from a blob.
+
+        Parameters
+        ----------
+        blob : str | ByteString
+            The blob to load.
+        defaults : MutableMapping[str, Any] | None
+            The default values to use.
+
+        Returns
+        -------
+        MutableMapping[str, Any]
+            The loaded config.
+        """
         raise NotImplementedError
 
-    def dump(self, config: dict[str, Any]):
+    def _dump(self, config: MutableMapping[str, Any]) -> str | ByteString:
         raise NotImplementedError
+
+    def dump(
+        self,
+        config: MutableMapping[str, Any],
+        autoconvert: bool = True
+    ):
+        """
+        Dump a config to a blob.
+
+        Parameters
+        ----------
+        config : MutableMapping[str, Any]
+            The config to dump.
+        autoconvert : bool
+            Whether to automatically convert the config.
+
+        Returns
+        -------
+        str | ByteString
+            The dumped config blob.
+        """
+        if autoconvert:
+            config = self.convert(config)
+        return self._dump(config)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls.name = cls.name.casefold()
-        key = cls.name
-        namespace = cls._registry
-        # #  I don't think we need this
-        # #  But I'm leaving it here for now
-        # while '.' in key:
-        #     family, key = key.split('.', 1)
-        #     if not family:
-        #         break
-        #     namespace = namespace.setdefault(family, {})
-        namespace[key] = cls
+        cls.name = name = cls.name.casefold()
+        Engine._registry[name] = cls
+
+    @functools.singledispatchmethod
+    def convert(self, obj: Any) -> Any:
+        """
+        Engine-specific conversion of config values.
+
+        Parameters
+        ----------
+        obj : Any
+            The object to convert.
+
+        Returns
+        -------
+        Any
+            The converted object.
+        """
+        return convert(obj)
 
 
-def get_engine_class(engine_name: str):
+@functools.singledispatch
+def convert(obj: Any) -> Any:
+    """
+    Default conversion of config values.
+
+    Parameters
+    ----------
+    obj : Any
+        The object to convert.
+
+    Returns
+    -------
+    Any
+        The converted object.
+    """
+    return obj
+
+
+def converter(func):
+    """
+    Register a converter for an object within a convenient decorator.
+
+    Parameters
+    ----------
+    func : Callable[[Any], Any]
+        The converter function.
+
+    Returns
+    -------
+    Callable[[Any], Any]
+        The converter function.
+    """
+    def wrapper(obj) -> Any:
+        convert.register(obj, func)
+        return obj
+    return wrapper
+
+
+def get_engine_class(engine_name: str) -> type[Engine]:
+    """
+    Get the engine class for the given engine name.
+
+    Parameters
+    ----------
+    engine_name : str
+        The name of the engine.
+
+    Returns
+    -------
+    type[Engine]
+        The engine class.
+
+    Raises
+    ------
+    KeyError
+        If the engine is not found.
+    """
     engine_name = engine_name.casefold()
     if engine_name not in Engine._registry:
         try:
@@ -35,11 +144,3 @@ def get_engine_class(engine_name: str):
         except ImportError:
             pass
     return Engine._registry[engine_name]
-
-
-def to_dict(obj: Any) -> dict[str, Any]:
-    if hasattr(obj, '__configzen_to_dict__'):
-        obj = obj.__configzen_to_dict__()
-    if isinstance(obj, dict):
-        return {k: to_dict(v) for k, v in obj.items()}
-    return obj

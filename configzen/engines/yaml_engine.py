@@ -11,10 +11,10 @@ class YamlEngine(Engine):
     def __init__(self, **export_options):
         self.export_options = export_options
 
-    def load(self, serialized_data, defaults=None):
+    def load(self, blob, defaults=None):
         if defaults is None:
             defaults = {}
-        return defaults | yaml.load(serialized_data, Loader=yaml.SafeLoader)
+        return defaults | yaml.load(blob, Loader=yaml.SafeLoader)
 
-    def dump(self, config: dict[str, Any]):
+    def _dump(self, config: dict[str, Any]):
         return yaml.dump(config, **self.export_options)

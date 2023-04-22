@@ -13,14 +13,14 @@ class ConfigParserEngine(Engine):
         self.parser_factory = parser_factory
         self.export_options = export_options
 
-    def load(self, serialized_data, defaults=None):
+    def load(self, blob, defaults=None):
         if defaults is None:
             defaults = {}
         data = self.parser_factory(defaults=defaults)
-        data.read_string(serialized_data)
+        data.read_string(blob)
         return data
 
-    def dump(self, config: dict[str, Any]):
+    def _dump(self, config: dict[str, Any]):
         data = self.parser_factory()
         data.read_dict(config)
         dump = StringIO()
