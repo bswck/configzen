@@ -140,7 +140,10 @@ def load(factory: Any, value: Any) -> Any:
     return loaders.dispatch(factory)(factory, value)
 
 
-def converter(func):
+_MISSING = object()
+
+
+def converter(func, obj=_MISSING):
     """
     Register a converter for an object within a convenient decorator.
 
@@ -149,18 +152,21 @@ def converter(func):
     func : Callable[[Any], Any]
         The converter function.
 
+    obj : Any
+        The object to register the converter for.
+
     Returns
     -------
     Callable[[Any], Any]
         The converter function.
     """
-    def wrapper(obj) -> Any:
-        convert.register(obj, func)
-        return obj
-    return wrapper
+    if obj is _MISSING:
+        return functools.partial(converter, func)
+    convert.register(obj, func)
+    return obj
 
 
-def loader(func):
+def loader(func, factory=_MISSING):
     """
     Register a loader for an object within a convenient decorator.
 
@@ -169,16 +175,20 @@ def loader(func):
     func : Callable[[Any], Any]
         The loader function.
 
+    factory : Any
+        The factory to register the loader for.
+
     Returns
     -------
     Callable[[Any], Any]
         The loader function.
 
     """
-    def wrapper(factory) -> Any:
-        loaders.register(factory, func)
-        return factory
-    return wrapper
+    if factory is _MISSING:
+        return functools.partial(loader, func)
+
+    loaders.register(factory, func)
+    return factory
 
 
 def get_engine_class(engine_name: str) -> type[Engine]:
