@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import importlib
 from collections.abc import ByteString, MutableMapping
@@ -6,7 +7,7 @@ from typing import Any, ClassVar
 
 class Engine:
     name: ClassVar[str]
-    _registry = {}
+    registry = {}
 
     def __init__(self, schema, **kwargs):
         self.schema = schema
@@ -64,7 +65,7 @@ class Engine:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         cls.name = name = cls.name.casefold()
-        Engine._registry[name] = cls
+        Engine.registry[name] = cls
 
     @functools.singledispatchmethod
     def convert(self, obj: Any) -> Any:
@@ -215,9 +216,9 @@ def get_engine_class(engine_name: str) -> type[Engine]:
         If the engine is not found.
     """
     engine_name = engine_name.casefold()
-    if engine_name not in Engine._registry:
+    if engine_name not in Engine.registry:
         try:
             importlib.import_module(f'configzen.engines.{engine_name}_engine')
         except ImportError:
             pass
-    return Engine._registry[engine_name]
+    return Engine.registry[engine_name]

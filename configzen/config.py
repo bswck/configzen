@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import inspect
 import os.path
@@ -5,7 +6,7 @@ import threading
 from collections import UserDict
 from collections.abc import ByteString, Coroutine, MutableMapping
 from io import StringIO
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable, Union
 from urllib.parse import uses_relative, uses_netloc, uses_params, urlparse
 from urllib.request import urlopen
 
@@ -30,7 +31,7 @@ _URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {''}
 
 
 T = TypeVar('T')
-DispatchReturnT = MutableMapping[str, Any] | Coroutine[MutableMapping[str, Any]]
+DispatchReturnT = Union[MutableMapping[str, Any], Coroutine[MutableMapping[str, Any]]]
 
 
 @runtime_checkable
