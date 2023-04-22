@@ -11,6 +11,7 @@ if not os.getenv('CONFIGZEN_DISABLE_ORJSON'):
 
 try:
     import jsonschema
+
     JSONSCHEMA_AVAILABLE = True
 except ImportError:
     JSONSCHEMA_AVAILABLE = False

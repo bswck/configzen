@@ -14,6 +14,7 @@ from configzen.engine import convert, load, get_engine_class, Engine
 
 try:
     import aiofiles
+
     AIOFILES_AVAILABLE = True
 except ImportError:
     aiofiles = None  # type: ignore
@@ -21,6 +22,7 @@ except ImportError:
 
 try:
     import aiohttp
+
     AIOHTTP_AVAILABLE = True
 except ImportError:
     aiohttp = None  # type: ignore
@@ -113,9 +115,7 @@ class ConfigSpec:
         return cls(spec)
 
     def open(
-        self,
-        asynchronous: bool = False,
-        **kwds: Any
+        self, asynchronous: bool = False, **kwds: Any
     ) -> Readable[str | ByteString] | Coroutine[Readable[str | ByteString]]:
         """
         Open the configuration file.
@@ -189,13 +189,9 @@ class DispatchStrategy:
         If not provided, the schema must be provided as keyword arguments.
     **schema_kwds
         Keyword arguments corresponding to the schema.
-     """
+    """
 
-    def __init__(
-        self,
-        schema: dict[str, Any] | None = None,
-        /, **schema_kwds: Any
-    ):
+    def __init__(self, schema: dict[str, Any] | None = None, /, **schema_kwds: Any):
         if schema and schema_kwds:
             raise ValueError('Must provide either schema or schema_kwds')
         self.schema = schema or schema_kwds
@@ -210,7 +206,7 @@ class DispatchStrategy:
     def dispatch(self, data: dict[str, Any]) -> DispatchReturnT:
         """
         Dispatch the configuration to a dictionary of objects.
-        
+
         Parameters
         ----------
         data : dict
@@ -219,8 +215,8 @@ class DispatchStrategy:
         Returns
         -------
         dict
-            The ready-to-use configuration dictionary.          
-            
+            The ready-to-use configuration dictionary.
+
         """
         if self.asynchronous:
             return self._async_dispatch(data)
@@ -239,15 +235,11 @@ class SimpleDispatcher(DispatchStrategy):
         return data
 
     def _dispatch(self, data):
-        return {
-            key: self._load_item(key, value)
-            for key, value in data.items()
-        }
+        return {key: self._load_item(key, value) for key, value in data.items()}
 
     async def _async_dispatch(self, data):
         return {
-            key: await self._async_load_item(key, value)
-            for key, value in data.items()
+            key: await self._async_load_item(key, value) for key, value in data.items()
         }
 
 
@@ -276,6 +268,7 @@ class Config(UserDict[str, Any]):
     Either ``dispatcher`` or ``**schema`` must be provided.
     If both are provided, a ValueError is raised.
     """
+
     dispatcher: DispatchStrategy
     schema: dict[str, Any]
     spec: ConfigSpec
@@ -288,7 +281,7 @@ class Config(UserDict[str, Any]):
         dispatcher: DispatchStrategy | None = None,
         lazy: bool | None = None,
         asynchronous: bool | None = None,
-        **schema: Any
+        **schema: Any,
     ):
         super().__init__()
 
@@ -330,12 +323,14 @@ class Config(UserDict[str, Any]):
         objects = self.dispatcher.dispatch(config)  # type: DispatchReturnT
 
         if self.asynchronous:
+
             async def async_update():
                 nonlocal objects
                 if inspect.isawaitable(objects):
                     objects = await objects
                 self.update(objects)
                 return self
+
             return async_update()
 
         self.update(objects)
@@ -398,8 +393,8 @@ class Config(UserDict[str, Any]):
         return self._do_load(**kwargs)
 
     def _do_load(self, **kwargs):
-
         if self.asynchronous:
+
             async def async_read():
                 new_async_config = self.spec.read(asynchronous=True, **kwargs)
                 if inspect.isawaitable(new_async_config):
@@ -407,6 +402,7 @@ class Config(UserDict[str, Any]):
                 async_config = await self(**new_async_config)
                 self._loaded.set()
                 return async_config
+
             return async_read()
 
         new_config = self.spec.read(asynchronous=False, **kwargs)
@@ -444,7 +440,9 @@ class Config(UserDict[str, Any]):
             The number of bytes written.
         """
         if self.spec.is_url:
-            raise NotImplementedError('Saving to URLs is not yet supported')  # todo(bswck)
+            raise NotImplementedError(
+                'Saving to URLs is not yet supported'
+            )  # todo(bswck)
         if self.asynchronous:
             return self._async_write(blob, **kwargs)
         return self._write(blob, **kwargs)
@@ -468,7 +466,4 @@ class Config(UserDict[str, Any]):
 
 @convert.register(Config)
 def convert_config(config: Config):
-    return {
-        key: convert(value)
-        for key, value in config.items()
-    }
+    return {key: convert(value) for key, value in config.items()}

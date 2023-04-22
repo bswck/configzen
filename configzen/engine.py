@@ -14,9 +14,7 @@ class Engine:
         self.engine_options = kwargs
 
     def load(
-        self,
-        blob: str | ByteString,
-        defaults: MutableMapping[str, Any] | None = None
+        self, blob: str | ByteString, defaults: MutableMapping[str, Any] | None = None
     ) -> MutableMapping[str, Any]:
         """
         Load a config from a blob.
@@ -38,11 +36,7 @@ class Engine:
     def _dump(self, config: MutableMapping[str, Any]) -> str | ByteString:
         raise NotImplementedError
 
-    def dump(
-        self,
-        config: MutableMapping[str, Any],
-        autoconvert: bool = True
-    ):
+    def dump(self, config: MutableMapping[str, Any], autoconvert: bool = True):
         """
         Dump a config to a blob.
 
