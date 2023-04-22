@@ -1,6 +1,6 @@
 import functools
 import importlib
-from collections.abc import ByteString, MutableMapping, Coroutine
+from collections.abc import ByteString, MutableMapping
 from typing import Any, ClassVar
 
 
@@ -79,11 +79,31 @@ class Engine:
         """
         return convert(obj)
 
+    @functools.singledispatchmethod
+    def loader(self, factory, value) -> Any:
+        """
+        Engine-specific loading of config values.
+
+        Parameters
+        ----------
+        factory : Any
+            The factory to use.
+        value : Any
+            The value to load.
+
+        Returns
+        -------
+        Any
+            The loaded value.
+        """
+
+        return load(factory, value)
+
 
 @functools.singledispatch
 def convert(obj: Any) -> Any:
     """
-    Default conversion of config values.
+    Default conversion of config objects.
 
     Parameters
     ----------
@@ -96,6 +116,28 @@ def convert(obj: Any) -> Any:
         The converted object.
     """
     return obj
+
+
+loaders = functools.singledispatch(lambda: None)
+
+
+def load(factory: Any, value: Any) -> Any:
+    """
+    Default loading of config objects.
+
+    Parameters
+    ----------
+    factory : Any
+        The factory to use.
+    value : Any
+        The value to load.
+
+    Returns
+    -------
+    Any
+        The loaded value.
+    """
+    return loaders.dispatch(factory)(factory, value)
 
 
 def converter(func):
@@ -115,6 +157,27 @@ def converter(func):
     def wrapper(obj) -> Any:
         convert.register(obj, func)
         return obj
+    return wrapper
+
+
+def loader(func):
+    """
+    Register a loader for an object within a convenient decorator.
+
+    Parameters
+    ----------
+    func : Callable[[Any], Any]
+        The loader function.
+
+    Returns
+    -------
+    Callable[[Any], Any]
+        The loader function.
+
+    """
+    def wrapper(factory) -> Any:
+        loaders.register(factory, func)
+        return factory
     return wrapper
 
 
