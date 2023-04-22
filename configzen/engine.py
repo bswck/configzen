@@ -8,6 +8,10 @@ class Engine:
     name: ClassVar[str]
     _registry = {}
 
+    def __init__(self, schema, **kwargs):
+        self.schema = schema
+        self.engine_options = kwargs
+
     def load(
         self,
         blob: str | ByteString,

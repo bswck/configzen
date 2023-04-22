@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import os.path
 import threading
 from collections import UserDict
 from collections.abc import ByteString, Coroutine, MutableMapping
@@ -64,13 +65,17 @@ class ConfigSpec:
     def __init__(
         self,
         filepath_or_buffer: Readable | str = None,
-        engine_name: str = 'yaml',
+        engine_name: str | None = None,
         cache_engine: bool = True,
         defaults: dict[str, Any] | None = None,
         **engine_options: Any,
     ):
         self.filepath_or_buffer = filepath_or_buffer
         self.defaults = defaults
+
+        if engine_name is None:
+            raise ValueError('engine_name must be provided')
+
         self.engine_name = engine_name
         self._engine = None
         self._engine_options = engine_options
@@ -278,6 +283,7 @@ class Config(UserDict[str, Any]):
     def __init__(
         self,
         spec: ConfigSpec | str,
+        engine_name: str | None = None,
         dispatcher: DispatchStrategy | None = None,
         lazy: bool | None = None,
         asynchronous: bool | None = None,
@@ -285,19 +291,23 @@ class Config(UserDict[str, Any]):
     ):
         super().__init__()
 
-        if isinstance(spec, (str, Readable)):
-            spec = ConfigSpec(spec)
-        self.spec = spec
-        self.dispatcher = dispatcher
-        self.schema = schema
-
-        if schema and dispatcher:
-            raise ValueError('Must provide either dispatcher or **schema')
         if dispatcher:
+            if schema:
+                raise ValueError('Cannot provide both dispatcher and schema')
+
             self.dispatcher = dispatcher
             self.schema = dispatcher.schema
         else:
             self.dispatcher = SimpleDispatcher(schema)
+            self.schema = schema
+
+        if isinstance(spec, (str, Readable)):
+            if engine_name is None:
+                if isinstance(spec, str):
+                    # Infer engine name from file extension
+                    engine_name = os.path.splitext(spec)[1][1:]
+            spec = ConfigSpec(spec, schema=self.schema, engine_name=engine_name)
+        self.spec = spec
 
         self.asynchronous = asynchronous
         if lazy is None:
@@ -390,18 +400,18 @@ class Config(UserDict[str, Any]):
 
         if self.asynchronous:
             async def async_read():
-                aconfig = self.spec.read(asynchronous=True, **kwargs)
-                if inspect.isawaitable(aconfig):
-                    aconfig = await aconfig
-                aret = await self(**aconfig)
+                new_async_config = self.spec.read(asynchronous=True, **kwargs)
+                if inspect.isawaitable(new_async_config):
+                    new_async_config = await new_async_config
+                async_config = await self(**new_async_config)
                 self._loaded.set()
-                return aret
+                return async_config
             return async_read()
 
-        config = self.spec.read(asynchronous=False, **kwargs)
-        ret = self(**config)
+        new_config = self.spec.read(asynchronous=False, **kwargs)
+        config = self(**new_config)
         self._loaded.set()
-        return ret
+        return config
 
     def save(self, **kwargs: Any) -> int | Coroutine[int]:
         """

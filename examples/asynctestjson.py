@@ -19,7 +19,7 @@ class TupleDataclass(zen.Tuple):
 
 async def main():
     config = await zen.Config(
-        'test.yaml',
+        'test.json',
         dispatcher=zen.SimpleDispatcher(dict=DictDataclass, tuple=TupleDataclass),
         asynchronous=True,
     )
