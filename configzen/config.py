@@ -1,9 +1,12 @@
 from __future__ import annotations
 import asyncio
 import copy
+import functools
 import inspect
+import operator
 import os.path
 import threading
+import types
 from collections import UserDict
 from collections.abc import ByteString, Coroutine, MutableMapping
 from io import StringIO
@@ -312,7 +315,7 @@ class Config(UserDict[str, Any]):
             raise ValueError('Cannot be asynchronous and not lazy')
 
         self.lazy = lazy
-        self._original = {}
+        self._original = types.MappingProxyType({})
 
         if not asynchronous and not lazy:
             self.load()
@@ -352,6 +355,11 @@ class Config(UserDict[str, Any]):
             self._loaded = asyncio.Event()
         else:
             self._loaded = threading.Event()
+
+    @property
+    def original(self) -> types.MappingProxyType:
+        """The original configuration dictionary."""
+        return self._original
 
     def wait_until_loaded(self):
         """Wait until the configuration is loaded."""
@@ -402,7 +410,7 @@ class Config(UserDict[str, Any]):
                 new_async_config = self.spec.read(asynchronous=True, **kwargs)
                 if inspect.isawaitable(new_async_config):
                     new_async_config = await new_async_config
-                self._original = new_async_config
+                self._original = types.MappingProxyType(new_async_config)
                 async_config = await self(**copy.deepcopy(new_async_config))
                 self._loaded.set()
                 return async_config
@@ -410,7 +418,7 @@ class Config(UserDict[str, Any]):
             return async_read()
 
         new_config = self.spec.read(asynchronous=False, **kwargs)
-        self._original = new_config
+        self._original = types.MappingProxyType(new_config)
         config = self(**copy.deepcopy(new_config))
         self._loaded.set()
         return config
@@ -433,6 +441,22 @@ class Config(UserDict[str, Any]):
 
         """
         blob = self.spec.engine.dump(self)
+        return self.write(blob, **kwargs)
+
+    def save_sections(self, *sections, **kwargs: Any) -> int | Coroutine[int]:
+        """
+        Save only selected sections of the configuration to the configuration file.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the write method.
+
+        """
+        data = dict(self.original)
+        for section in sections:
+            data[section] = self[section]
+        blob = self.spec.engine.dump(data)
         return self.write(blob, **kwargs)
 
     def write(self, blob: str | ByteString, **kwargs) -> int | Coroutine[int]:
