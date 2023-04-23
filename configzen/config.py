@@ -1,9 +1,7 @@
 from __future__ import annotations
 import asyncio
 import copy
-import functools
 import inspect
-import operator
 import os.path
 import threading
 import types
