@@ -35,7 +35,7 @@ _URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {''}
 
 
 T = TypeVar('T')
-DispatchReturnT = Union[MutableMapping[str, Any], Coroutine[MutableMapping[str, Any]]]
+DispatchReturnType = Union[MutableMapping[str, Any], Coroutine[MutableMapping[str, Any]]]
 
 
 @runtime_checkable
@@ -153,7 +153,7 @@ class ConfigSpec:
             return urlopen(self.filepath_or_buffer, **kwds)
         return open(self.filepath_or_buffer, **kwds)
 
-    def read(self, asynchronous: bool = False, **kwds) -> DispatchReturnT:
+    def read(self, asynchronous: bool = False, **kwds) -> DispatchReturnType:
         """
         Read the configuration file.
 
@@ -205,7 +205,7 @@ class DispatchStrategy:
     def _dispatch(self, data: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
-    def dispatch(self, data: dict[str, Any]) -> DispatchReturnT:
+    def dispatch(self, data: dict[str, Any]) -> DispatchReturnType:
         """
         Dispatch the configuration to a dictionary of objects.
 
@@ -324,7 +324,7 @@ class Config(UserDict[str, Any]):
         return self.load().__await__()
 
     def __call__(self, **config):
-        objects = self.dispatcher.dispatch(config)  # type: DispatchReturnT
+        objects = self.dispatcher.dispatch(config)  # type: DispatchReturnType
 
         if self.asynchronous:
 
@@ -482,12 +482,12 @@ class Config(UserDict[str, Any]):
         return self._write(blob, **kwargs)
 
     async def _async_write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        async with self.spec.open(asynchronous=True, mode='w', **kwargs) as f:
-            return await f.write(blob)
+        async with self.spec.open(asynchronous=True, mode='w', **kwargs) as file:
+            return await file.write(blob)
 
     def _write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        with self.spec.open(asynchronous=False, mode='w', **kwargs) as f:
-            return f.write(blob)
+        with self.spec.open(asynchronous=False, mode='w', **kwargs) as file:
+            return file.write(blob)
 
     def __getattr__(self, item: str) -> Any:
         try:
