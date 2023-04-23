@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import copy
 import inspect
 import os.path
 import threading
@@ -311,6 +312,8 @@ class Config(UserDict[str, Any]):
             raise ValueError('Cannot be asynchronous and not lazy')
 
         self.lazy = lazy
+        self._original = {}
+
         if not asynchronous and not lazy:
             self.load()
 
@@ -371,7 +374,7 @@ class Config(UserDict[str, Any]):
         """
         if self._loaded.is_set():
             raise ValueError('Configuration is already loaded')
-        return self._do_load(**kwargs)
+        return self._load(**kwargs)
 
     def reload(self, **kwargs) -> 'Config | Coroutine[Config]':
         """
@@ -388,27 +391,36 @@ class Config(UserDict[str, Any]):
         self
         """
         if not self._loaded.is_set():
-            raise ValueError('Configuration is not loaded')
+            raise ValueError('Configuration has not been loaded, use load() instead')
         self._loaded.clear()
-        return self._do_load(**kwargs)
+        return self._load(**kwargs)
 
-    def _do_load(self, **kwargs):
+    def _load(self, **kwargs):
         if self.asynchronous:
 
             async def async_read():
                 new_async_config = self.spec.read(asynchronous=True, **kwargs)
                 if inspect.isawaitable(new_async_config):
                     new_async_config = await new_async_config
-                async_config = await self(**new_async_config)
+                self._original = new_async_config
+                async_config = await self(**copy.deepcopy(new_async_config))
                 self._loaded.set()
                 return async_config
 
             return async_read()
 
         new_config = self.spec.read(asynchronous=False, **kwargs)
-        config = self(**new_config)
+        self._original = new_config
+        config = self(**copy.deepcopy(new_config))
         self._loaded.set()
         return config
+
+    def rollback(self):
+        """Rollback the configuration to its original state."""
+        self._loaded.clear()
+        self.clear()
+        self.update(self._original)
+        self._loaded.set()
 
     def save(self, **kwargs: Any) -> int | Coroutine[int]:
         """
