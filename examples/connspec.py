@@ -12,11 +12,6 @@ class ConnSpec(lib.DictSection):
     test: int = 0
 
 
-@dataclasses.dataclass
-class Hello(lib.DictSection):
-    text: str
-
-
 config = lib.Config(
     lib.ConfigSpec(
         'connspec.yaml',
@@ -32,9 +27,9 @@ config = lib.Config(
         ),
         autocreate=True
     ),
-    dispatcher=lib.SimpleDispatcher(spec=ConnSpec, hello=dict),
+    dispatcher=lib.SimpleDispatcher(spec=ConnSpec, hello=list),
 )
 
-config.hello['text'] = 'Hello, people!'
+config['hello'] = ['Hello, people!']
 config['spec'].test += 1
 print(lib.save(config.meta('hello')))

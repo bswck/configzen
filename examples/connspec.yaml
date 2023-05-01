@@ -1,5 +1,5 @@
 hello:
-  text: Hello, people!
+- Hello, people!
 spec:
   database: postgres
   host: localhost

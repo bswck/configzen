@@ -4,8 +4,6 @@ import importlib
 from collections.abc import ByteString, MutableMapping
 from typing import Any, ClassVar
 
-from configzen.errors import ConfigError
-
 
 class Engine:
     name: ClassVar[str]
@@ -119,15 +117,13 @@ def convert(obj: Any) -> Any:
     return obj
 
 
-def no_loader_error(cls, value):
+def no_loader_strategy(cls, value):
     if isinstance(value, cls):
         return value
-    raise ConfigError(
-        f'no loader available for factory {cls} (when loading value {value!r})'
-    )
+    return cls(value)
 
 
-loaders = functools.singledispatch(no_loader_error)
+loaders = functools.singledispatch(no_loader_strategy)
 
 
 def load(factory: Any, value: Any) -> Any:
