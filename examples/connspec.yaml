@@ -1,0 +1,9 @@
+hello:
+  text: Hello, people!
+spec:
+  database: postgres
+  host: localhost
+  password: postgres
+  port: 5432
+  test: 2
+  user: postgres

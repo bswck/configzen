@@ -1,10 +1,12 @@
 from __future__ import annotations
 import asyncio
+import collections.abc
 import copy
 import inspect
 import os.path
 import threading
 import types
+import typing
 from collections import UserDict
 from collections.abc import ByteString, Coroutine, MutableMapping
 from io import StringIO
@@ -13,6 +15,7 @@ from urllib.parse import uses_relative, uses_netloc, uses_params, urlparse
 from urllib.request import urlopen
 
 from configzen.engine import convert, load, get_engine_class, Engine
+from configzen.errors import ConfigError
 
 try:
     import aiofiles
@@ -63,6 +66,8 @@ class ConfigSpec:
         If False, a new engine instance will be created for each load and dump.
     defaults : dict, optional
         A dictionary of default values to use when loading the configuration.
+    autocreate : bool, optional
+        Whether to automatically create missing keys when loading the configuration.
     **engine_options
         Additional keyword arguments to pass to the engine.
     """
@@ -73,10 +78,16 @@ class ConfigSpec:
         engine_name: str | None = None,
         cache_engine: bool = True,
         defaults: dict[str, Any] | None = None,
+        autocreate: bool = False,
         **engine_options: Any,
     ):
         self.filepath_or_buffer = filepath_or_buffer
         self.defaults = defaults
+
+        if engine_name is None:
+            if isinstance(filepath_or_buffer, str):
+                # Infer engine name from file extension
+                engine_name = os.path.splitext(filepath_or_buffer)[1][1:]
 
         if engine_name is None:
             raise ValueError('engine_name must be provided')
@@ -87,6 +98,8 @@ class ConfigSpec:
         if cache_engine:
             self._engine = get_engine_class(self.engine_name)(**engine_options)
         self.cache_engine = cache_engine
+
+        self.missing_autocreate = autocreate
 
     def _get_engine(self) -> Engine:
         """Get the engine instance to use for loading and saving the configuration."""
@@ -169,15 +182,37 @@ class ConfigSpec:
             return self._async_read(**kwds)
         return self._read(**kwds)
 
-    def _read(self, **kwds) -> MutableMapping[str, Any]:
-        with self.open(asynchronous=False, **kwds) as fp:
-            blob = fp.read()
+    def _read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+        try:
+            with self.open(asynchronous=False, **kwds) as fp:
+                blob = fp.read()
+        except FileNotFoundError:
+            if self.missing_autocreate:
+                blob = self.engine.dump(convert_config(self.defaults))
+                if create_kwds is None:
+                    create_kwds = {}
+                self._write(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
 
-    async def _async_read(self, **kwds) -> MutableMapping[str, Any]:
-        async with self.open(asynchronous=True, **kwds) as fp:
-            blob = await fp.read()
+    def _write(self, blob, **kwds) -> int:
+        with self.open(asynchronous=False, **kwds) as fp:
+            return fp.write(blob)
+
+    async def _async_read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+        try:
+            async with self.open(asynchronous=True, **kwds) as fp:
+                blob = await fp.read()
+        except FileNotFoundError:
+            if self.missing_autocreate:
+                blob = self.engine.dump(convert_config(self.defaults))
+                if create_kwds is None:
+                    create_kwds = {}
+                await self._async_write(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
+
+    async def _async_write(self, blob, **kwds) -> int:
+        async with self.open(asynchronous=True, **kwds) as fp:
+            return await fp.write(blob)
 
 
 class DispatchStrategy:
@@ -199,13 +234,17 @@ class DispatchStrategy:
         self.schema = schema or schema_kwds
         self.asynchronous = False
 
-    async def _async_dispatch(self, data: dict[str, Any]) -> Coroutine[dict[str, Any]]:
+    async def _async_dispatch(
+        self,
+        data: dict[str, Any],
+        config: 'Config | None' = None
+    ) -> Coroutine[dict[str, Any]]:
         raise NotImplementedError
 
-    def _dispatch(self, data: dict[str, Any]) -> dict[str, Any]:
+    def _dispatch(self, data: dict[str, Any], config: 'Config | None' = None) -> dict[str, Any]:
         raise NotImplementedError
 
-    def dispatch(self, data: dict[str, Any]) -> DispatchReturnType:
+    def dispatch(self, data: dict[str, Any], config: 'Config | None' = None) -> DispatchReturnType:
         """
         Dispatch the configuration to a dictionary of objects.
 
@@ -214,6 +253,10 @@ class DispatchStrategy:
         data : dict
             The configuration data.
 
+        config : Config, optional
+            The configuration object. If provided, the configuration metadata
+            will be bound to the dispatched objects.
+
         Returns
         -------
         dict
@@ -221,13 +264,23 @@ class DispatchStrategy:
 
         """
         if self.asynchronous:
-            return self._async_dispatch(data)
-        return self._dispatch(data)
+            return self._async_dispatch(data, config)
+        return self._dispatch(data, config)
+
+
+class ConfigMeta(typing.NamedTuple):
+    """Metadata for a configuration item."""
+
+    config: Config
+    key: str
 
 
 class SimpleDispatcher(DispatchStrategy):
     def _load_item(self, key, value):
-        factory = self.schema[key]
+        try:
+            factory = self.schema[key]
+        except KeyError:
+            raise ConfigError(f'section {key!r} is undefined') from None
         return load(factory, value)
 
     async def _async_load_item(self, key, value):
@@ -236,13 +289,65 @@ class SimpleDispatcher(DispatchStrategy):
             data = await data
         return data
 
-    def _dispatch(self, data):
-        return {key: self._load_item(key, value) for key, value in data.items()}
+    @staticmethod
+    def bind_config_meta(item, config_meta: ConfigMeta):
+        try:
+            item.__config_meta__ = config_meta
+        except AttributeError:
+            pass
+        return item
 
-    async def _async_dispatch(self, data):
+    def _dispatch(self, data, config=None):
         return {
-            key: await self._async_load_item(key, value) for key, value in data.items()
+            key: self.bind_config_meta(
+                item=self._load_item(key, value),
+                config_meta=ConfigMeta(config, key) if config is not None else None
+            )
+            for key, value in data.items()
         }
+
+    async def _async_dispatch(self, data, config=None):
+        return {
+            key: self.bind_config_meta(
+                item=await self._async_load_item(key, value),
+                config_meta=ConfigMeta(config, key) if config is not None else None
+            )
+            for key, value in data.items()
+        }
+
+
+def get_config_meta(item):
+    meta = None
+    if isinstance(item, ConfigMeta):
+        meta = item
+    if hasattr(item, '__config_meta__'):
+        meta = item.__config_meta__
+    return meta
+
+
+def save(item):
+    config_meta = get_config_meta(item)
+    if isinstance(item, ConfigMeta):
+        item = item.config[item.key]
+
+    if config_meta is not None:
+        config = config_meta.config
+        data = dict(config.original)
+        data.update({config_meta.key: item})
+        blob = config.spec.engine.dump(convert_config(data))
+
+        if config.asynchronous:
+            async def async_save():
+                async_result = await config.write(blob)  # type: ignore
+                config._original = types.MappingProxyType(data)
+                return async_result
+            return async_save()
+
+        result = config.write(blob)
+        config._original = types.MappingProxyType(data)
+        return result
+
+    raise ConfigError(f'cannot save {item!r} without config metadata')
 
 
 class Config(UserDict[str, Any]):
@@ -283,6 +388,7 @@ class Config(UserDict[str, Any]):
         dispatcher: DispatchStrategy | None = None,
         lazy: bool | None = None,
         asynchronous: bool | None = None,
+        create_if_missing: bool | None = None,
         **schema: Any,
     ):
         super().__init__()
@@ -297,13 +403,12 @@ class Config(UserDict[str, Any]):
             self.dispatcher = SimpleDispatcher(schema)
             self.schema = schema
 
-        if isinstance(spec, (str, Readable)):
-            if engine_name is None:
-                if isinstance(spec, str):
-                    # Infer engine name from file extension
-                    engine_name = os.path.splitext(spec)[1][1:]
+        if not isinstance(spec, ConfigSpec):
             spec = ConfigSpec(spec, schema=self.schema, engine_name=engine_name)
+
         self.spec = spec
+        if create_if_missing is not None:
+            spec.missing_autocreate = create_if_missing
 
         self.asynchronous = asynchronous
         if lazy is None:
@@ -324,7 +429,7 @@ class Config(UserDict[str, Any]):
         return self.load().__await__()
 
     def __call__(self, **config):
-        objects = self.dispatcher.dispatch(config)  # type: DispatchReturnType
+        objects = self.dispatcher.dispatch(config, self)  # type: DispatchReturnType
 
         if self.asynchronous:
 
@@ -405,7 +510,7 @@ class Config(UserDict[str, Any]):
         if self.asynchronous:
 
             async def async_read():
-                new_async_config = self.spec.read(asynchronous=True, **kwargs)
+                new_async_config = self._async_read(**kwargs)
                 if inspect.isawaitable(new_async_config):
                     new_async_config = await new_async_config
                 self._original = types.MappingProxyType(new_async_config)
@@ -415,11 +520,21 @@ class Config(UserDict[str, Any]):
 
             return async_read()
 
-        new_config = self.spec.read(asynchronous=False, **kwargs)
+        new_config = self._read(**kwargs)
         self._original = types.MappingProxyType(new_config)
         config = self(**copy.deepcopy(new_config))
         self._loaded.set()
         return config
+
+    async def _async_read(self, **kwargs: Any):
+        kwargs.setdefault('mode', 'r')
+        kwargs.setdefault('create_kwds', {'mode': 'w'})
+        return await self.spec.read(asynchronous=True, **kwargs)
+
+    def _read(self, **kwargs: Any):
+        kwargs.setdefault('mode', 'r')
+        kwargs.setdefault('create_kwds', {'mode': 'w'})
+        return self.spec.read(asynchronous=False, **kwargs)
 
     def rollback(self):
         """Rollback the configuration to its original state."""
@@ -427,6 +542,22 @@ class Config(UserDict[str, Any]):
         self.clear()
         self.update(self._original)
         self._loaded.set()
+
+    def meta(self, key: str) -> ConfigMeta:
+        """
+        Return the configuration item metadata.
+
+        Parameters
+        ----------
+        key
+            The key of the item.
+
+        Returns
+        -------
+        dict
+            The item metadata.
+        """
+        return ConfigMeta(self, key)
 
     def save(self, **kwargs: Any) -> int | Coroutine[int]:
         """
@@ -439,23 +570,18 @@ class Config(UserDict[str, Any]):
 
         """
         blob = self.spec.engine.dump(self)
-        return self.write(blob, **kwargs)
+        result = self.write(blob, **kwargs)
+        if self.asynchronous:
+            async def async_save():
+                async_result = result
+                if inspect.isawaitable(result):
+                    async_result = await result  # type: ignore
+                self._original = types.MappingProxyType(self.data)
+                return async_result
 
-    def save_sections(self, *sections, **kwargs: Any) -> int | Coroutine[int]:
-        """
-        Save only selected sections of the configuration to the configuration file.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments to pass to the write method.
-
-        """
-        data = dict(self.original)
-        for section in sections:
-            data[section] = self[section]
-        blob = self.spec.engine.dump(data)
-        return self.write(blob, **kwargs)
+            return async_save()
+        self._original = types.MappingProxyType(self.data)
+        return result
 
     def write(self, blob: str | ByteString, **kwargs) -> int | Coroutine[int]:
         """
@@ -477,17 +603,16 @@ class Config(UserDict[str, Any]):
             raise NotImplementedError(
                 'Saving to URLs is not yet supported'
             )  # todo(bswck)
+        kwargs.setdefault('mode', 'w')
         if self.asynchronous:
             return self._async_write(blob, **kwargs)
         return self._write(blob, **kwargs)
 
     async def _async_write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        async with self.spec.open(asynchronous=True, mode='w', **kwargs) as file:
-            return await file.write(blob)
+        return await self.spec._async_write(blob, **kwargs)
 
     def _write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        with self.spec.open(asynchronous=False, mode='w', **kwargs) as file:
-            return file.write(blob)
+        return self.spec._write(blob, **kwargs)
 
     def __getattr__(self, item: str) -> Any:
         try:
@@ -499,5 +624,5 @@ class Config(UserDict[str, Any]):
 
 
 @convert.register(Config)
-def convert_config(config: Config):
+def convert_config(config: collections.abc.MutableMapping):
     return {key: convert(value) for key, value in config.items()}

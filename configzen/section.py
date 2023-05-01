@@ -4,6 +4,8 @@ from configzen.engine import converter as register_converter, loader as register
 
 
 class Section:
+    __config_meta__ = None
+
     def __init_subclass__(cls, converter=None, loader=None):
         super().__init_subclass__()
         if converter is not None:
@@ -12,31 +14,35 @@ class Section:
             register_loader(loader, cls)
 
 
-def dict_converter(obj):
+def default_dict_converter(obj):
     if dataclasses.is_dataclass(obj):
         return dataclasses.asdict(obj)
     return dict(obj)
 
 
-def dict_loader(cls, value):
+def default_dict_loader(cls, value):
+    if isinstance(value, cls):
+        return value
     return cls(**value)
 
 
-class Dict(Section):
-    def __init_subclass__(cls, converter=dict_converter, loader=dict_loader):
+class DictSection(Section):
+    def __init_subclass__(cls, converter=default_dict_converter, loader=default_dict_loader):
         super().__init_subclass__(converter=converter, loader=loader)
 
 
-def tuple_converter(obj):
+def default_tuple_converter(obj):
     if dataclasses.is_dataclass(obj):
         return list(dataclasses.astuple(obj))
     return list(obj)
 
 
-def tuple_loader(cls, value):
+def default_tuple_loader(cls, value):
+    if isinstance(value, cls):
+        return value
     return cls(*value)
 
 
-class Tuple(Section):
-    def __init_subclass__(cls, converter=tuple_converter, loader=tuple_loader):
+class TupleSection(Section):
+    def __init_subclass__(cls, converter=default_tuple_converter, loader=default_tuple_loader):
         super().__init_subclass__(converter=converter, loader=loader)
