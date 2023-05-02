@@ -1,2 +1,2 @@
-class ConfigError(Exception):
+class StrictConfigError(Exception):
     """An error occurred while loading a configuration."""

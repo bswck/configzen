@@ -15,7 +15,7 @@ from urllib.parse import uses_relative, uses_netloc, uses_params, urlparse
 from urllib.request import urlopen
 
 from configzen.engine import convert, load, get_engine_class, Engine
-from configzen.errors import ConfigError
+from configzen.errors import StrictConfigError
 
 try:
     import aiofiles
@@ -82,7 +82,7 @@ class ConfigSpec:
         **engine_options: Any,
     ):
         self.filepath_or_buffer = filepath_or_buffer
-        self.defaults = defaults
+        self.defaults = defaults or {}
 
         if engine_name is None:
             if isinstance(filepath_or_buffer, str):
@@ -99,7 +99,7 @@ class ConfigSpec:
             self._engine = get_engine_class(self.engine_name)(**engine_options)
         self.cache_engine = cache_engine
 
-        self.missing_autocreate = autocreate
+        self.autocreate = autocreate
 
     def _get_engine(self) -> Engine:
         """Get the engine instance to use for loading and saving the configuration."""
@@ -187,7 +187,8 @@ class ConfigSpec:
             with self.open(asynchronous=False, **kwds) as fp:
                 blob = fp.read()
         except FileNotFoundError:
-            if self.missing_autocreate:
+            blob = None
+            if self.autocreate:
                 blob = self.engine.dump(convert_config(self.defaults))
                 if create_kwds is None:
                     create_kwds = {}
@@ -203,7 +204,7 @@ class ConfigSpec:
             async with self.open(asynchronous=True, **kwds) as fp:
                 blob = await fp.read()
         except FileNotFoundError:
-            if self.missing_autocreate:
+            if self.autocreate:
                 blob = self.engine.dump(convert_config(self.defaults))
                 if create_kwds is None:
                     create_kwds = {}
@@ -224,15 +225,15 @@ class DispatchStrategy:
     schema : dict, optional
         A dictionary of configuration keys and their corresponding types.
         If not provided, the schema must be provided as keyword arguments.
-    **schema_kwds
-        Keyword arguments corresponding to the schema.
     """
 
-    def __init__(self, schema: dict[str, Any] | None = None, /, **schema_kwds: Any):
-        if schema and schema_kwds:
-            raise ValueError('Must provide either schema or schema_kwds')
-        self.schema = schema or schema_kwds
+    def __init__(self, schema: dict[str, Any] | None = None):
+        self.schema = schema or {}
         self.asynchronous = False
+
+    @classmethod
+    def with_schema(cls, **schema: Any):
+        return cls(schema=schema)
 
     async def _async_dispatch(
         self,
@@ -275,12 +276,31 @@ class ConfigMeta(typing.NamedTuple):
     key: str
 
 
-class SimpleDispatcher(DispatchStrategy):
+class DefaultDispatcher(DispatchStrategy):
+    def __init__(
+        self,
+        schema: dict[str, Any] | None = None,
+        strict: bool = False
+    ):
+        super().__init__(schema)
+        self.strict = strict
+        self._deferred_items = {}
+
+    def load_deferred_items(self):
+        for key, value in self._deferred_items.items():
+            self._load_item(key, value)
+
     def _load_item(self, key, value):
         try:
             factory = self.schema[key]
         except KeyError:
-            raise ConfigError(f'section {key!r} is undefined') from None
+            if self.strict:
+                raise StrictConfigError(
+                    f'section {key!r} is used but undefined in schema'
+                ) from None
+            self._deferred_items.update({key: value})
+            return value
+        self._deferred_items.pop(key, None)
         return load(factory, value)
 
     async def _async_load_item(self, key, value):
@@ -350,7 +370,7 @@ def save(item):
         config._original = types.MappingProxyType(data)
         return result
 
-    raise ConfigError(f'cannot save {item!r} without config metadata')
+    raise StrictConfigError(f'cannot save {item!r} without config metadata')
 
 
 class Config(UserDict[str, Any]):
@@ -391,27 +411,30 @@ class Config(UserDict[str, Any]):
         dispatcher: DispatchStrategy | None = None,
         lazy: bool | None = None,
         asynchronous: bool | None = None,
-        create_if_missing: bool | None = None,
-        **schema: Any,
+        autocreate: bool | None = None,
+        defaults: dict[str, Any] | None = None,
+        schema: dict[str, Any] | None = None,
     ):
         super().__init__()
 
         if dispatcher:
-            if schema:
+            if schema is not None:
                 raise ValueError('Cannot provide both dispatcher and schema')
 
             self.dispatcher = dispatcher
-            self.schema = dispatcher.schema
         else:
-            self.dispatcher = SimpleDispatcher(schema)
-            self.schema = schema
+            self.dispatcher = DefaultDispatcher(schema)
 
         if not isinstance(spec, ConfigSpec):
             spec = ConfigSpec(spec, schema=self.schema, engine_name=engine_name)
 
+        if autocreate is not None:
+            spec.autocreate = autocreate
+
+        if defaults is not None:
+            spec.defaults.update(defaults)
+
         self.spec = spec
-        if create_if_missing is not None:
-            spec.missing_autocreate = create_if_missing
 
         self.asynchronous = asynchronous
         if lazy is None:
@@ -461,6 +484,17 @@ class Config(UserDict[str, Any]):
             self._loaded = asyncio.Event()
         else:
             self._loaded = threading.Event()
+
+    @property
+    def schema(self) -> dict[str, Any]:
+        """The configuration schema."""
+        return self.dispatcher.schema
+
+    @schema.setter
+    def schema(self, value):
+        """The configuration schema."""
+        self.dispatcher.schema = value
+        self.reload()
 
     @property
     def original(self) -> types.MappingProxyType:
