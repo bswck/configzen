@@ -326,6 +326,9 @@ def get_config_meta(item):
 
 
 def save(item):
+    if isinstance(item, Config):
+        return item.save()
+
     config_meta = get_config_meta(item)
     if isinstance(item, ConfigMeta):
         item = item.config[item.key]
