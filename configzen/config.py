@@ -259,10 +259,6 @@ class LoadingStrategy:
         data : dict
             The configuration data.
 
-        config : BaseConfig, optional
-            The configuration object. If provided, the configuration metadata
-            will be bound to the loaded objects.
-
         Returns
         -------
         dict
@@ -281,10 +277,6 @@ class LoadingStrategy:
         ----------
         data : dict
             The configuration data.
-
-        config : BaseConfig, optional
-            The configuration object. If provided, the configuration metadata
-            will be bound to the loaded objects.
 
         Returns
         -------
