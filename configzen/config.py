@@ -16,7 +16,6 @@ class, which is used to load, save, and manipulate configuration files.
 from __future__ import annotations
 
 import abc
-import contextlib
 import copy
 import inspect
 import pathlib
@@ -171,7 +170,7 @@ class ConfigSpec:
                 'aiofiles is not available, '
                 'cannot open file asynchronously (install with "pip install aiofiles")',
             )
-        return aiofiles.open(self.filepath_or_stream, **kwds)  # type: ignore
+        return aiofiles.open(self.filepath_or_stream, **kwds)
 
     def read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
         """Read the configuration file.
@@ -340,28 +339,15 @@ class DefaultLoader(LoadingStrategy):
             data = await data
         return data
 
-    @staticmethod
-    def bind_config_meta(item, config_meta: ConfigMeta):
-        with contextlib.suppress(AttributeError):
-            item.__config_meta__ = config_meta
-
-        return item
-
     def load(self, data, config=None):
         return {
-            key: self.bind_config_meta(
-                item=self._load_item(key, value),
-                config_meta=ConfigMeta(config, key) if config is not None else None,
-            )
+            key: self._load_item(key, value)
             for key, value in data.items()
         }
 
     async def load_async(self, data, config=None):
         return {
-            key: self.bind_config_meta(
-                item=await self._async_load_item(key, value),
-                config_meta=ConfigMeta(config, key) if config is not None else None,
-            )
+            key: await self._async_load_item(key, value)
             for key, value in data.items()
         }
 
@@ -396,7 +382,7 @@ def save(item):
 
 
 async def save_async(item):
-    if isinstance(item, Config):
+    if isinstance(item, AsyncConfig):
         return await item.save_async()
 
     config_meta = get_config_meta(item)
@@ -408,7 +394,7 @@ async def save_async(item):
         data = dict(config.original)
         data.update({config_meta.key: item})
         blob = config.spec.engine.dump(convert_config(data))
-        result = await config.write_async(blob)  # type: ignore
+        result = await config.write_async(blob)
         config._original = types.MappingProxyType(data)
         return result
 

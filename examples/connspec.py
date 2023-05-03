@@ -1,11 +1,7 @@
-import dataclasses
-import typing
-
 import configzen as lib
 
 
-@dataclasses.dataclass
-class ConnSpec(lib.MappingSection):
+class ConnSpec(lib.Section):
     host: str
     port: int
     user: str
@@ -13,9 +9,7 @@ class ConnSpec(lib.MappingSection):
     database: str
 
 
-@lib.loader(lib.sequence_load)
-@lib.converter(lib.sequence_convert)
-class Point2D(typing.NamedTuple):
+class Point2D(lib.Section):
     x: int
     y: int
 

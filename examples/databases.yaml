@@ -1,0 +1,12 @@
+db1:
+  database: postgres1
+  host: host1
+  password: postgres1
+  port: 5432
+  user: postgres
+db2:
+  database: postgres2
+  host: host2
+  password: postgres2
+  port: 5432
+  user: postgres
