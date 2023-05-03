@@ -251,7 +251,6 @@ class LoadingStrategy:
     async def load_async(
         self,
         data: dict[str, Any],
-        config: BaseConfig | None = None,
     ) -> MutableMapping[str, Any]:
         """Dispatch the configuration to a dictionary of objects.
 
@@ -275,7 +274,6 @@ class LoadingStrategy:
     def load(
         self,
         data: dict[str, Any],
-        config: BaseConfig | None = None,
     ) -> MutableMapping[str, Any]:
         """Dispatch the configuration to a dictionary of objects.
 
@@ -338,14 +336,14 @@ class DefaultLoader(LoadingStrategy):
             data = await data
         return data
 
-    def load(self, data, config=None):
+    def load(self, data):
         data = {
             key: self._load_item(key, value)
             for key, value in data.items()
         }
         return data
 
-    async def load_async(self, data, config=None):
+    async def load_async(self, data):
         data = {
             key: await self._async_load_item(key, value)
             for key, value in data.items()
@@ -447,6 +445,17 @@ class BaseConfig(collections.UserDict[str, Any]):
         """Update the configuration with the given keyword arguments."""
 
     @property
+    def loaded(self) -> bool:
+        """
+        Whether the configuration has been loaded.
+        
+        Returns
+        -------
+        bool
+        """
+        return self._loaded
+
+    @property
     def sections(self) -> dict[str, Any]:
         """The configuration sections."""
         return self.loader.sections
@@ -506,7 +515,7 @@ class Config(BaseConfig):
         -------
         self
         """
-        objects = self.loader.load(config, self)
+        objects = self.loader.load(config)
         self.update(objects)
         return self
 
@@ -610,7 +619,7 @@ class AsyncConfig(BaseConfig):
         -------
 
         """
-        objects = await self.loader.load_async(config, self)
+        objects = await self.loader.load_async(config)
         self.update(objects)
         return self
 
@@ -630,7 +639,7 @@ class AsyncConfig(BaseConfig):
         """
         if self._loaded:
             raise ValueError("Configuration is already loaded")
-        return self._async_load_impl(**kwargs)
+        return self._load_async_impl(**kwargs)
 
     async def reload_async(self: ConfigSelf, **kwargs) -> ConfigSelf:
         """Reload the configuration file.
@@ -648,7 +657,7 @@ class AsyncConfig(BaseConfig):
         if not self._loaded:
             raise ValueError("Configuration has not been loaded, use load() instead")
         self._loaded = False
-        return self._async_load_impl(**kwargs)
+        return self._load_async_impl(**kwargs)
 
     async def _load_async_impl(self: ConfigSelf, **kwargs: Any) -> ConfigSelf:
         new_async_config = self.read_async(**kwargs)
