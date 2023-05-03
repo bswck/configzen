@@ -14,7 +14,7 @@ class Point2D(lib.Section):
     y: int
 
 
-loader = lib.DefaultLoader.strict_with_schema(spec=ConnSpec, point=Point2D)
+loader = lib.DefaultLoader.strict_with_sections(spec=ConnSpec, point=Point2D)
 defaults = {
     "spec": ConnSpec(
         host="localhost",
@@ -32,6 +32,7 @@ config = lib.Config(
     loader=loader,
 )
 config.load()
-config["point"] = Point2D(1, 1)
+config["point"].x += 1
+config["point"].y += 1
 config["spec"].host = "newhost"
 print(lib.save(config.section("point")))

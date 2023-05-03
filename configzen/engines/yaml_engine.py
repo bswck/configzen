@@ -6,8 +6,8 @@ from configzen import Engine
 class YamlEngine(Engine):
     name = "yaml"
 
-    def __init__(self, schema=None, **options) -> None:
-        super().__init__(schema, **options)
+    def __init__(self, sections=None, **options) -> None:
+        super().__init__(sections, **options)
 
     def load(self, blob, defaults=None):
         if defaults is None:

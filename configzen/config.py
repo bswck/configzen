@@ -343,34 +343,38 @@ class DefaultLoader(LoadingStrategy):
             key: self._load_item(key, value)
             for key, value in data.items()
         }
+        return data
 
     async def load_async(self, data, config=None):
         data = {
             key: await self._async_load_item(key, value)
             for key, value in data.items()
         }
+        return data
 
 
-def save(section):
+def save(section: Config | ConfigSection):
     if isinstance(section, Config):
-        return section.save()
+        config = section
+        return config.save()
     
     config = section.config
     data = dict(config.original)
-    data.update({section.key: section})
+    data.update({section.key: config[section.key]})
     blob = config.spec.engine.dump(convert_config(data))
     result = config.write(blob)
     config._original = types.MappingProxyType(data)
     return result
 
 
-async def save_async(section):
+async def save_async(section: AsyncConfig | ConfigSection):
     if isinstance(section, AsyncConfig):
-        return await section.save_async()
+        config = section
+        return await config.save_async()
 
     config = section.config
     data = dict(config.original)
-    data.update({section.key: section})
+    data.update({section.key: config[section.key]})
     blob = config.spec.engine.dump(convert_config(data))
     result = await config.write_async(blob)
     config._original = types.MappingProxyType(data)
@@ -610,7 +614,7 @@ class AsyncConfig(BaseConfig):
         self.update(objects)
         return self
 
-    async def async_load(self: ConfigSelf, **kwargs) -> ConfigSelf:
+    async def load_async(self: ConfigSelf, **kwargs) -> ConfigSelf:
         """Load the configuration file.
         If the configuration is already loaded, a ValueError is raised.
         To reload the configuration, use the ``reload`` method.
@@ -628,7 +632,7 @@ class AsyncConfig(BaseConfig):
             raise ValueError("Configuration is already loaded")
         return self._async_load_impl(**kwargs)
 
-    async def async_reload(self: ConfigSelf, **kwargs) -> ConfigSelf:
+    async def reload_async(self: ConfigSelf, **kwargs) -> ConfigSelf:
         """Reload the configuration file.
         If the configuration is not loaded, a ValueError is raised.
 
@@ -646,7 +650,7 @@ class AsyncConfig(BaseConfig):
         self._loaded = False
         return self._async_load_impl(**kwargs)
 
-    async def _async_load_impl(self: ConfigSelf, **kwargs: Any) -> ConfigSelf:
+    async def _load_async_impl(self: ConfigSelf, **kwargs: Any) -> ConfigSelf:
         new_async_config = self.read_async(**kwargs)
         if inspect.isawaitable(new_async_config):
             new_async_config = await new_async_config
