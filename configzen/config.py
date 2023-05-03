@@ -28,7 +28,6 @@ from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
 from urllib.request import urlopen
 
 from configzen.engine import Engine, convert, get_engine_class, load
-from configzen.errors import StrictConfigError
 
 if TYPE_CHECKING:
     from collections.abc import ByteString, Generator, MutableMapping
@@ -58,10 +57,16 @@ T_co = TypeVar("T_co", covariant=True)
 
 class ConfigSpec:
     """A specification for a configuration file."""
-
+    filepath_or_stream: Opened | str
+    defaults: dict[str, Any]
+    create_missing: bool
+    engine_name: str
+    _engine: Engine | None
+    _engine_options: dict[str, Any]
+    
     def __init__(
         self: ConfigSpec,
-        filepath_or_stream: Opened | str | None = None,
+        filepath_or_stream: Opened | str,
         engine_name: str | None = None,
         *,
         cache_engine: bool = True,
@@ -160,8 +165,6 @@ class ConfigSpec:
         ----------
         **kwds
             Keyword arguments to pass to the opening routine.
-            For URLs, these are passed to ``urllib.request.urlopen()``.
-            For local files, these are passed to ``builtins.open()``.
         """
         if self.is_url:
             raise NotImplementedError("asynchronous URL opening is not supported")
@@ -231,19 +234,19 @@ class LoadingStrategy:
 
     Parameters
     ----------
-    schema : dict, optional
+    sections : dict, optional
         A dictionary of configuration keys and their corresponding types.
-        If not provided, the schema must be provided as keyword arguments.
+        If not provided, the sections must be provided as keyword arguments.
     """
 
-    schema: dict[str, Any]
+    sections: dict[str, Any]
 
-    def __init__(self, schema: dict[str, Any] | None = None) -> None:
-        self.schema = schema or {}
+    def __init__(self, sections: dict[str, Any] | None = None) -> None:
+        self.sections = sections or {}
 
     @classmethod
-    def with_schema(cls, **schema: Any):
-        return cls(schema=schema)
+    def with_sections(cls, **sections: Any):
+        return cls(sections=sections)
 
     async def load_async(
         self,
@@ -304,17 +307,17 @@ class ConfigSection(NamedTuple):
 class DefaultLoader(LoadingStrategy):
     def __init__(
         self,
-        schema: dict[str, Any] | None = None,
+        sections: dict[str, Any] | None = None,
         *,
         strict: bool = False,
     ) -> None:
-        super().__init__(schema)
+        super().__init__(sections)
         self.strict = strict
         self._deferred_items: dict[str, Any] = {}
 
     @classmethod
-    def strict_with_schema(cls, **schema: Any):
-        return cls(schema=schema, strict=True)
+    def strict_with_sections(cls, **sections: Any):
+        return cls(sections=sections, strict=True)
 
     def load_deferred_items(self):
         for key, value in self._deferred_items.items():
@@ -322,12 +325,8 @@ class DefaultLoader(LoadingStrategy):
 
     def _load_item(self, key, value):
         try:
-            factory = self.schema[key]
+            factory = self.sections[key]
         except KeyError:
-            if self.strict:
-                raise StrictConfigError(
-                    f"section {key!r} is used but undefined in schema",
-                ) from None
             self._deferred_items.update({key: value})
             return value
         self._deferred_items.pop(key, None)
@@ -340,65 +339,42 @@ class DefaultLoader(LoadingStrategy):
         return data
 
     def load(self, data, config=None):
-        return {
+        data = {
             key: self._load_item(key, value)
             for key, value in data.items()
         }
 
     async def load_async(self, data, config=None):
-        return {
+        data = {
             key: await self._async_load_item(key, value)
             for key, value in data.items()
         }
 
 
-def get_config_meta(item):
-    meta = None
-    if isinstance(item, ConfigSection):
-        meta = item
-    if hasattr(item, "__config_meta__"):
-        meta = item.__config_meta__
-    return meta
+def save(section):
+    if isinstance(section, Config):
+        return section.save()
+    
+    config = section.config
+    data = dict(config.original)
+    data.update({section.key: section})
+    blob = config.spec.engine.dump(convert_config(data))
+    result = config.write(blob)
+    config._original = types.MappingProxyType(data)
+    return result
 
 
-def save(item):
-    if isinstance(item, Config):
-        return item.save()
+async def save_async(section):
+    if isinstance(section, AsyncConfig):
+        return await section.save_async()
 
-    config_meta = get_config_meta(item)
-    if isinstance(item, ConfigSection):
-        item = item.config[item.key]
-
-    if config_meta is not None:
-        config = config_meta.config
-        data = dict(config.original)
-        data.update({config_meta.key: item})
-        blob = config.spec.engine.dump(convert_config(data))
-        result = config.write(blob)
-        config._original = types.MappingProxyType(data)
-        return result
-
-    raise StrictConfigError(f"cannot save {item!r} without config metadata")
-
-
-async def save_async(item):
-    if isinstance(item, AsyncConfig):
-        return await item.save_async()
-
-    config_meta = get_config_meta(item)
-    if isinstance(item, ConfigSection):
-        item = item.config[item.key]
-
-    if config_meta is not None:
-        config = config_meta.config
-        data = dict(config.original)
-        data.update({config_meta.key: item})
-        blob = config.spec.engine.dump(convert_config(data))
-        result = await config.write_async(blob)
-        config._original = types.MappingProxyType(data)
-        return result
-
-    raise StrictConfigError(f"cannot save {item!r} without config metadata")
+    config = section.config
+    data = dict(config.original)
+    data.update({section.key: section})
+    blob = config.spec.engine.dump(convert_config(data))
+    result = await config.write_async(blob)
+    config._original = types.MappingProxyType(data)
+    return result
 
 
 class BaseConfig(UserDict[str, Any]):
@@ -410,17 +386,17 @@ class BaseConfig(UserDict[str, Any]):
         A ConfigSpec instance or a string representing a ConfigSpec.
     loader : DispatchStrategy, optional
         A strategy for loading the configuration to a set of objects.
-        If not provided, the schema must be provided as keyword arguments.
+        If not provided, the sections must be provided as keyword arguments.
     create_missing : bool, optional
         Whether to create missing configuration files. Defaults to False.
     defaults : dict, optional
         Default values for the configuration. Defaults to None.
-    schema : dict, optional
-        A schema for the configuration. Defaults to None.
+    sections : dict, optional
+        A sections for the configuration. Defaults to None.
         
     Notes
     -----
-    Either ``loader`` or ``schema`` must be provided.
+    Either ``loader`` or ``sections`` must be provided.
     If both are provided, a ValueError is raised.
     """
 
@@ -436,20 +412,20 @@ class BaseConfig(UserDict[str, Any]):
         loader: LoadingStrategy | None = None,
         create_missing: bool | None = None,
         defaults: dict[str, Any] | None = None,
-        schema: dict[str, Any] | None = None,
+        sections: dict[str, Any] | None = None,
     ) -> None:
         super().__init__()
 
         if loader:
-            if schema is not None:
-                raise ValueError("Cannot provide both loader and schema")
+            if sections is not None:
+                raise ValueError("Cannot provide both loader and sections")
 
             self.loader = loader
         else:
-            self.loader = DefaultLoader(schema)
+            self.loader = DefaultLoader(sections)
 
         if not isinstance(spec, ConfigSpec):
-            spec = ConfigSpec(spec, schema=self.schema, engine_name=engine_name)
+            spec = ConfigSpec(spec, sections=self.sections, engine_name=engine_name)
 
         if create_missing is not None:
             spec.create_missing = create_missing
@@ -467,14 +443,14 @@ class BaseConfig(UserDict[str, Any]):
         """Update the configuration with the given keyword arguments."""
 
     @property
-    def schema(self) -> dict[str, Any]:
-        """The configuration schema."""
-        return self.loader.schema
+    def sections(self) -> dict[str, Any]:
+        """The configuration sections."""
+        return self.loader.sections
 
-    @schema.setter
-    def schema(self, value):
-        """Set the configuration schema."""
-        self.loader.schema = value
+    @sections.setter
+    def sections(self, value):
+        """Set the configuration sections."""
+        self.loader.sections = value
 
     @property
     def original(self) -> types.MappingProxyType:

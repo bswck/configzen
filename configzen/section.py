@@ -1,7 +1,12 @@
 import dataclasses
-import typing
+try:
+    from typing import dataclass_transform
+except ImportError:
+    def dataclass_transform():  # type: ignore[misc]
+        return lambda cls: cls
 
-from collections.abc import Mapping
+
+from collections.abc import Mapping, Iterable
 
 from configzen.engine import convert, loaders
 
@@ -17,12 +22,12 @@ def dataclass_load(cls, value):
         return value
     if isinstance(value, Mapping):
         return cls(**value)
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Iterable):
         return cls(*value)
     return cls(value)
 
 
-@typing.dataclass_transform()
+@dataclass_transform()
 class Section:
     def __init_subclass__(cls, converter=dataclass_convert, loader=dataclass_load):
         super().__init_subclass__()

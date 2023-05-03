@@ -11,8 +11,8 @@ class Engine:
     name: ClassVar[str]
     registry: dict[str, type[Engine]] = {}
 
-    def __init__(self, schema, **kwargs) -> None:
-        self.schema = schema
+    def __init__(self, sections, **kwargs) -> None:
+        self.sections = sections
         self.engine_options = kwargs
 
     def load(
