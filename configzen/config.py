@@ -294,7 +294,7 @@ class LoadingStrategy:
         raise NotImplementedError
 
 
-class ConfigMeta(NamedTuple):
+class ConfigSection(NamedTuple):
     """Metadata for a configuration item."""
 
     config: BaseConfig
@@ -354,7 +354,7 @@ class DefaultLoader(LoadingStrategy):
 
 def get_config_meta(item):
     meta = None
-    if isinstance(item, ConfigMeta):
+    if isinstance(item, ConfigSection):
         meta = item
     if hasattr(item, "__config_meta__"):
         meta = item.__config_meta__
@@ -366,7 +366,7 @@ def save(item):
         return item.save()
 
     config_meta = get_config_meta(item)
-    if isinstance(item, ConfigMeta):
+    if isinstance(item, ConfigSection):
         item = item.config[item.key]
 
     if config_meta is not None:
@@ -386,7 +386,7 @@ async def save_async(item):
         return await item.save_async()
 
     config_meta = get_config_meta(item)
-    if isinstance(item, ConfigMeta):
+    if isinstance(item, ConfigSection):
         item = item.config[item.key]
 
     if config_meta is not None:
@@ -481,8 +481,8 @@ class BaseConfig(UserDict[str, Any]):
         """The original configuration dictionary."""
         return self._original
 
-    def meta(self: ConfigSelf, key: str) -> ConfigMeta:
-        """Return the configuration item metadata.
+    def section(self: ConfigSelf, key: str) -> ConfigSection:
+        """Return the configuration section metadata.
 
         Parameters
         ----------
@@ -494,7 +494,7 @@ class BaseConfig(UserDict[str, Any]):
         dict
             The item metadata.
         """
-        return ConfigMeta(self, key)
+        return ConfigSection(self, key)
 
     def rollback(self: ConfigSelf) -> None:
         """Rollback the configuration to its original state."""

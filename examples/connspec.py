@@ -34,4 +34,4 @@ config = lib.Config(
 config.load()
 config["point"] = Point2D(1, 1)
 config["spec"].host = "newhost"
-print(lib.save(config.meta("point")))
+print(lib.save(config.section("point")))
