@@ -1,28 +1,45 @@
+"""Configuration objects and utilities.
+
+This module provides the :class:`ConfigSpec` class, which is used to
+specify a configuration file and its options, and the :class:`BaseConfig`
+class, which is used to load, save, and manipulate configuration files.
+
+.. note::
+
+    The :class:`BaseConfig` class is not meant to be used directly.
+    Instead, use the :class:`Config` or :class:`AsyncConfig` classes.
+
+    The :class:`Config` class is a synchronous configuration class, and
+    the :class:`AsyncConfig` class is an asynchronous configuration class.
+"""
+
 from __future__ import annotations
-import asyncio
-import collections.abc
+
+import abc
+import contextlib
 import copy
 import inspect
-import os.path
-import threading
+import pathlib
 import types
-import typing
 from collections import UserDict
-from collections.abc import ByteString, Coroutine, MutableMapping
-from io import StringIO
-from typing import Any, Protocol, TypeVar, runtime_checkable, Union
-from urllib.parse import uses_relative, uses_netloc, uses_params, urlparse
+from contextlib import AbstractContextManager
+from io import BytesIO, StringIO
+from typing import TYPE_CHECKING, Any, NamedTuple, TextIO, TypeVar, cast
+from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
 from urllib.request import urlopen
 
-from configzen.engine import convert, load, get_engine_class, Engine
+from configzen.engine import Engine, convert, get_engine_class, load
 from configzen.errors import StrictConfigError
+
+if TYPE_CHECKING:
+    from collections.abc import ByteString, Generator, MutableMapping
 
 try:
     import aiofiles
 
     AIOFILES_AVAILABLE = True
 except ImportError:
-    aiofiles = None  # type: ignore
+    aiofiles = None  # type: ignore[assignment]
     AIOFILES_AVAILABLE = False
 
 try:
@@ -30,67 +47,56 @@ try:
 
     AIOHTTP_AVAILABLE = True
 except ImportError:
-    aiohttp = None  # type: ignore
+    aiohttp = None  # type: ignore[assignment]
     AIOHTTP_AVAILABLE = False
 
+_URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {""}
 
-_URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {''}
-
-
-T = TypeVar('T')
-DispatchReturnType = Union[MutableMapping[str, Any], Coroutine[MutableMapping[str, Any]]]
-
-
-@runtime_checkable
-class Readable(Protocol[T]):
-    """A protocol for objects that can be read."""
-
-    def read(self) -> T | Coroutine[T]:
-        ...
+ConfigSelf = TypeVar("ConfigSelf", bound="BaseConfig")  # Y001
+Opened = AbstractContextManager[StringIO | BytesIO | TextIO]
+T_co = TypeVar("T_co", covariant=True)
 
 
 class ConfigSpec:
-    """
-    A specification for a configuration file.
-
-    Parameters
-    ----------
-    filepath_or_buffer : str or file-like object, optional
-        The path to the configuration file, or a file-like object.
-        If not provided, an empty configuration will be created.
-    engine_name : str, optional
-        The name of the engine to use for loading and saving the configuration.
-        Defaults to 'yaml'.
-    cache_engine : bool, optional
-        Whether to cache the engine instance. Defaults to True.
-        If False, a new engine instance will be created for each load and dump.
-    defaults : dict, optional
-        A dictionary of default values to use when loading the configuration.
-    autocreate : bool, optional
-        Whether to automatically create missing keys when loading the configuration.
-    **engine_options
-        Additional keyword arguments to pass to the engine.
-    """
+    """A specification for a configuration file."""
 
     def __init__(
-        self,
-        filepath_or_buffer: Readable | str = None,
+        self: ConfigSpec,
+        filepath_or_stream: Opened | str | None = None,
         engine_name: str | None = None,
+        *,
         cache_engine: bool = True,
         defaults: dict[str, Any] | None = None,
-        autocreate: bool = False,
+        create_missing: bool = False,
         **engine_options: Any,
-    ):
-        self.filepath_or_buffer = filepath_or_buffer
+    ) -> None:
+        """Parameters
+        ----------
+        filepath_or_stream : str or file-like object, optional
+            The path to the configuration file, or a file-like object.
+            If not provided, an empty configuration will be created.
+        engine_name : str, optional
+            The name of the engine to use for loading and saving the configuration.
+            Defaults to 'yaml'.
+        cache_engine : bool, optional
+            Whether to cache the engine instance. Defaults to True.
+            If False, a new engine instance will be created for each load and dump.
+        defaults : dict, optional
+            A dictionary of default values to use when loading the configuration.
+        create_missing : bool, optional
+            Whether to automatically create missing keys when loading the configuration.
+        **engine_options
+            Additional keyword arguments to pass to the engine.
+        """
+        self.filepath_or_stream = filepath_or_stream
         self.defaults = defaults or {}
 
-        if engine_name is None:
-            if isinstance(filepath_or_buffer, str):
-                # Infer engine name from file extension
-                engine_name = os.path.splitext(filepath_or_buffer)[1][1:]
+        if engine_name is None and isinstance(filepath_or_stream, str):
+            # Infer engine name from file extension
+            engine_name = pathlib.Path(filepath_or_stream).suffix[1:]
 
         if engine_name is None:
-            raise ValueError('engine_name must be provided')
+            raise ValueError("engine_name must be provided")
 
         self.engine_name = engine_name
         self._engine = None
@@ -99,7 +105,7 @@ class ConfigSpec:
             self._engine = get_engine_class(self.engine_name)(**engine_options)
         self.cache_engine = cache_engine
 
-        self.autocreate = autocreate
+        self.create_missing = create_missing
 
     def _get_engine(self) -> Engine:
         """Get the engine instance to use for loading and saving the configuration."""
@@ -118,107 +124,111 @@ class ConfigSpec:
 
     @property
     def is_url(self) -> bool:
-        """Whether the filepath_or_buffer is a URL."""
+        """Whether the filepath_or_stream is a URL."""
         return (
-            isinstance(self.filepath_or_buffer, str)
-            and urlparse(self.filepath_or_buffer).scheme in _URL_SCHEMES
+            isinstance(self.filepath_or_stream, str)
+            and urlparse(self.filepath_or_stream).scheme in _URL_SCHEMES
         )
 
     @classmethod
-    def from_str(cls, spec: str) -> 'ConfigSpec':
+    def from_str(cls, spec: str) -> ConfigSpec:
         """Create a ConfigSpec from a string."""
         return cls(spec)
 
-    def open(
-        self, asynchronous: bool = False, **kwds: Any
-    ) -> Readable[str | ByteString] | Coroutine[Readable[str | ByteString]]:
-        """
-        Open the configuration file.
+    def open(self, **kwds) -> Opened:
+        """Open the configuration file.
 
         Parameters
         ----------
-        asynchronous : bool, optional
-            Whether to open the file asynchronously. Defaults to False.
-
         **kwds
             Keyword arguments to pass to the opening routine.
             For URLs, these are passed to ``urllib.request.urlopen()``.
             For local files, these are passed to ``builtins.open()``.
         """
-        if asynchronous:
-            return self._async_open(**kwds)
-        return self._open(**kwds)
-
-    def _async_open(self, **kwds) -> Readable[str | ByteString]:
-        if self.is_url:
-            raise NotImplementedError('asynchronous URL opening is not supported')
-        if not AIOFILES_AVAILABLE:
-            raise RuntimeError(
-                'aiofiles is not available, '
-                'cannot open file asynchronously (install with "pip install aiofiles")'
-            )
-        return aiofiles.open(self.filepath_or_buffer, **kwds)  # type: ignore
-
-    def _open(self, **kwds) -> Readable[str | ByteString]:
-        if self.filepath_or_buffer is None:
+        if self.filepath_or_stream is None:
             return StringIO()
         if self.is_url:
-            return urlopen(self.filepath_or_buffer, **kwds)
-        return open(self.filepath_or_buffer, **kwds)
+            url = cast(str, self.filepath_or_stream)
+            return urlopen(url, **kwds)
+        if isinstance(self.filepath_or_stream, str):
+            return open(self.filepath_or_stream, **kwds)
+        return self.filepath_or_stream
 
-    def read(self, asynchronous: bool = False, **kwds) -> DispatchReturnType:
-        """
-        Read the configuration file.
+    def open_async(self, **kwds) -> Any:
+        """Open the configuration file asynchronously.
 
         Parameters
         ----------
-        asynchronous : bool, optional
-            Whether to read the file asynchronously. Defaults to False.
+        **kwds
+            Keyword arguments to pass to the opening routine.
+            For URLs, these are passed to ``urllib.request.urlopen()``.
+            For local files, these are passed to ``builtins.open()``.
+        """
+        if self.is_url:
+            raise NotImplementedError("asynchronous URL opening is not supported")
+        if not AIOFILES_AVAILABLE:
+            raise RuntimeError(
+                'aiofiles is not available, '
+                'cannot open file asynchronously (install with "pip install aiofiles")',
+            )
+        return aiofiles.open(self.filepath_or_stream, **kwds)  # type: ignore
+
+    def read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+        """Read the configuration file.
+
+        Parameters
+        ----------
+        create_kwds : dict, optional
+            Keyword arguments to pass to the open method
+            when optionally creating the file.
         **kwds
             Keyword arguments to pass to the open method.
         """
-
-        if asynchronous:
-            return self._async_read(**kwds)
-        return self._read(**kwds)
-
-    def _read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
         try:
-            with self.open(asynchronous=False, **kwds) as fp:
+            with self.open(**kwds) as fp:
                 blob = fp.read()
         except FileNotFoundError:
             blob = None
-            if self.autocreate:
+            if self.create_missing:
                 blob = self.engine.dump(convert_config(self.defaults))
                 if create_kwds is None:
                     create_kwds = {}
-                self._write(blob, **create_kwds)
+                self.write(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
 
-    def _write(self, blob, **kwds) -> int:
-        with self.open(asynchronous=False, **kwds) as fp:
+    def write(self, blob, **kwds) -> int:
+        with self.open(**kwds) as fp:
             return fp.write(blob)
 
-    async def _async_read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+    async def read_async(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+        """Read the configuration file asynchronously.
+
+        Parameters
+        ----------
+        create_kwds : dict, optional
+            Keyword arguments to pass to the open method
+            when optionally creating the file.
+        **kwds
+            Keyword arguments to pass to the open method.
+        """
         try:
-            async with self.open(asynchronous=True, **kwds) as fp:
+            async with self.open_async(**kwds) as fp:
                 blob = await fp.read()
         except FileNotFoundError:
-            if self.autocreate:
+            if self.create_missing:
                 blob = self.engine.dump(convert_config(self.defaults))
                 if create_kwds is None:
                     create_kwds = {}
-                await self._async_write(blob, **create_kwds)
+                await self.write_async(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
 
-    async def _async_write(self, blob, **kwds) -> int:
-        async with self.open(asynchronous=True, **kwds) as fp:
+    async def write_async(self, blob, **kwds) -> int:
+        async with self.open_async(**kwds) as fp:
             return await fp.write(blob)
 
 
-class DispatchStrategy:
-    """
-    A strategy for dispatching a configuration to a dictionary of objects.
+class LoadingStrategy:
+    """A strategy for loading a configuration to a dictionary of objects.
 
     Parameters
     ----------
@@ -227,36 +237,30 @@ class DispatchStrategy:
         If not provided, the schema must be provided as keyword arguments.
     """
 
-    def __init__(self, schema: dict[str, Any] | None = None):
+    schema: dict[str, Any]
+
+    def __init__(self, schema: dict[str, Any] | None = None) -> None:
         self.schema = schema or {}
-        self.asynchronous = False
 
     @classmethod
     def with_schema(cls, **schema: Any):
         return cls(schema=schema)
 
-    async def _async_dispatch(
+    async def load_async(
         self,
         data: dict[str, Any],
-        config: 'Config | None' = None
-    ) -> Coroutine[dict[str, Any]]:
-        raise NotImplementedError
-
-    def _dispatch(self, data: dict[str, Any], config: 'Config | None' = None) -> dict[str, Any]:
-        raise NotImplementedError
-
-    def dispatch(self, data: dict[str, Any], config: 'Config | None' = None) -> DispatchReturnType:
-        """
-        Dispatch the configuration to a dictionary of objects.
+        config: BaseConfig | None = None,
+    ) -> MutableMapping[str, Any]:
+        """Dispatch the configuration to a dictionary of objects.
 
         Parameters
         ----------
         data : dict
             The configuration data.
 
-        config : Config, optional
+        config : BaseConfig, optional
             The configuration object. If provided, the configuration metadata
-            will be bound to the dispatched objects.
+            will be bound to the loaded objects.
 
         Returns
         -------
@@ -264,27 +268,54 @@ class DispatchStrategy:
             The ready-to-use configuration dictionary.
 
         """
-        if self.asynchronous:
-            return self._async_dispatch(data, config)
-        return self._dispatch(data, config)
+        raise NotImplementedError
+
+    def load(
+        self,
+        data: dict[str, Any],
+        config: BaseConfig | None = None,
+    ) -> MutableMapping[str, Any]:
+        """Dispatch the configuration to a dictionary of objects.
+
+        Parameters
+        ----------
+        data : dict
+            The configuration data.
+
+        config : BaseConfig, optional
+            The configuration object. If provided, the configuration metadata
+            will be bound to the loaded objects.
+
+        Returns
+        -------
+        dict
+            The ready-to-use configuration dictionary.
+
+        """
+        raise NotImplementedError
 
 
-class ConfigMeta(typing.NamedTuple):
+class ConfigMeta(NamedTuple):
     """Metadata for a configuration item."""
 
-    config: Config
+    config: BaseConfig
     key: str
 
 
-class DefaultDispatcher(DispatchStrategy):
+class DefaultLoader(LoadingStrategy):
     def __init__(
         self,
         schema: dict[str, Any] | None = None,
-        strict: bool = False
-    ):
+        *,
+        strict: bool = False,
+    ) -> None:
         super().__init__(schema)
         self.strict = strict
-        self._deferred_items = {}
+        self._deferred_items: dict[str, Any] = {}
+
+    @classmethod
+    def strict_with_schema(cls, **schema: Any):
+        return cls(schema=schema, strict=True)
 
     def load_deferred_items(self):
         for key, value in self._deferred_items.items():
@@ -296,7 +327,7 @@ class DefaultDispatcher(DispatchStrategy):
         except KeyError:
             if self.strict:
                 raise StrictConfigError(
-                    f'section {key!r} is used but undefined in schema'
+                    f"section {key!r} is used but undefined in schema",
                 ) from None
             self._deferred_items.update({key: value})
             return value
@@ -311,26 +342,25 @@ class DefaultDispatcher(DispatchStrategy):
 
     @staticmethod
     def bind_config_meta(item, config_meta: ConfigMeta):
-        try:
+        with contextlib.suppress(AttributeError):
             item.__config_meta__ = config_meta
-        except AttributeError:
-            pass
+
         return item
 
-    def _dispatch(self, data, config=None):
+    def load(self, data, config=None):
         return {
             key: self.bind_config_meta(
                 item=self._load_item(key, value),
-                config_meta=ConfigMeta(config, key) if config is not None else None
+                config_meta=ConfigMeta(config, key) if config is not None else None,
             )
             for key, value in data.items()
         }
 
-    async def _async_dispatch(self, data, config=None):
+    async def load_async(self, data, config=None):
         return {
             key: self.bind_config_meta(
                 item=await self._async_load_item(key, value),
-                config_meta=ConfigMeta(config, key) if config is not None else None
+                config_meta=ConfigMeta(config, key) if config is not None else None,
             )
             for key, value in data.items()
         }
@@ -340,7 +370,7 @@ def get_config_meta(item):
     meta = None
     if isinstance(item, ConfigMeta):
         meta = item
-    if hasattr(item, '__config_meta__'):
+    if hasattr(item, "__config_meta__"):
         meta = item.__config_meta__
     return meta
 
@@ -358,231 +388,115 @@ def save(item):
         data = dict(config.original)
         data.update({config_meta.key: item})
         blob = config.spec.engine.dump(convert_config(data))
-
-        if config.asynchronous:
-            async def async_save():
-                async_result = await config.write(blob)  # type: ignore
-                config._original = types.MappingProxyType(data)
-                return async_result
-            return async_save()
-
         result = config.write(blob)
         config._original = types.MappingProxyType(data)
         return result
 
-    raise StrictConfigError(f'cannot save {item!r} without config metadata')
+    raise StrictConfigError(f"cannot save {item!r} without config metadata")
 
 
-class Config(UserDict[str, Any]):
-    """
-    A configuration dictionary.
+async def save_async(item):
+    if isinstance(item, Config):
+        return await item.save_async()
+
+    config_meta = get_config_meta(item)
+    if isinstance(item, ConfigMeta):
+        item = item.config[item.key]
+
+    if config_meta is not None:
+        config = config_meta.config
+        data = dict(config.original)
+        data.update({config_meta.key: item})
+        blob = config.spec.engine.dump(convert_config(data))
+        result = await config.write_async(blob)  # type: ignore
+        config._original = types.MappingProxyType(data)
+        return result
+
+    raise StrictConfigError(f"cannot save {item!r} without config metadata")
+
+
+class BaseConfig(UserDict[str, Any]):
+    """A configuration dictionary.
 
     Parameters
     ----------
     spec : ConfigSpec | str
         A ConfigSpec instance or a string representing a ConfigSpec.
-    dispatcher : DispatchStrategy, optional
-        A strategy for dispatching the configuration to a set of objects.
+    loader : DispatchStrategy, optional
+        A strategy for loading the configuration to a set of objects.
         If not provided, the schema must be provided as keyword arguments.
-    lazy : bool, optional
-        Whether to load the configuration lazily.
-        If False, the configuration is loaded immediately.
-    asynchronous : bool, optional
-        Whether to load the configuration asynchronously.
-        If None, the value is inherited from the dispatcher.
-    **schema
-        Keyword arguments corresponding to the schema.
-
+    create_missing : bool, optional
+        Whether to create missing configuration files. Defaults to False.
+    defaults : dict, optional
+        Default values for the configuration. Defaults to None.
+    schema : dict, optional
+        A schema for the configuration. Defaults to None.
+        
     Notes
     -----
-    Either ``dispatcher`` or ``**schema`` must be provided.
+    Either ``loader`` or ``schema`` must be provided.
     If both are provided, a ValueError is raised.
     """
 
-    dispatcher: DispatchStrategy
-    schema: dict[str, Any]
+    loader: LoadingStrategy
     spec: ConfigSpec
     lazy: bool
+    _original: types.MappingProxyType[str, Any]
 
     def __init__(
-        self,
+        self: ConfigSelf,
         spec: ConfigSpec | str,
         engine_name: str | None = None,
-        dispatcher: DispatchStrategy | None = None,
-        lazy: bool | None = None,
-        asynchronous: bool | None = None,
-        autocreate: bool | None = None,
+        loader: LoadingStrategy | None = None,
+        create_missing: bool | None = None,
         defaults: dict[str, Any] | None = None,
         schema: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         super().__init__()
 
-        if dispatcher:
+        if loader:
             if schema is not None:
-                raise ValueError('Cannot provide both dispatcher and schema')
+                raise ValueError("Cannot provide both loader and schema")
 
-            self.dispatcher = dispatcher
+            self.loader = loader
         else:
-            self.dispatcher = DefaultDispatcher(schema)
+            self.loader = DefaultLoader(schema)
 
         if not isinstance(spec, ConfigSpec):
             spec = ConfigSpec(spec, schema=self.schema, engine_name=engine_name)
 
-        if autocreate is not None:
-            spec.autocreate = autocreate
+        if create_missing is not None:
+            spec.create_missing = create_missing
 
         if defaults is not None:
             spec.defaults.update(defaults)
 
         self.spec = spec
 
-        self.asynchronous = asynchronous
-        if lazy is None:
-            lazy = self.asynchronous
-
-        if asynchronous and not lazy:
-            raise ValueError('Cannot be asynchronous and not lazy')
-
-        self.lazy = lazy
         self._original = types.MappingProxyType({})
+        self._loaded = False
 
-        if not asynchronous and not lazy:
-            self.load()
-
-    def __await__(self):
-        if not self.asynchronous:
-            raise TypeError('Config is not asynchronous')
-        return self.load().__await__()
-
-    def __call__(self, **config):
-        objects = self.dispatcher.dispatch(config, self)  # type: DispatchReturnType
-
-        if self.asynchronous:
-
-            async def async_update():
-                nonlocal objects
-                if inspect.isawaitable(objects):
-                    objects = await objects
-                self.update(objects)
-                return self
-
-            return async_update()
-
-        self.update(objects)
-        return self
-
-    @property
-    def asynchronous(self) -> bool:
-        """Whether the configuration is asynchronous."""
-        return self.dispatcher.asynchronous
-
-    @asynchronous.setter
-    def asynchronous(self, value: bool):
-        if value is not None:
-            self.dispatcher.asynchronous = value
-        if self.asynchronous:
-            self._loaded = asyncio.Event()
-        else:
-            self._loaded = threading.Event()
+    @abc.abstractmethod
+    def __call__(self: ConfigSelf, **config: Any) -> Any:
+        """Update the configuration with the given keyword arguments."""
 
     @property
     def schema(self) -> dict[str, Any]:
         """The configuration schema."""
-        return self.dispatcher.schema
+        return self.loader.schema
 
     @schema.setter
     def schema(self, value):
-        """The configuration schema."""
-        self.dispatcher.schema = value
-        self.reload()
+        """Set the configuration schema."""
+        self.loader.schema = value
 
     @property
     def original(self) -> types.MappingProxyType:
         """The original configuration dictionary."""
         return self._original
 
-    def wait_until_loaded(self):
-        """Wait until the configuration is loaded."""
-        self._loaded.wait()
-
-    def load(self, **kwargs) -> 'Config | Coroutine[Config]':
-        """
-        Load the configuration file.
-        If the configuration is already loaded, a ValueError is raised.
-        To reload the configuration, use the ``reload`` method.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments to pass to the read method.
-
-        Returns
-        -------
-        self
-        """
-        if self._loaded.is_set():
-            raise ValueError('Configuration is already loaded')
-        return self._load(**kwargs)
-
-    def reload(self, **kwargs) -> 'Config | Coroutine[Config]':
-        """
-        Reload the configuration file.
-        If the configuration is not loaded, a ValueError is raised.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments to pass to the read method.
-
-        Returns
-        -------
-        self
-        """
-        if not self._loaded.is_set():
-            raise ValueError('Configuration has not been loaded, use load() instead')
-        self._loaded.clear()
-        return self._load(**kwargs)
-
-    def _load(self, **kwargs):
-        if self.asynchronous:
-
-            async def async_read():
-                new_async_config = self._async_read(**kwargs)
-                if inspect.isawaitable(new_async_config):
-                    new_async_config = await new_async_config
-                self._original = types.MappingProxyType(new_async_config)
-                async_config = await self(**copy.deepcopy(new_async_config))
-                self._loaded.set()
-                return async_config
-
-            return async_read()
-
-        new_config = self._read(**kwargs)
-        self._original = types.MappingProxyType(new_config)
-        config = self(**copy.deepcopy(new_config))
-        self._loaded.set()
-        return config
-
-    async def _async_read(self, **kwargs: Any):
-        kwargs.setdefault('mode', 'r')
-        kwargs.setdefault('create_kwds', {'mode': 'w'})
-        return await self.spec.read(asynchronous=True, **kwargs)
-
-    def _read(self, **kwargs: Any):
-        kwargs.setdefault('mode', 'r')
-        kwargs.setdefault('create_kwds', {'mode': 'w'})
-        return self.spec.read(asynchronous=False, **kwargs)
-
-    def rollback(self):
-        """Rollback the configuration to its original state."""
-        self._loaded.clear()
-        self.clear()
-        self.update(self._original)
-        self._loaded.set()
-
-    def meta(self, key: str) -> ConfigMeta:
-        """
-        Return the configuration item metadata.
+    def meta(self: ConfigSelf, key: str) -> ConfigMeta:
+        """Return the configuration item metadata.
 
         Parameters
         ----------
@@ -596,9 +510,90 @@ class Config(UserDict[str, Any]):
         """
         return ConfigMeta(self, key)
 
-    def save(self, **kwargs: Any) -> int | Coroutine[int]:
+    def rollback(self: ConfigSelf) -> None:
+        """Rollback the configuration to its original state."""
+        self._loaded = False
+        self.clear()
+        self.update(self._original)
+        self._loaded = True
+
+    def __getattr__(self, item: str) -> Any:
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {item}",
+            ) from None
+
+
+class Config(BaseConfig):
+
+    def __call__(self: ConfigSelf, **config: Any) -> ConfigSelf:
+        """Update the configuration with the given configuration.
+
+        Parameters
+        ----------
+        **config : Any
+            The configuration to update with.
+
+        Returns
+        -------
+        self
         """
-        Save the configuration to the configuration file.
+        objects = self.loader.load(config, self)
+        self.update(objects)
+        return self
+
+    def load(self: ConfigSelf, **kwargs) -> ConfigSelf:
+        """Load the configuration file.
+        If the configuration is already loaded, a ValueError is raised.
+        To reload the configuration, use the ``reload`` method.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the read method.
+
+        Returns
+        -------
+        self
+        """
+        if self._loaded:
+            raise ValueError("Configuration is already loaded")
+        return self._load_impl(**kwargs)
+
+    def reload(self: ConfigSelf, **kwargs) -> ConfigSelf:
+        """Reload the configuration file.
+        If the configuration is not loaded, a ValueError is raised.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the read method.
+
+        Returns
+        -------
+        self
+        """
+        if not self._loaded:
+            raise ValueError("Configuration has not been loaded, use load() instead")
+        self._loaded = False
+        return self._load_impl(**kwargs)
+
+    def _load_impl(self: ConfigSelf, **kwargs: Any) -> ConfigSelf:
+        new_config = self.read(**kwargs)
+        self._original = types.MappingProxyType(new_config)
+        config = self(**copy.deepcopy(new_config))
+        self._loaded = True
+        return config
+
+    def read(self: ConfigSelf, **kwargs: Any) -> MutableMapping[str, Any]:
+        kwargs.setdefault("mode", "r")
+        kwargs.setdefault("create_kwds", {"mode": "w"})
+        return self.spec.read(**kwargs)
+
+    def save(self: ConfigSelf, **kwargs: Any) -> int:
+        """Save the configuration to the configuration file.
 
         Parameters
         ----------
@@ -608,21 +603,12 @@ class Config(UserDict[str, Any]):
         """
         blob = self.spec.engine.dump(self)
         result = self.write(blob, **kwargs)
-        if self.asynchronous:
-            async def async_save():
-                async_result = result
-                if inspect.isawaitable(result):
-                    async_result = await result  # type: ignore
-                self._original = types.MappingProxyType(self.data)
-                return async_result
-
-            return async_save()
         self._original = types.MappingProxyType(self.data)
         return result
 
-    def write(self, blob: str | ByteString, **kwargs) -> int | Coroutine[int]:
-        """
-        Overwrite the configuration file with the given blob (config dump as string or bytes).
+    def write(self: ConfigSelf, blob: str | ByteString, **kwargs) -> int:
+        """Overwrite the configuration file with the given blob
+        (config dump as string or bytes).
 
         Parameters
         ----------
@@ -637,29 +623,118 @@ class Config(UserDict[str, Any]):
             The number of bytes written.
         """
         if self.spec.is_url:
-            raise NotImplementedError(
-                'Saving to URLs is not yet supported'
-            )  # todo(bswck)
-        kwargs.setdefault('mode', 'w')
-        if self.asynchronous:
-            return self._async_write(blob, **kwargs)
-        return self._write(blob, **kwargs)
+            raise NotImplementedError("Saving to URLs is not yet supported")
+        kwargs.setdefault("mode", "w")
+        return self.spec.write(blob, **kwargs)
 
-    async def _async_write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        return await self.spec._async_write(blob, **kwargs)
 
-    def _write(self, blob: str | ByteString, **kwargs: Any) -> int:
-        return self.spec._write(blob, **kwargs)
+class AsyncConfig(BaseConfig):
 
-    def __getattr__(self, item: str) -> Any:
-        try:
-            return self[item]
-        except KeyError:
-            raise AttributeError(
-                f'{type(self).__name__!r} object has no attribute {item}'
-            ) from None
+    def __await__(self: ConfigSelf) -> Generator[Any, None, ConfigSelf]:
+        return self.load_async().__await__()
+
+    async def __call__(self: ConfigSelf, **config) -> ConfigSelf:
+        """Update the configuration with the given configuration, asynchronously.
+
+        Parameters
+        ----------
+        config
+
+        Returns
+        -------
+
+        """
+        objects = await self.loader.load_async(config, self)
+        self.update(objects)
+        return self
+
+    async def async_load(self: ConfigSelf, **kwargs) -> ConfigSelf:
+        """Load the configuration file.
+        If the configuration is already loaded, a ValueError is raised.
+        To reload the configuration, use the ``reload`` method.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the read method.
+
+        Returns
+        -------
+        self
+        """
+        if self._loaded:
+            raise ValueError("Configuration is already loaded")
+        return self._async_load_impl(**kwargs)
+
+    async def async_reload(self: ConfigSelf, **kwargs) -> ConfigSelf:
+        """Reload the configuration file.
+        If the configuration is not loaded, a ValueError is raised.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the read method.
+
+        Returns
+        -------
+        self
+        """
+        if not self._loaded:
+            raise ValueError("Configuration has not been loaded, use load() instead")
+        self._loaded = False
+        return self._async_load_impl(**kwargs)
+
+    async def _async_load_impl(self: ConfigSelf, **kwargs: Any) -> ConfigSelf:
+        new_async_config = self.read_async(**kwargs)
+        if inspect.isawaitable(new_async_config):
+            new_async_config = await new_async_config
+        self._original = types.MappingProxyType(new_async_config)
+        async_config = await self(**copy.deepcopy(new_async_config))
+        self._loaded = True
+        return async_config
+
+    async def read_async(self: ConfigSelf, **kwargs: Any) -> MutableMapping[str, Any]:
+        kwargs.setdefault("mode", "r")
+        kwargs.setdefault("create_kwds", {"mode": "w"})
+        return await self.spec.read_async(**kwargs)
+
+    async def save_async(self, **kwargs) -> int:
+        """Save the configuration to the configuration file asynchronously.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the write method.
+
+        """
+        blob = self.spec.engine.dump(self)
+        result = await self.write_async(blob, **kwargs)
+        self._original = types.MappingProxyType(self.data)
+        return result
+
+    async def write_async(self, blob: str | ByteString, **kwargs: Any) -> int:
+        """Overwrite the configuration file asynchronously with the given blob
+        (config dump as string or bytes).
+
+        Parameters
+        ----------
+        blob : str | bytes
+            The blob to write to the configuration file.
+        **kwargs
+            Keyword arguments to pass to the open method.
+
+        Returns
+        -------
+        int
+            The number of bytes written.
+        """
+        if self.spec.is_url:
+            raise NotImplementedError("Saving to URLs is not yet supported")
+        kwargs.setdefault("mode", "w")
+        return await self.spec.write_async(blob, **kwargs)
 
 
 @convert.register(Config)
-def convert_config(config: collections.abc.MutableMapping):
+@convert.register(AsyncConfig)
+def convert_config(config: MutableMapping) -> dict[str, Any]:
     return {key: convert(value) for key, value in config.items()}

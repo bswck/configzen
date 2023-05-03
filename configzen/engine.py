@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import contextlib
 import functools
 import importlib
 from collections.abc import ByteString, MutableMapping
@@ -7,21 +9,22 @@ from typing import Any, ClassVar
 
 class Engine:
     name: ClassVar[str]
-    registry = {}
+    registry: dict[str, type[Engine]] = {}
 
-    def __init__(self, schema, **kwargs):
+    def __init__(self, schema, **kwargs) -> None:
         self.schema = schema
         self.engine_options = kwargs
 
     def load(
-        self, blob: str | ByteString, defaults: MutableMapping[str, Any] | None = None
+        self,
+        blob: str | ByteString | None,
+        defaults: MutableMapping[str, Any] | None = None,
     ) -> MutableMapping[str, Any]:
-        """
-        Load a config from a blob.
+        """Load a config from a blob.
 
         Parameters
         ----------
-        blob : str | ByteString
+        blob : str | ByteString | None
             The blob to load.
         defaults : MutableMapping[str, Any] | None
             The default values to use.
@@ -37,8 +40,7 @@ class Engine:
         raise NotImplementedError
 
     def dump(self, config: MutableMapping[str, Any], autoconvert: bool = True):
-        """
-        Dump a config to a blob.
+        """Dump a config to a blob.
 
         Parameters
         ----------
@@ -63,8 +65,7 @@ class Engine:
 
     @functools.singledispatchmethod
     def convert(self, obj: Any) -> Any:
-        """
-        Engine-specific conversion of config values.
+        """Engine-specific conversion of config values.
 
         Parameters
         ----------
@@ -80,8 +81,7 @@ class Engine:
 
     @functools.singledispatchmethod
     def loader(self, factory, value) -> Any:
-        """
-        Engine-specific loading of config values.
+        """Engine-specific loading of config values.
 
         Parameters
         ----------
@@ -95,14 +95,12 @@ class Engine:
         Any
             The loaded value.
         """
-
         return load(factory, value)
 
 
 @functools.singledispatch
 def convert(obj: Any) -> Any:
-    """
-    Default conversion of config objects.
+    """Default conversion of config objects.
 
     Parameters
     ----------
@@ -127,8 +125,7 @@ loaders = functools.singledispatch(no_loader_strategy)
 
 
 def load(factory: Any, value: Any) -> Any:
-    """
-    Default loading of config objects.
+    """Default loading of config objects.
 
     Parameters
     ----------
@@ -149,8 +146,7 @@ _MISSING = object()
 
 
 def converter(func, obj=_MISSING):
-    """
-    Register a converter for an object within a convenient decorator.
+    """Register a converter for an object within a convenient decorator.
 
     Parameters
     ----------
@@ -172,8 +168,7 @@ def converter(func, obj=_MISSING):
 
 
 def loader(func, factory=_MISSING):
-    """
-    Register a loader for an object within a convenient decorator.
+    """Register a loader for an object within a convenient decorator.
 
     Parameters
     ----------
@@ -197,8 +192,7 @@ def loader(func, factory=_MISSING):
 
 
 def get_engine_class(engine_name: str) -> type[Engine]:
-    """
-    Get the engine class for the given engine name.
+    """Get the engine class for the given engine name.
 
     Parameters
     ----------
@@ -217,8 +211,7 @@ def get_engine_class(engine_name: str) -> type[Engine]:
     """
     engine_name = engine_name.casefold()
     if engine_name not in Engine.registry:
-        try:
-            importlib.import_module(f'configzen.engines.{engine_name}_engine')
-        except ImportError:
-            pass
+        with contextlib.suppress(ImportError):
+            importlib.import_module(f"configzen.engines.{engine_name}_engine")
+
     return Engine.registry[engine_name]

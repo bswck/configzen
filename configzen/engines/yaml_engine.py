@@ -1,14 +1,12 @@
-from typing import Any
+import yaml
 
 from configzen import Engine
 
-import yaml
-
 
 class YamlEngine(Engine):
-    name = 'yaml'
+    name = "yaml"
 
-    def __init__(self, schema=None, **options):
+    def __init__(self, schema=None, **options) -> None:
         super().__init__(schema, **options)
 
     def load(self, blob, defaults=None):
@@ -19,7 +17,7 @@ class YamlEngine(Engine):
             loaded = yaml.load(blob, Loader=yaml.SafeLoader)
         return defaults | (loaded or {})
 
-    def _dump(self, config: dict[str, Any]):
+    def _dump(self, config):
         return yaml.dump(config, **self.engine_options)
 
     # todo: add explicit support for all the weird yaml features

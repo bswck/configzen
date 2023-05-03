@@ -1,6 +1,6 @@
 import dataclasses
 
-from configzen.engine import converter as register_converter, loader as register_loader
+from configzen.engine import convert, loaders
 
 
 class Section:
@@ -9,40 +9,48 @@ class Section:
     def __init_subclass__(cls, converter=None, loader=None):
         super().__init_subclass__()
         if converter is not None:
-            register_converter(converter, cls)
+            convert.register(cls, converter)
         if loader is not None:
-            register_loader(loader, cls)
+            loaders.register(cls, loader)
 
 
-def default_dict_converter(obj):
+def mapping_convert(obj):
     if dataclasses.is_dataclass(obj):
         return dataclasses.asdict(obj)
     return dict(obj)
 
 
-def default_dict_loader(cls, value):
+def mapping_load(cls, value):
     if isinstance(value, cls):
         return value
     return cls(**value)
 
 
-class DictSection(Section):
-    def __init_subclass__(cls, converter=default_dict_converter, loader=default_dict_loader):
+class MappingSection(Section):
+    def __init_subclass__(
+        cls,
+        converter=mapping_convert,
+        loader=mapping_load,
+    ):
         super().__init_subclass__(converter=converter, loader=loader)
 
 
-def default_tuple_converter(obj):
+def sequence_convert(obj):
     if dataclasses.is_dataclass(obj):
         return list(dataclasses.astuple(obj))
     return list(obj)
 
 
-def default_tuple_loader(cls, value):
+def sequence_load(cls, value):
     if isinstance(value, cls):
         return value
     return cls(*value)
 
 
-class TupleSection(Section):
-    def __init_subclass__(cls, converter=default_tuple_converter, loader=default_tuple_loader):
+class SequenceSection(Section):
+    def __init_subclass__(
+        cls,
+        converter=sequence_convert,
+        loader=sequence_load,
+    ):
         super().__init_subclass__(converter=converter, loader=loader)

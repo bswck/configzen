@@ -1,9 +1,8 @@
 import os
-from typing import Any
 
 from configzen import Engine
 
-if not os.getenv('CONFIGZEN_DISABLE_ORJSON'):
+if not os.getenv("CONFIGZEN_DISABLE_ORJSON"):
     try:
         import orjson as json
     except ImportError:
@@ -19,12 +18,18 @@ except ImportError:
 
 
 class JSONEngine(Engine):
-    name = 'json'
+    name = "json"
 
-    def __init__(self, schema, json_schema=None, json_schema_validator=None, **options):
+    def __init__(
+        self,
+        schema,
+        json_schema=None,
+        json_schema_validator=None,
+        **options,
+    ) -> None:
         super().__init__(schema, **options)
         if json_schema and not JSONSCHEMA_AVAILABLE:
-            raise RuntimeError('jsonschema is not available')
+            raise RuntimeError("jsonschema is not available")
         self.json_schema = json_schema
 
         self.json_schema_validator = json_schema_validator
@@ -32,7 +37,7 @@ class JSONEngine(Engine):
     def load(self, blob, defaults=None):
         if defaults is None:
             defaults = {}
-        config = defaults | json.loads(blob, **self.engine_options)
+        config = defaults | json.loads(blob or "{}", **self.engine_options)
         if self.json_schema:
             self.validate(config)
         return config
@@ -40,10 +45,10 @@ class JSONEngine(Engine):
     def validate(self, data):
         if JSONSCHEMA_AVAILABLE:
             jsonschema.validate(  # type: ignore
-                data, self.json_schema, cls=self.json_schema_validator
+                data, self.json_schema, cls=self.json_schema_validator,
             )
 
-    def _dump(self, config: dict[str, Any]):
+    def _dump(self, config):
         if self.json_schema:
             self.validate(config)
         return json.dumps(config, **self.engine_options)
