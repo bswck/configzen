@@ -702,5 +702,5 @@ class AsyncConfig(BaseConfig):
 
 @convert.register(Config)
 @convert.register(AsyncConfig)
-def convert_config(config: MutableMapping[str, Any]) -> dict[str, Any]:
+def convert_config(config: BaseConfig) -> dict[str, Any]:
     return {key: convert(value) for key, value in config.items()}
