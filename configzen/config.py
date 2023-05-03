@@ -20,9 +20,9 @@ import copy
 import inspect
 import pathlib
 import types
-from collections import UserDict
-from contextlib import AbstractContextManager
-from io import BytesIO, StringIO
+import collections
+import contextlib
+import io
 from typing import TYPE_CHECKING, Any, NamedTuple, TextIO, TypeVar, cast
 from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
 from urllib.request import urlopen
@@ -51,7 +51,7 @@ except ImportError:
 _URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {""}
 
 ConfigSelf = TypeVar("ConfigSelf", bound="BaseConfig")  # Y001
-Opened = AbstractContextManager[StringIO | BytesIO | TextIO]
+Opened = contextlib.AbstractContextManager[io.StringIO | io.BytesIO | TextIO]
 T_co = TypeVar("T_co", covariant=True)
 
 
@@ -150,7 +150,7 @@ class ConfigSpec:
             For local files, these are passed to ``builtins.open()``.
         """
         if self.filepath_or_stream is None:
-            return StringIO()
+            return io.StringIO()
         if self.is_url:
             url = cast(str, self.filepath_or_stream)
             return urlopen(url, **kwds)
@@ -381,7 +381,7 @@ async def save_async(section: AsyncConfig | ConfigSection):
     return result
 
 
-class BaseConfig(UserDict[str, Any]):
+class BaseConfig(collections.UserDict[str, Any]):
     """A configuration dictionary.
 
     Parameters
