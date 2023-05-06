@@ -1,4 +1,4 @@
-from configzen import Config
+from configzen import Config, save
 
 
 class ConnSpec(Config):
@@ -30,5 +30,5 @@ spec.host = 'newhost'
 point = config.point
 point.x += 1
 point.y += 1
-point.save()
-print(point.nested_config._context.section)
+section = config.section('point.x')
+save(section)
