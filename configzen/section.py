@@ -1,14 +1,20 @@
 import dataclasses
-try:
-    from typing import dataclass_transform
-except ImportError:
-    def dataclass_transform():  # type: ignore[misc]
-        return lambda cls: cls
-
+import sys
 
 from collections.abc import Mapping, Iterable
 
 from configzen.engine import convert, loaders
+
+if sys.version_info >= (3, 11):
+    from typing import dataclass_transform
+else:
+    from typing_extensions import dataclass_transform
+
+__all__ = (
+    'Section',
+    'dataclass_convert',
+    'dataclass_load',
+)
 
 
 def dataclass_convert(obj):

@@ -1,3 +1,4 @@
+
 import configzen as lib
 
 
@@ -10,29 +11,19 @@ class ConnSpec(lib.Section):
 
 
 class Point2D(lib.Section):
-    x: int
-    y: int
+    x: int = 1
+    y: int = 1
+    
+
+class MyConfig(lib.Config):
+    spec: ConnSpec
+    point: Point2D
 
 
-loader = lib.DefaultLoader.strict_with_sections(spec=ConnSpec, point=Point2D)
-defaults = {
-    "spec": ConnSpec(
-        host="localhost",
-        port=5432,
-        user="postgres",
-        password="postgres",
-        database="postgres",
-    ),
-    "point": Point2D(0, 0),
-}
-config = lib.Config(
-    "connspec.yaml", 
-    defaults=defaults, 
-    create_missing=True,
-    loader=loader,
-)
-config.load()
-config["point"].x += 1
-config["point"].y += 1
-config["spec"].host = "newhost"
-print(lib.save(config.section("point")))
+config = MyConfig.load('connspec.yaml')
+point = config.point
+point.x += 1
+point.y += 1
+config.save()
+
+
