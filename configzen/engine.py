@@ -7,7 +7,7 @@ from collections.abc import ByteString, MutableMapping
 from typing import Any, ClassVar, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from configzen.config import ConfigContext
+    from configzen.config import BaseConfigContext
 
 
 __all__ = (
@@ -95,7 +95,7 @@ class Engine:
         return convert(obj)
 
     @functools.singledispatchmethod
-    def loader(self, factory, value) -> Any:
+    def loader(self, factory, value, context: BaseConfigContext) -> Any:
         """Engine-specific loading of config values.
 
         Parameters
@@ -104,13 +104,15 @@ class Engine:
             The factory to use.
         value : Any
             The value to load.
+        context : BaseConfigContext
+            The config context.
 
         Returns
         -------
         Any
             The loaded value.
         """
-        return load(factory, value)
+        return load(factory, value, context)
 
 
 @functools.singledispatch
@@ -139,7 +141,7 @@ def no_loader_strategy(cls, value, context):
 loaders = functools.singledispatch(no_loader_strategy)
 
 
-def load(factory: Any, value: Any, context: ConfigContext) -> Any:
+def load(factory: Any, value: Any, context: BaseConfigContext) -> Any:
     """Default loading of config objects.
 
     Parameters
