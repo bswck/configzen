@@ -4,7 +4,10 @@ import contextlib
 import functools
 import importlib
 from collections.abc import ByteString, MutableMapping
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from configzen.config import ConfigContext
 
 
 __all__ = (
@@ -127,7 +130,7 @@ def convert(obj: Any) -> Any:
     return obj
 
 
-def no_loader_strategy(cls, value):
+def no_loader_strategy(cls, value, context):
     if isinstance(value, cls):
         return value
     return cls(value)
@@ -136,7 +139,7 @@ def no_loader_strategy(cls, value):
 loaders = functools.singledispatch(no_loader_strategy)
 
 
-def load(factory: Any, value: Any) -> Any:
+def load(factory: Any, value: Any, context: ConfigContext) -> Any:
     """Default loading of config objects.
 
     Parameters
@@ -145,13 +148,15 @@ def load(factory: Any, value: Any) -> Any:
         The factory to use.
     value : Any
         The value to load.
+    context : ConfigContext
+        The config context.
 
     Returns
     -------
     Any
         The loaded value.
     """
-    return loaders.dispatch(factory)(factory, value)
+    return loaders.dispatch(factory)(factory, value, context)
 
 
 _MISSING = object()

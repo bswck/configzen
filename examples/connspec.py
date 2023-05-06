@@ -1,8 +1,7 @@
+from configzen import Config
 
-import configzen as lib
 
-
-class ConnSpec(lib.Section):
+class ConnSpec(Config):
     host: str
     port: int
     user: str
@@ -10,20 +9,26 @@ class ConnSpec(lib.Section):
     database: str
 
 
-class Point2D(lib.Section):
+class NestedConfig(Config):
+    nested_key: str
+
+
+class Point2D(Config):
+    nested_config: NestedConfig
     x: int = 1
     y: int = 1
-    
 
-class MyConfig(lib.Config):
+
+class MyConfig(Config):
     spec: ConnSpec
     point: Point2D
 
 
 config = MyConfig.load('connspec.yaml')
+spec = config.spec
+spec.host = 'newhost'
 point = config.point
 point.x += 1
 point.y += 1
-config.save()
-
-
+point.save()
+print(point.nested_config._context.section)
