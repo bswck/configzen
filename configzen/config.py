@@ -47,12 +47,13 @@ except ImportError:
 
 
 __all__ = (
-    'ConfigSpec',
-    'BaseConfig',
-    'Config',
-    'AsyncConfig',
-    'BaseLoader',
-    'DefaultLoader'
+    "ConfigSpec",
+    "BaseConfig",
+    "Config",
+    "AsyncConfig",
+    "BaseLoader",
+    "DefaultLoader",
+    "save"
 )
 
 
@@ -326,7 +327,7 @@ else:
                 self.config[path[0]] = value
             else:
                 key = path.pop()
-                self._replace(path=path).config[key] = value
+                self._replace(path=path).get()[key] = value
 
 
 class DefaultLoader(BaseLoader):
@@ -578,21 +579,31 @@ class BaseConfig(MutableMapping[str, Any]):
         """The original configuration dictionary."""
         return self._context.original
 
-    def section(self: ConfigType, path: str | list[str]) -> ConfigSection[ConfigType]:
+    def section(
+        self: ConfigType, 
+        path: str | list[str], 
+        parse_dotlist: bool = True
+    ) -> ConfigSection[ConfigType]:
         """Return the configuration section metadata.
 
         Parameters
         ----------
         path
             The key of the item.
-
+        
+        parse_dotlist : bool, optional
+            Whether to parse the path as a dotlist, by default True
+        
         Returns
         -------
         dict
             The item metadata.
         """
         if isinstance(path, str):
-            [*path] = path.split(".")        
+            if parse_dotlist:
+                [*path] = path.split(".")        
+            else:
+                path = [path]
         return ConfigSection(self, path)
 
     def update(self, data, **kw_data):
@@ -835,11 +846,13 @@ class AsyncConfig(BaseConfig, root=True):
             Keyword arguments to pass to the write method.
 
         """
-        data = self.as_dict()
-        blob = self._context.spec.engine.dump(data)
-        result = await self.write_async(blob, **kwargs)
-        self._context.original = types.MappingProxyType(data)
-        return result
+        if self._context.owner is self:
+            data = self.as_dict()
+            blob = self._context.spec.engine.dump(data)
+            result = await self.write_async(blob, **kwargs)
+            self._context.original = types.MappingProxyType(data)
+            return result
+        return await save_async(self._context.section)
 
     async def write_async(self, blob: str | ByteString, **kwargs: Any) -> int:
         """Overwrite the configuration file asynchronously with the given blob
