@@ -341,7 +341,7 @@ if TYPE_CHECKING:
         def get(self) -> Any:
             ...
 
-        def update(self, value: Any) -> None:
+        def update(self, _value: Any) -> None:
             ...
 else:
     class ConfigSection(NamedTuple):
@@ -581,6 +581,7 @@ FieldWatcherBase: type = type(MutableMapping)
 
 class FieldWatcher(FieldWatcherBase):
     _loader_factory: LoaderFactoryT
+    _loader: BaseLoader
 
     def __setattr__(self, key: str, value: Any) -> None:
         super().__setattr__(key, value)
@@ -616,7 +617,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
 
     if TYPE_CHECKING:
         # Because PyCharm doesn't understand
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             ...
 
     @abc.abstractmethod

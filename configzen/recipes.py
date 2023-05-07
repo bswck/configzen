@@ -5,10 +5,11 @@ import inspect
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
+from configzen.errors import IncompleteConfigurationError
+
 if TYPE_CHECKING:
     from configzen.config import BaseConfigContext, ConfigT
 
-from configzen.errors import IncompleteConfigurationError
 
 __all__ = (
     "dataclass_convert",
