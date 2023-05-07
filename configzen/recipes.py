@@ -1,24 +1,41 @@
-import dataclasses
+from __future__ import annotations
 
-from collections.abc import Mapping, Iterable
+import dataclasses
+import inspect
+from collections.abc import Iterable, Mapping
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from configzen.config import BaseConfigContext, ConfigT
+
+from configzen.errors import IncompleteConfigurationError
 
 __all__ = (
-    'dataclass_convert',
-    'dataclass_load',
+    "dataclass_convert",
+    "dataclass_load",
 )
 
 
-def dataclass_convert(obj):
+def dataclass_convert(obj: Any) -> dict[str, Any]:
     if dataclasses.is_dataclass(obj):
         return dataclasses.asdict(obj)
     return dict(obj)
 
 
-def dataclass_load(cls, value, _context):
+def dataclass_load(
+    cls: type[ConfigT],
+    value: Mapping,
+    _context: BaseConfigContext[ConfigT]
+) -> ConfigT:
     if isinstance(value, cls):
         return value
-    if isinstance(value, Mapping):
-        return cls(**value)
-    if isinstance(value, Iterable):
-        return cls(*value)
-    return cls(value)
+    if not isinstance(value, Mapping | Iterable):
+        return cls(value)
+    sig = inspect.signature(cls)
+    try:
+        bound = sig.bind(**value) if isinstance(value, Mapping) else sig.bind(*value)
+    except TypeError as exc:
+        raise IncompleteConfigurationError(
+            cls.__name__ + " configuration is " + exc.args[0],
+        ) from None
+    return cls(*bound.args, **bound.kwargs)

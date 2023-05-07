@@ -1,4 +1,5 @@
-from configzen import Config, save
+
+from configzen import Config, dataclass_load, loader
 
 
 class ConnSpec(Config):
@@ -9,6 +10,7 @@ class ConnSpec(Config):
     database: str
 
 
+@loader(dataclass_load)
 class NestedConfig(Config):
     nested_key: str
 
@@ -21,14 +23,11 @@ class Point2D(Config):
 
 class MyConfig(Config):
     spec: ConnSpec
-    point: Point2D
+    point: Point2D = Point2D(
+        nested_config=NestedConfig(nested_key='nested_value')
+    )
 
 
-config = MyConfig.load('connspec.yaml')
-spec = config.spec
-spec.host = 'newhost'
-point = config.point
-point.x += 1
-point.y += 1
-section = config.section('point.x')
-save(section)
+config = MyConfig.load('connspec.yaml', create_missing=True)
+config.point.x += 1
+config.point.y -= 1

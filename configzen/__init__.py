@@ -1,9 +1,8 @@
 # flake8: noqa
+from . import config, engine, recipes
 from .config import *
 from .engine import *
 from .recipes import *
-
-from . import config, engine, recipes
 
 __all__ = (
     *config.__all__,

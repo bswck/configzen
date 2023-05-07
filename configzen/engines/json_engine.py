@@ -1,4 +1,6 @@
 import os
+from collections.abc import ByteString, MutableMapping
+from typing import Any
 
 from configzen import Engine
 
@@ -22,10 +24,10 @@ class JSONEngine(Engine):
 
     def __init__(
         self,
-        schema,
-        json_schema=None,
-        json_schema_validator=None,
-        **options,
+        schema: dict[str, Any] | None = None,
+        json_schema: dict[str, Any] = None,
+        json_schema_validator: Any =None,
+        **options: Any,
     ) -> None:
         super().__init__(schema, **options)
         if json_schema and not JSONSCHEMA_AVAILABLE:
@@ -34,7 +36,11 @@ class JSONEngine(Engine):
 
         self.json_schema_validator = json_schema_validator
 
-    def load(self, blob, defaults=None):
+    def load(
+        self,
+        blob: str | ByteString | None,
+        defaults: MutableMapping[str, Any] | None = None,
+    ) -> MutableMapping[str, Any]:
         if defaults is None:
             defaults = {}
         config = defaults | json.loads(blob or "{}", **self.engine_options)
@@ -42,13 +48,13 @@ class JSONEngine(Engine):
             self.validate(config)
         return config
 
-    def validate(self, data):
+    def validate(self, data: MutableMapping[str, Any]) -> None:
         if JSONSCHEMA_AVAILABLE:
             jsonschema.validate(  # type: ignore
                 data, self.json_schema, cls=self.json_schema_validator,
             )
 
-    def _dump(self, config):
+    def _dump(self, config: MutableMapping[str, Any]) -> str | ByteString:
         if self.json_schema:
             self.validate(config)
         return json.dumps(config, **self.engine_options)

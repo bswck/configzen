@@ -1,33 +1,40 @@
+"""Core configuration classes and functions."""
+
 from __future__ import annotations
 
 import abc
+import contextlib
 import copy
 import dataclasses
 import inspect
+import io
+import os
 import pathlib
 import sys
 import types
-import contextlib
-import io
-from collections.abc import MutableMapping, Generator
+from collections.abc import ByteString, Callable, Generator, MutableMapping, Iterator
 from typing import (
-    Callable, TYPE_CHECKING, Any, NamedTuple, TextIO, TypeVar, cast, ClassVar, Generic,
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    NamedTuple,
+    TypeVar,
+    cast,
 )
 from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 
 from configzen.engine import Engine, convert, get_engine_class, load, loaders
 from configzen.recipes import dataclass_load
-
 
 if sys.version_info >= (3, 11):
     from typing import dataclass_transform
 else:
     from typing_extensions import dataclass_transform
 
-
 if TYPE_CHECKING:
-    from collections.abc import ByteString, Mapping, ItemsView
+    from collections.abc import ItemsView, Mapping
 
 try:
     import aiofiles
@@ -45,7 +52,6 @@ except ImportError:
     aiohttp = None  # type: ignore[assignment]
     AIOHTTP_AVAILABLE = False
 
-
 __all__ = (
     "ConfigSpec",
     "BaseConfig",
@@ -53,29 +59,34 @@ __all__ = (
     "AsyncConfig",
     "BaseLoader",
     "DefaultLoader",
-    "save"
+    "save",
 )
-
 
 _URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {""}
 
-MutableMappingType = TypeVar("MutableMappingType", bound="MutableMapping")  # Y001
-ConfigType = TypeVar("ConfigType", bound="BaseConfig")  # Y001
-Opened = contextlib.AbstractContextManager[io.StringIO | io.BytesIO | TextIO]
+ConfigT = TypeVar("ConfigT", bound="BaseConfig")
+ContextT = TypeVar("ContextT", bound="BaseConfigContext")
+ConfigT_co = TypeVar("ConfigT_co", bound="Config", covariant=True)
+BlobT = TypeVar("BlobT", str, ByteString)
+LoaderFactoryT = Callable[[dict[str, Callable]], "BaseLoader"]
+AsyncConfigT_co = TypeVar("AsyncConfigT_co", bound="AsyncConfig", covariant=True)
+Opened = contextlib.AbstractContextManager
 
 
-class ConfigSpec:
+class ConfigSpec(Generic[BlobT]):
     """A specification for a configuration file."""
-    filepath_or_stream: Opened | str
+
+    filepath_or_stream: Opened | str | os.PathLike | pathlib.Path
     defaults: dict[str, Any]
     create_missing: bool
     engine_name: str
     _engine: Engine | None
     _engine_options: dict[str, Any]
+    allowed_url_schemes: set[str] = _URL_SCHEMES
 
     def __init__(
-        self: ConfigSpec,
-        filepath_or_stream: Opened | str,
+        self: ConfigSpec[BlobT],
+        filepath_or_stream: Opened[BlobT] | str,
         engine_name: str,
         *,
         cache_engine: bool = True,
@@ -139,10 +150,10 @@ class ConfigSpec:
     @classmethod
     def from_str(cls, spec: str, **kwargs: Any) -> ConfigSpec:
         """Create a ConfigSpec from a string."""
-        engine_name = pathlib.Path(spec).suffix[1:]
-        return cls(spec, engine_name, **kwargs)
+        kwargs.setdefault("engine_name", pathlib.Path(spec).suffix[1:])
+        return cls(spec, **kwargs)
 
-    def open(self, **kwds) -> Opened:
+    def open_sync(self, **kwds: Any) -> Opened:
         """Open the configuration file.
 
         Parameters
@@ -156,12 +167,17 @@ class ConfigSpec:
             return io.StringIO()
         if self.is_url:
             url = cast(str, self.filepath_or_stream)
-            return urlopen(url, **kwds)
-        if isinstance(self.filepath_or_stream, str):
-            return open(self.filepath_or_stream, **kwds)
+            if urlparse(url).scheme not in self.allowed_url_schemes:
+                raise ValueError(
+                    f"URL scheme {urlparse(url).scheme!r} is not allowed, "
+                    f"must be one of {self.allowed_url_schemes!r}",
+                )
+            return urlopen(Request(url), **kwds)  # noqa: S310, ^
+        if isinstance(self.filepath_or_stream, str | os.PathLike | pathlib.Path):
+            return pathlib.Path(self.filepath_or_stream).open(**kwds)
         return self.filepath_or_stream
 
-    def open_async(self, **kwds) -> Any:
+    def open_async(self, **kwds: Any) -> Any:
         """Open the configuration file asynchronously.
 
         Parameters
@@ -178,7 +194,12 @@ class ConfigSpec:
             )
         return aiofiles.open(cast(str, self.filepath_or_stream), **kwds)
 
-    def read(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+    def read(
+        self,
+        *,
+        create_kwds: dict[str, Any] | None = None,
+        **kwds: Any
+    ) -> MutableMapping[str, Any]:
         """Read the configuration file.
 
         Parameters
@@ -189,8 +210,9 @@ class ConfigSpec:
         **kwds
             Keyword arguments to pass to the open method.
         """
+        blob: str | ByteString | None
         try:
-            with self.open(**kwds) as fp:
+            with self.open_sync(**kwds) as fp:
                 blob = fp.read()
         except FileNotFoundError:
             blob = None
@@ -201,11 +223,16 @@ class ConfigSpec:
                 self.write(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
 
-    def write(self, blob, **kwds) -> int:
-        with self.open(**kwds) as fp:
+    def write(self, blob: str | ByteString, **kwds: Any) -> int:
+        with self.open_sync(**kwds) as fp:
             return fp.write(blob)
 
-    async def read_async(self, *, create_kwds=None, **kwds) -> MutableMapping[str, Any]:
+    async def read_async(
+        self,
+        *,
+        create_kwds: dict[str, Any] | None = None,
+        **kwds: Any
+    ) -> MutableMapping[str, Any]:
         """Read the configuration file asynchronously.
 
         Parameters
@@ -227,7 +254,7 @@ class ConfigSpec:
                 await self.write_async(blob, **create_kwds)
         return self.engine.load(blob, defaults=self.defaults)
 
-    async def write_async(self, blob, **kwds) -> int:
+    async def write_async(self, blob: str | ByteString, **kwds: Any) -> int:
         async with self.open_async(**kwds) as fp:
             return await fp.write(blob)
 
@@ -241,13 +268,14 @@ class BaseLoader:
         A dictionary of configuration keys and their corresponding types.
         If not provided, the sections must be provided as keyword arguments.
     """
-    sections: dict[str, Callable]
 
-    def __init__(self, sections: dict[str, Callable] | None = None) -> None:
+    sections: dict[str, Callable[[Any], Any]]
+
+    def __init__(self, sections: dict[str, Callable[[Any], Any]] | None = None) -> None:
         self.sections = sections or {}
 
     @classmethod
-    def with_sections(cls, sections) -> BaseLoader:
+    def with_sections(cls, sections: dict[str, Callable[[Any], Any]]) -> BaseLoader:
         return cls(sections=sections)
 
     async def load_async(
@@ -298,30 +326,32 @@ class BaseLoader:
 
 
 if TYPE_CHECKING:
+    MutableMappingType = TypeVar("MutableMappingType", bound="MutableMapping")  # Y001
+
+
     class ConfigSection(NamedTuple, Generic[MutableMappingType]):
         config: MutableMappingType
         path: list[str]
 
-        def get(self):
+        def get(self) -> Any:
             ...
 
-        def update(self, value):
+        def update(self, value: Any) -> None:
             ...
-
 else:
     class ConfigSection(NamedTuple):
         """Metadata for a configuration item."""
-    
-        config: MutableMappingType
+
+        config: MutableMapping
         path: list[str]
 
-        def get(self):
+        def get(self) -> Any:
             value = self.config
             for key in self.path:
                 value = value[key]
             return value
 
-        def update(self, value):
+        def update(self, value: Any) -> None:
             path = list(self.path)
             if len(path) == 1:
                 self.config[path[0]] = value
@@ -333,7 +363,7 @@ else:
 class DefaultLoader(BaseLoader):
     def __init__(
         self,
-        sections: dict[str, Callable] | None = None,
+        sections: dict[str, Callable[[Any], Any]] | None = None,
         *,
         strict: bool = False,
     ) -> None:
@@ -342,14 +372,14 @@ class DefaultLoader(BaseLoader):
         self._deferred_items: dict[str, Any] = {}
 
     @classmethod
-    def strict_with_sections(cls, sections) -> DefaultLoader:
+    def strict_with_sections(cls, sections: dict[str, Callable]) -> DefaultLoader:
         return cls(sections=sections, strict=True)
 
-    def load_deferred_items(self):
+    def load_deferred_items(self) -> None:
         for key, (value, context) in self._deferred_items.items():
             self._load_item(key, value, context)
 
-    def _load_item(self, key, value, context):
+    def _load_item(self, key: str, value: Any, context: ContextT) -> Any:
         try:
             factory = self.sections[key]
         except KeyError:
@@ -358,76 +388,142 @@ class DefaultLoader(BaseLoader):
         self._deferred_items.pop(key, None)
         return load(factory, value, context)
 
-    async def _async_load_item(self, key, value, context):
+    async def _async_load_item(self, key: str, value: Any, context: ContextT) -> Any:
         data = self._load_item(key, value, context)
         if inspect.isawaitable(data):
             data = await data
         return data
 
-    def load(self, data, context):
-        data = {
+    def load(self, data: Mapping | None, context: ContextT) -> Any:
+        return {
             key: self._load_item(key, value, context.enter(key))
-            for key, value in data.items()
+            for key, value in (data or {}).items()
         }
-        return data
 
-    async def load_async(self, data, context):
-        data = {
+    async def load_async(self, data: Mapping | None, context: ContextT) -> Any:
+        return {
             key: await self._async_load_item(key, value, context.enter(key))
-            for key, value in data.items()
+            for key, value in (data or {}).items()
         }
-        return data
 
 
-def save(section: Config | ConfigSection):
+def save(section: ConfigT_co | ConfigSection[ConfigT_co]) -> int:
     if isinstance(section, Config):
         config = section
         return config.save()
 
+    if TYPE_CHECKING:
+        section = cast(ConfigSection[ConfigT_co], section)
     config = section.config
     data = dict(config.original)
     ConfigSection(data, section.path).update(section.get())
-    blob = config._context.spec.engine.dump(config_convert(data))
+    context = ConfigContext.get(config)
+    spec = cast(ConfigSpec, context.spec)
+    blob = spec.engine.dump(config_convert(data))
     result = config.write(blob)
-    config._context.original = types.MappingProxyType(data)
+    context.original = types.MappingProxyType(data)
     return result
 
 
-async def save_async(section: AsyncConfig | ConfigSection):
+async def save_async(section: AsyncConfigT_co | ConfigSection[AsyncConfigT_co]) -> int:
     if isinstance(section, AsyncConfig):
         config = section
         return await config.save_async()
 
+    if TYPE_CHECKING:
+        section = cast(ConfigSection[AsyncConfigT_co], section)
     config = section.config
     data = dict(config.original)
     ConfigSection(data, section.path).update(section.get())
-    blob = config._context.spec.engine.dump(config_convert(data))
+    context = ConfigContext.get(config)
+    spec = cast(ConfigSpec, context.spec)
+    blob = spec.engine.dump(config_convert(data))
     result = await config.write_async(blob)
-    config._context.original = types.MappingProxyType(data)
+    context.original = types.MappingProxyType(data)
     return result
 
 
-class BaseConfigContext(abc.ABC):
-    spec: ConfigSpec
-    owner: Config | None
+class BaseConfigContext(abc.ABC, Generic[ConfigT]):
     original: Mapping[str, Any]
+    _original: Mapping[str, Any]
     loaded: bool
 
     @abc.abstractmethod
     def trace_route(self) -> Generator[str, None, None]:
         """Trace the route to the configuration context."""
 
-    def bind_to(self, config):
-        if config is None:
-            return 
-        config._context = self
+    @classmethod
+    def get(cls, config: ConfigT) -> BaseConfigContext[ConfigT]:
+        return object.__getattribute__(config, "_context")
 
-    def enter(self, key):
+    def bind_to(self, config: ConfigT) -> None:
+        if config is None:
+            return
+        object.__setattr__(config, "_context", self)
+
+    def enter(self, key: str) -> ConfigSubcontext[ConfigT]:
         return ConfigSubcontext(self, key)
 
+    @property
+    @abc.abstractmethod
+    def spec(self) -> ConfigSpec | None:
+        ...
 
-class ConfigContext(BaseConfigContext):
-    def __init__(self, spec, owner=None):
+    @property
+    @abc.abstractmethod
+    def owner(self) -> ConfigT | None:
+        ...
+
+    @property
+    @abc.abstractmethod
+    def section(self) -> ConfigT | ConfigSection[ConfigT]:
+        ...
+
+
+class ConfigSubcontext(BaseConfigContext, Generic[ConfigT]):
+    def __init__(self, parent: BaseConfigContext[ConfigT], key: str) -> None:
+        self.parent = parent
+        self.key = key
+
+    @property
+    def spec(self) -> None:
+        return None  # ???
+
+    def trace_route(self) -> Generator[str, None, None]:
+        yield from self.parent.trace_route()
+        yield self.key
+
+    @property
+    def section(self) -> ConfigSection[ConfigT]:
+        if self.owner is None:
+            raise ValueError("Cannot get section for unbound context")
+        return ConfigSection(self.owner, list(self.trace_route()))
+
+    @property
+    def owner(self) -> ConfigT | None:
+        return self.parent.owner
+
+    @property
+    def original(self) -> Mapping[str, Any]:
+        return self.parent.original
+
+    @original.setter
+    def original(self, value: Mapping[str, Any]) -> None:
+        data = dict(self.parent.original)
+        data[self.key] = value
+        self.parent.original = data
+
+    @property
+    def loaded(self) -> bool:
+        return self.parent.loaded
+
+    @loaded.setter
+    def loaded(self, value: bool) -> None:
+        self.parent.loaded = value
+
+
+class ConfigContext(BaseConfigContext, Generic[ConfigT]):
+    def __init__(self, spec: ConfigSpec, owner: ConfigT | None = None) -> None:
         self._spec = spec
         self._owner = None
         self._original = types.MappingProxyType({})
@@ -435,87 +531,71 @@ class ConfigContext(BaseConfigContext):
 
         self.owner = owner
 
-    def trace_route(self):
+    def trace_route(self) -> Generator[str, None, None]:
         yield from ()
 
     @property
-    def spec(self):
+    def spec(self) -> ConfigSpec:
         return self._spec
 
     @property
-    def section(self):
+    def section(self) -> ConfigT | None:
         return self.owner
 
     @property
-    def owner(self):
+    def owner(self) -> ConfigT | None:
         return self._owner
 
     @owner.setter
-    def owner(self, config):
+    def owner(self, config: ConfigT | None) -> None:
         if config is None:
-            return 
+            return
         self.bind_to(config)
         self._owner = config
 
     @property
-    def original(self):
+    def original(self) -> Mapping[str, Any]:
         return self._original
 
     @original.setter
-    def original(self, value):
+    def original(self, value: Mapping[str, Any]) -> None:
         self._original = types.MappingProxyType(value)
 
     @property
-    def loaded(self):
+    def loaded(self) -> bool:
         return self._loaded
-    
+
     @loaded.setter
-    def loaded(self, value):
+    def loaded(self, value: bool) -> None:
         self._loaded = value
 
-    
-class ConfigSubcontext(BaseConfigContext):
-    def __init__(self, parent: BaseConfigContext, key: str):
-        self.parent = parent
-        self.key = key
 
-    @property
-    def spec(self):
-        return None  # ???
+FieldWatcherBase: type = type(MutableMapping)
 
-    def trace_route(self):
-        yield from self.parent.trace_route()
-        yield self.key
 
-    @property
-    def section(self):
-        return ConfigSection(self.owner, list(self.trace_route()))
+class FieldWatcher(FieldWatcherBase):
+    _loader_factory: LoaderFactoryT
 
-    @property
-    def owner(self):
-        return self.parent.owner
+    def __setattr__(self, key: str, value: Any) -> None:
+        super().__setattr__(key, value)
+        if key == "__dataclass_fields__":
+            self._on_dataclass_fields(value)
 
-    @property
-    def original(self):
-        return self.parent.original
-
-    @original.setter
-    def original(self, value):
-        data = dict(self.parent.original)
-        data[self.key] = value
-        self.parent.original = data        
-
-    @property
-    def loaded(self):
-        return self.parent.loaded
-
-    @loaded.setter
-    def loaded(self, value):
-        self.parent.loaded = value
+    def _on_dataclass_fields(
+        self,
+        dataclass_fields: dict[str, dataclasses.Field]
+    ) -> None:
+        sections = {
+            name: cast(Callable, field.type)
+            for name, field in dataclass_fields.items()
+        }
+        self._loader = self._loader_factory(sections)
+        loaders.register(self, config_load)
+        convert.register(self, config_convert)
 
 
 @dataclass_transform()
-class BaseConfig(MutableMapping[str, Any]):
+class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
     """A configuration dictionary.
 
     Notes
@@ -528,23 +608,28 @@ class BaseConfig(MutableMapping[str, Any]):
     _context: ConfigContext
     __dataclass_fields__: ClassVar[dict[str, dataclasses.Field]]
 
+    if TYPE_CHECKING:
+        # Because PyCharm doesn't understand
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
+
     @abc.abstractmethod
     def __call__(self, **config: Any) -> Any:
         """Update the configuration with the given keyword arguments."""
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.as_dict())
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         self.update({key: value})
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> Any:
         return self.as_dict()[item]
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         delattr(self, key)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.as_dict())
 
     def as_dict(self) -> dict[str, Any]:
@@ -553,11 +638,18 @@ class BaseConfig(MutableMapping[str, Any]):
     def items(self) -> ItemsView[str, Any]:
         return self.as_dict().items()
 
+    @classmethod
+    def get_defaults(cls) -> dict[str, Any]:
+        return config_convert({
+            field.name: field.default
+            for field in dataclasses.fields(cls)
+            if field.default is not dataclasses.MISSING
+        })
+
     @property
     def was_loaded(self) -> bool:
-        """
-        Whether the configuration has been loaded.
-        
+        """Whether the configuration has been loaded.
+
         Returns
         -------
         bool
@@ -570,7 +662,7 @@ class BaseConfig(MutableMapping[str, Any]):
         return self._loader.sections
 
     @sections.setter
-    def sections(self, value):
+    def sections(self, value: dict[str, Any]) -> None:
         """Set the configuration sections."""
         self._loader.sections = value
 
@@ -580,20 +672,22 @@ class BaseConfig(MutableMapping[str, Any]):
         return self._context.original
 
     def section(
-        self: ConfigType, 
-        path: str | list[str], 
-        parse_dotlist: bool = True
-    ) -> ConfigSection[ConfigType]:
+        self: ConfigT,
+        path: str | list[str],
+        *,
+        parse_dotlist: bool = True,
+    ) -> ConfigSection[ConfigT]:
         """Return the configuration section metadata.
 
         Parameters
         ----------
         path
             The key of the item.
-        
+
         parse_dotlist : bool, optional
             Whether to parse the path as a dotlist, by default True
-        
+
+
         Returns
         -------
         dict
@@ -601,15 +695,19 @@ class BaseConfig(MutableMapping[str, Any]):
         """
         if isinstance(path, str):
             if parse_dotlist:
-                [*path] = path.split(".")        
+                [*path] = path.split(".")
             else:
                 path = [path]
         return ConfigSection(self, path)
 
-    def update(self, data, **kw_data):
+    def update(  # type: ignore[override]
+        self,
+        data: Mapping[str, Any],
+        /,
+        **kw_data: Any
+    ) -> None:
         """Update the configuration with the given data, without loading."""
-        if kw_data:
-            data.update(kw_data)
+        data = {**data, **kw_data}
         for attr, value in data.items():
             setattr(self, attr, value)
 
@@ -620,28 +718,24 @@ class BaseConfig(MutableMapping[str, Any]):
         self._context.loaded = True
 
     def __init_subclass__(
-        cls, 
-        loader_factory
-        : Callable[[dict[str, type]], BaseLoader] 
-        = DefaultLoader.strict_with_sections,
+        cls,
+        loader_factory: LoaderFactoryT = DefaultLoader.strict_with_sections,
+        *,
         root: bool = False,
-    ):
+        make_dataclass: bool = True,
+        **dataclass_params: Any,
+    ) -> None:
         if root:
-            return 
-        dataclasses.dataclass(cls)
-        sections = {
-            field.name: field.type
-            for field in dataclasses.fields(cls)
-        }
-        cls._loader = loader_factory(sections)
-        loaders.register(cls, config_load)
-        convert.register(cls, config_convert)
+            return
+        cls._loader_factory = loader_factory
+        if make_dataclass:
+            dataclasses.dataclass(cls, **dataclass_params)  # type: ignore
 
 
 @dataclass_transform()
 class Config(BaseConfig, root=True):
 
-    def __call__(self: ConfigType, **new_config: Any) -> ConfigType:
+    def __call__(self: ConfigT, **new_config: Any) -> ConfigT:
         """Update the configuration with the given configuration, with loading.
 
         Parameters
@@ -658,11 +752,11 @@ class Config(BaseConfig, root=True):
 
     @classmethod
     def load(
-        cls: type[ConfigType],
+        cls: type[ConfigT],
         spec: ConfigSpec | str,
-        create_missing: bool = False,
+        create_missing: bool | None = None,
         **kwargs: Any,
-    ) -> ConfigType:
+    ) -> ConfigT:
         """Load the configuration file.
         To reload the configuration, use the ``reload`` method.
 
@@ -680,19 +774,25 @@ class Config(BaseConfig, root=True):
         self
         """
         if isinstance(spec, str):
-            spec = ConfigSpec.from_str(spec)
+            spec = ConfigSpec.from_str(
+                spec,
+                defaults=cls.get_defaults(),
+            )
+        if create_missing is not None:
+            spec.create_missing = create_missing
         kwargs.setdefault("mode", "r")
         if create_missing:
             kwargs.setdefault("create_kwds", {"mode": "w"})
         loader = cls._loader
-        context = ConfigContext(spec)
-        config = load(cls, loader.load(spec.read(**kwargs), context), context)
+        context: ConfigContext[ConfigT] = ConfigContext(spec)
+        data = loader.load(spec.read(**kwargs), context)
+        config = load(cls, data, context)
         context.owner = config
         context.loaded = True
         context.original = types.MappingProxyType(config.as_dict())
         return config
 
-    def reload(self: ConfigType, **kwargs: Any) -> ConfigType:
+    def reload(self: ConfigT, **kwargs: Any) -> ConfigT:
         """Reload the configuration file.
         If the configuration is not loaded, a ValueError is raised.
 
@@ -735,7 +835,7 @@ class Config(BaseConfig, root=True):
             return result
         return save(self._context.section)
 
-    def write(self, blob: str | ByteString, **kwargs) -> int:
+    def write(self, blob: str | ByteString, **kwargs: Any) -> int:
         """Overwrite the configuration file with the given blob
         (config dump as string or bytes).
 
@@ -760,7 +860,7 @@ class Config(BaseConfig, root=True):
 @dataclass_transform()
 class AsyncConfig(BaseConfig, root=True):
 
-    async def __call__(self: ConfigType, **config: Any) -> ConfigType:
+    async def __call__(self: ConfigT, **config: Any) -> ConfigT:
         """Update the configuration with the given configuration, asynchronously.
 
         Parameters
@@ -777,11 +877,12 @@ class AsyncConfig(BaseConfig, root=True):
 
     @classmethod
     async def load_async(
-        cls: type[ConfigType],
+        cls: type[ConfigT],
         spec: ConfigSpec | str,
+        *,
         create_missing: bool = False,
         **kwargs: Any,
-    ) -> ConfigType:
+    ) -> ConfigT:
         """Load the configuration file asynchronously.
         To reload the configuration, use the ``reload`` method.
 
@@ -799,21 +900,21 @@ class AsyncConfig(BaseConfig, root=True):
         self
         """
         if isinstance(spec, str):
-            spec = ConfigSpec.from_str(spec)
+            spec = ConfigSpec.from_str(spec, defaults=cls.get_defaults())
         kwargs.setdefault("mode", "r")
         if create_missing:
             kwargs.setdefault("create_kwds", {"mode": "w"})
-        context = ConfigContext(spec)
+        context: ConfigContext[ConfigT] = ConfigContext(spec)
         config = load(
-            cls, 
+            cls,
             await cls._loader.load_async(spec.read(**kwargs), context),
-            context
+            context,
         )
         context.owner = config
         context.loaded = True
         return config
 
-    async def reload_async(self: ConfigType, **kwargs) -> ConfigType:
+    async def reload_async(self: ConfigT, **kwargs: Any) -> ConfigT:
         """Reload the configuration file.
         If the configuration is not loaded, a ValueError is raised.
 
@@ -837,7 +938,7 @@ class AsyncConfig(BaseConfig, root=True):
         self._context.loaded = True
         return async_config
 
-    async def save_async(self, **kwargs) -> int:
+    async def save_async(self, **kwargs: Any) -> int:
         """Save the configuration to the configuration file asynchronously.
 
         Parameters
@@ -876,7 +977,11 @@ class AsyncConfig(BaseConfig, root=True):
         return await self._context.spec.write_async(blob, **kwargs)
 
 
-def config_load(cls, value, context):
+def config_load(
+    cls: type[ConfigT],
+    value: MutableMapping[str, Any],
+    context: ConfigContext[ConfigT]
+) -> ConfigT:
     value = cls._loader.load(value, context)
     config = dataclass_load(cls, value, context)
     context.bind_to(config)

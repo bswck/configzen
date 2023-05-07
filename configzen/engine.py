@@ -3,22 +3,21 @@ from __future__ import annotations
 import contextlib
 import functools
 import importlib
-from collections.abc import ByteString, MutableMapping
-from typing import Any, ClassVar, TYPE_CHECKING
+from collections.abc import ByteString, MutableMapping, Callable, Mapping
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
-    from configzen.config import BaseConfigContext
-
+    from configzen.config import BaseConfigContext, ConfigT
 
 __all__ = (
-    'Engine',
-    'convert',
-    'converter',
-    'load',
-    'loader',
-    'loaders',
-    'no_loader_strategy',
-    'get_engine_class',
+    "Engine",
+    "convert",
+    "converter",
+    "load",
+    "loader",
+    "loaders",
+    "no_loader_strategy",
+    "get_engine_class",
 )
 
 
@@ -26,7 +25,7 @@ class Engine:
     name: ClassVar[str]
     registry: dict[str, type[Engine]] = {}
 
-    def __init__(self, sections, **kwargs) -> None:
+    def __init__(self, sections: dict[str, Callable], **kwargs: Any) -> None:
         self.sections = sections
         self.engine_options = kwargs
 
@@ -54,7 +53,12 @@ class Engine:
     def _dump(self, config: MutableMapping[str, Any]) -> str | ByteString:
         raise NotImplementedError
 
-    def dump(self, config: MutableMapping[str, Any], autoconvert: bool = True):
+    def dump(
+        self,
+        config: MutableMapping[str, Any],
+        *,
+        autoconvert: bool = True
+    ) -> str | ByteString:
         """Dump a config to a blob.
 
         Parameters
@@ -73,7 +77,7 @@ class Engine:
             config = self.convert(config)
         return self._dump(config)
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.name = name = cls.name.casefold()
         Engine.registry[name] = cls
@@ -95,7 +99,12 @@ class Engine:
         return convert(obj)
 
     @functools.singledispatchmethod
-    def loader(self, factory, value, context: BaseConfigContext) -> Any:
+    def loader(
+        self,
+        factory: type[ConfigT],
+        value: Any,
+        context: BaseConfigContext[ConfigT]
+    ) -> Any:
         """Engine-specific loading of config values.
 
         Parameters
@@ -132,7 +141,11 @@ def convert(obj: Any) -> Any:
     return obj
 
 
-def no_loader_strategy(cls, value, context):
+def no_loader_strategy(
+    cls: type[ConfigT],
+    value: Any,
+    _context: BaseConfigContext[ConfigT]
+) -> Any:
     if isinstance(value, cls):
         return value
     return cls(value)
@@ -141,7 +154,11 @@ def no_loader_strategy(cls, value, context):
 loaders = functools.singledispatch(no_loader_strategy)
 
 
-def load(factory: Any, value: Any, context: BaseConfigContext) -> Any:
+def load(
+    factory: Callable[[Any], Any],
+    value: Any,
+    context: BaseConfigContext[ConfigT]
+) -> Any:
     """Default loading of config objects.
 
     Parameters
@@ -164,7 +181,7 @@ def load(factory: Any, value: Any, context: BaseConfigContext) -> Any:
 _MISSING = object()
 
 
-def converter(func, obj=_MISSING):
+def converter(func: Callable[[Any], dict[str, Any]], obj: Any = _MISSING) -> Any:
     """Register a converter for an object within a convenient decorator.
 
     Parameters
@@ -186,7 +203,10 @@ def converter(func, obj=_MISSING):
     return obj
 
 
-def loader(func, factory=_MISSING):
+def loader(
+    func: Callable[[type[ConfigT], Mapping[str, Any], BaseConfigContext[ConfigT]], Any],
+    factory: Any = _MISSING
+) -> Any:
     """Register a loader for an object within a convenient decorator.
 
     Parameters
@@ -199,8 +219,8 @@ def loader(func, factory=_MISSING):
 
     Returns
     -------
-    Callable[[Any], Any]
-        The loader function.
+    Any
+        The factory function.
 
     """
     if factory is _MISSING:
