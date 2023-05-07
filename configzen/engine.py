@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import importlib
-from collections.abc import ByteString, MutableMapping, Callable, Mapping
+from collections.abc import ByteString, Callable, Mapping, MutableMapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ class Engine:
         self,
         config: MutableMapping[str, Any],
         *,
-        autoconvert: bool = True
+        autoconvert: bool = True,
     ) -> str | ByteString:
         """Dump a config to a blob.
 
@@ -103,7 +103,7 @@ class Engine:
         self,
         factory: type[ConfigT],
         value: Any,
-        context: BaseConfigContext[ConfigT]
+        context: BaseConfigContext[ConfigT],
     ) -> Any:
         """Engine-specific loading of config values.
 
@@ -144,7 +144,7 @@ def convert(obj: Any) -> Any:
 def no_loader_strategy(
     cls: type[ConfigT],
     value: Any,
-    _context: BaseConfigContext[ConfigT]
+    _context: BaseConfigContext[ConfigT],
 ) -> Any:
     if isinstance(value, cls):
         return value
@@ -157,7 +157,7 @@ loaders = functools.singledispatch(no_loader_strategy)
 def load(
     factory: Callable[[Any], Any],
     value: Any,
-    context: BaseConfigContext[ConfigT]
+    context: BaseConfigContext[ConfigT],
 ) -> Any:
     """Default loading of config objects.
 
@@ -205,7 +205,7 @@ def converter(func: Callable[[Any], dict[str, Any]], obj: Any = _MISSING) -> Any
 
 def loader(
     func: Callable[[type[ConfigT], Mapping[str, Any], BaseConfigContext[ConfigT]], Any],
-    factory: Any = _MISSING
+    factory: Any = _MISSING,
 ) -> Any:
     """Register a loader for an object within a convenient decorator.
 

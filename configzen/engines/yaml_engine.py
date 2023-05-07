@@ -1,4 +1,4 @@
-from collections.abc import ByteString, MutableMapping, Callable
+from collections.abc import ByteString, Callable, MutableMapping
 from typing import Any
 
 import yaml
@@ -12,7 +12,7 @@ class YamlEngine(Engine):
     def __init__(
         self,
         sections: dict[str, Callable[[Any], Any]] | None = None,
-        **options: Any
+        **options: Any,
     ) -> None:
         super().__init__(sections, **options)
 

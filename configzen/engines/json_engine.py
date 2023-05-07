@@ -31,7 +31,8 @@ class JSONEngine(Engine):
     ) -> None:
         super().__init__(schema, **options)
         if json_schema and not JSONSCHEMA_AVAILABLE:
-            raise RuntimeError("jsonschema is not available")
+            msg = "jsonschema is not available"
+            raise RuntimeError(msg)
         self.json_schema = json_schema
 
         self.json_schema_validator = json_schema_validator

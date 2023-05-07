@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from collections.abc import Iterable, Mapping
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from configzen.config import BaseConfigContext, ConfigT
@@ -25,7 +25,7 @@ def dataclass_convert(obj: Any) -> dict[str, Any]:
 def dataclass_load(
     cls: type[ConfigT],
     value: Mapping,
-    _context: BaseConfigContext[ConfigT]
+    _context: BaseConfigContext[ConfigT],
 ) -> ConfigT:
     if isinstance(value, cls):
         return value

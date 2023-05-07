@@ -12,7 +12,7 @@ import os
 import pathlib
 import sys
 import types
-from collections.abc import ByteString, Callable, Generator, MutableMapping, Iterator
+from collections.abc import ByteString, Callable, Generator, Iterator, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,7 +23,7 @@ from typing import (
     cast,
 )
 from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 from configzen.engine import Engine, convert, get_engine_class, load, loaders
 from configzen.recipes import dataclass_load
@@ -168,10 +168,11 @@ class ConfigSpec(Generic[BlobT]):
         if self.is_url:
             url = cast(str, self.filepath_or_stream)
             if urlparse(url).scheme not in self.allowed_url_schemes:
-                raise ValueError(
+                msg = (
                     f"URL scheme {urlparse(url).scheme!r} is not allowed, "
-                    f"must be one of {self.allowed_url_schemes!r}",
+                    f"must be one of {self.allowed_url_schemes!r}"
                 )
+                raise ValueError(msg)
             return urlopen(Request(url), **kwds)  # noqa: S310, ^
         if isinstance(self.filepath_or_stream, str | os.PathLike | pathlib.Path):
             return pathlib.Path(self.filepath_or_stream).open(**kwds)
@@ -186,11 +187,15 @@ class ConfigSpec(Generic[BlobT]):
             Keyword arguments to pass to the opening routine.
         """
         if self.is_url:
-            raise NotImplementedError("asynchronous URL opening is not supported")
+            msg = "asynchronous URL opening is not supported"
+            raise NotImplementedError(msg)
         if not AIOFILES_AVAILABLE:
+            msg = (
+                "aiofiles is not available, cannot open file "
+                "asynchronously (install with `pip install aiofiles`)"
+            )
             raise RuntimeError(
-                'aiofiles is not available, '
-                'cannot open file asynchronously (install with "pip install aiofiles")',
+                msg,
             )
         return aiofiles.open(cast(str, self.filepath_or_stream), **kwds)
 
@@ -198,7 +203,7 @@ class ConfigSpec(Generic[BlobT]):
         self,
         *,
         create_kwds: dict[str, Any] | None = None,
-        **kwds: Any
+        **kwds: Any,
     ) -> MutableMapping[str, Any]:
         """Read the configuration file.
 
@@ -231,7 +236,7 @@ class ConfigSpec(Generic[BlobT]):
         self,
         *,
         create_kwds: dict[str, Any] | None = None,
-        **kwds: Any
+        **kwds: Any,
     ) -> MutableMapping[str, Any]:
         """Read the configuration file asynchronously.
 
@@ -496,7 +501,8 @@ class ConfigSubcontext(BaseConfigContext, Generic[ConfigT]):
     @property
     def section(self) -> ConfigSection[ConfigT]:
         if self.owner is None:
-            raise ValueError("Cannot get section for unbound context")
+            msg = "Cannot get section for unbound context"
+            raise ValueError(msg)
         return ConfigSection(self.owner, list(self.trace_route()))
 
     @property
@@ -583,7 +589,7 @@ class FieldWatcher(FieldWatcherBase):
 
     def _on_dataclass_fields(
         self,
-        dataclass_fields: dict[str, dataclasses.Field]
+        dataclass_fields: dict[str, dataclasses.Field],
     ) -> None:
         sections = {
             name: cast(Callable, field.type)
@@ -704,7 +710,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
         self,
         data: Mapping[str, Any],
         /,
-        **kw_data: Any
+        **kw_data: Any,
     ) -> None:
         """Update the configuration with the given data, without loading."""
         data = {**data, **kw_data}
@@ -806,7 +812,8 @@ class Config(BaseConfig, root=True):
         self
         """
         if not self._context.loaded:
-            raise ValueError("Configuration has not been loaded, use load() instead")
+            msg = "Configuration has not been loaded, use load() instead"
+            raise ValueError(msg)
         if self._context.owner is self:
             self._context.loaded = False
             kwargs.setdefault("mode", "r")
@@ -816,7 +823,8 @@ class Config(BaseConfig, root=True):
             config = self(**copy.deepcopy(new_config))
             self._context.loaded = True
             return config
-        raise ValueError("partial reloading is not supported yet")
+        msg = "partial reloading is not supported yet"
+        raise ValueError(msg)
 
     def save(self, **kwargs: Any) -> int:
         """Save the configuration to the configuration file.
@@ -852,7 +860,8 @@ class Config(BaseConfig, root=True):
             The number of bytes written.
         """
         if self._context.spec.is_url:
-            raise NotImplementedError("Saving to URLs is not yet supported")
+            msg = "Saving to URLs is not yet supported"
+            raise NotImplementedError(msg)
         kwargs.setdefault("mode", "w")
         return self._context.spec.write(blob, **kwargs)
 
@@ -928,7 +937,8 @@ class AsyncConfig(BaseConfig, root=True):
         self
         """
         if not self._context.loaded:
-            raise ValueError("Configuration has not been loaded, use load() instead")
+            msg = "Configuration has not been loaded, use load() instead"
+            raise ValueError(msg)
         self._context.loaded = False
         kwargs.setdefault("mode", "r")
         kwargs.setdefault("create_kwds", {"mode": "w"})
@@ -972,7 +982,8 @@ class AsyncConfig(BaseConfig, root=True):
             The number of bytes written.
         """
         if self._context.spec.is_url:
-            raise NotImplementedError("Saving to URLs is not yet supported")
+            msg = "Saving to URLs is not yet supported"
+            raise NotImplementedError(msg)
         kwargs.setdefault("mode", "w")
         return await self._context.spec.write_async(blob, **kwargs)
 
@@ -980,7 +991,7 @@ class AsyncConfig(BaseConfig, root=True):
 def config_load(
     cls: type[ConfigT],
     value: MutableMapping[str, Any],
-    context: ConfigContext[ConfigT]
+    context: ConfigContext[ConfigT],
 ) -> ConfigT:
     value = cls._loader.load(value, context)
     config = dataclass_load(cls, value, context)
