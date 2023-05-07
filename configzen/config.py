@@ -334,7 +334,7 @@ if TYPE_CHECKING:
     MutableMappingType = TypeVar("MutableMappingType", bound="MutableMapping")  # Y001
 
 
-    class ConfigSection(NamedTuple, Generic[MutableMappingType]):
+    class ConfigAt(NamedTuple, Generic[MutableMappingType]):
         config: MutableMappingType
         path: list[str]
 
@@ -352,7 +352,7 @@ if TYPE_CHECKING:
 
         
 else:
-    class ConfigSection(NamedTuple):
+    class ConfigAt(NamedTuple):
         """Metadata for a configuration item."""
 
         config: MutableMapping
@@ -426,16 +426,16 @@ class DefaultLoader(BaseLoader):
         }
 
 
-def save(section: ConfigT_co | ConfigSection[ConfigT_co]) -> int:
+def save(section: ConfigT_co | ConfigAt[ConfigT_co]) -> int:
     if isinstance(section, Config):
         config = section
         return config.save()
 
     if TYPE_CHECKING:
-        section = cast(ConfigSection[ConfigT_co], section)
+        section = cast(ConfigAt[ConfigT_co], section)
     config = section.config
     data = dict(config.original)
-    ConfigSection(data, section.path).update(section.get())
+    ConfigAt(data, section.path).update(section.get())
     context = ConfigContext.get(config)
     spec = cast(ConfigSpec, context.spec)
     blob = spec.engine.dump(config_convert(data))
@@ -444,16 +444,16 @@ def save(section: ConfigT_co | ConfigSection[ConfigT_co]) -> int:
     return result
 
 
-async def save_async(section: AsyncConfigT_co | ConfigSection[AsyncConfigT_co]) -> int:
+async def save_async(section: AsyncConfigT_co | ConfigAt[AsyncConfigT_co]) -> int:
     if isinstance(section, AsyncConfig):
         config = section
         return await config.save_async()
 
     if TYPE_CHECKING:
-        section = cast(ConfigSection[AsyncConfigT_co], section)
+        section = cast(ConfigAt[AsyncConfigT_co], section)
     config = section.config
     data = dict(config.original)
-    ConfigSection(data, section.path).update(section.get())
+    ConfigAt(data, section.path).update(section.get())
     context = ConfigContext.get(config)
     spec = cast(ConfigSpec, context.spec)
     blob = spec.engine.dump(config_convert(data))
@@ -495,7 +495,7 @@ class BaseConfigContext(abc.ABC, Generic[ConfigT]):
 
     @property
     @abc.abstractmethod
-    def section(self) -> ConfigT | ConfigSection[ConfigT]:
+    def section(self) -> ConfigT | ConfigAt[ConfigT]:
         ...
 
 
@@ -513,11 +513,11 @@ class ConfigSubcontext(BaseConfigContext, Generic[ConfigT]):
         yield self.key
 
     @property
-    def section(self) -> ConfigSection[ConfigT]:
+    def section(self) -> ConfigAt[ConfigT]:
         if self.owner is None:
             msg = "Cannot get section for unbound context"
             raise ValueError(msg)
-        return ConfigSection(self.owner, list(self.trace_route()))
+        return ConfigAt(self.owner, list(self.trace_route()))
 
     @property
     def owner(self) -> ConfigT | None:
@@ -697,7 +697,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
         path: str | list[str],
         *,
         parse_dotlist: bool = True,
-    ) -> ConfigSection[ConfigT]:
+    ) -> ConfigAt[ConfigT]:
         """Return the configuration section metadata.
 
         Parameters
@@ -711,7 +711,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
 
         Returns
         -------
-        ConfigSection
+        ConfigAt
             The item metadata.
         """
         if isinstance(path, str):
@@ -719,7 +719,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
                 [*path] = path.split(".")
             else:
                 path = [path]
-        return ConfigSection(self, path)
+        return ConfigAt(self, path)
 
     def update(  # type: ignore[override]
         self,
