@@ -31,3 +31,4 @@ class MyConfig(Config):
 config = MyConfig.load('connspec.yaml', create_missing=True)
 config.point.x += 1
 config.point.y -= 1
+config.at("point.x").save()

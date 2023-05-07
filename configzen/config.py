@@ -20,7 +20,7 @@ from typing import (
     Generic,
     NamedTuple,
     TypeVar,
-    cast,
+    cast
 )
 from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
 from urllib.request import Request, urlopen
@@ -70,13 +70,13 @@ ConfigT_co = TypeVar("ConfigT_co", bound="Config", covariant=True)
 BlobT = TypeVar("BlobT", str, ByteString)
 LoaderFactoryT = Callable[[dict[str, Callable]], "BaseLoader"]
 AsyncConfigT_co = TypeVar("AsyncConfigT_co", bound="AsyncConfig", covariant=True)
-Opened = contextlib.AbstractContextManager
+OpenedT = contextlib.AbstractContextManager
 
 
 class ConfigSpec(Generic[BlobT]):
     """A specification for a configuration file."""
 
-    filepath_or_stream: Opened | str | os.PathLike | pathlib.Path
+    filepath_or_stream: OpenedT | str | os.PathLike | pathlib.Path
     defaults: dict[str, Any]
     create_missing: bool
     engine_name: str
@@ -86,7 +86,7 @@ class ConfigSpec(Generic[BlobT]):
 
     def __init__(
         self: ConfigSpec[BlobT],
-        filepath_or_stream: Opened[BlobT] | str,
+        filepath_or_stream: OpenedT[BlobT] | str,
         engine_name: str,
         *,
         cache_engine: bool = True,
@@ -153,7 +153,7 @@ class ConfigSpec(Generic[BlobT]):
         kwargs.setdefault("engine_name", pathlib.Path(spec).suffix[1:])
         return cls(spec, **kwargs)
 
-    def open_sync(self, **kwds: Any) -> Opened:
+    def open_sync(self, **kwds: Any) -> OpenedT:
         """Open the configuration file.
 
         Parameters
@@ -343,6 +343,14 @@ if TYPE_CHECKING:
 
         def update(self, _value: Any) -> None:
             ...
+        
+        async def save_async(self) -> int:
+            ...
+        
+        def save(self) -> int:
+            ...
+
+        
 else:
     class ConfigSection(NamedTuple):
         """Metadata for a configuration item."""
@@ -363,6 +371,12 @@ else:
             else:
                 key = path.pop()
                 self._replace(path=path).get()[key] = value
+
+        async def save_async(self) -> int:
+            return await save_async(self)
+        
+        def save(self) -> int:
+            return save(self)
 
 
 class DefaultLoader(BaseLoader):
@@ -678,7 +692,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
         """The original configuration dictionary."""
         return self._context.original
 
-    def section(
+    def at(
         self: ConfigT,
         path: str | list[str],
         *,
@@ -697,7 +711,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
 
         Returns
         -------
-        dict
+        ConfigSection
             The item metadata.
         """
         if isinstance(path, str):
