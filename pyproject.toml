@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "configzen"
+version = "0.1.0"
+description = "The easiest way to manage configuration files in Python"
+authors = ["bswck <bswck.dev@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+typing-extensions = {version = "^4.5.0", python = ">=3.9,<3.11"}
+pyyaml = {version = "^6.0", optional = true}
+orjson = {version = "^3.8.12", optional = true}
+
+[tool.poetry.extras]
+yaml = ["pyyaml"]
+json = ["orjson"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
