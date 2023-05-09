@@ -27,12 +27,12 @@ class JSONEngine(Engine):
 
     def __init__(
         self,
-        sections: dict[str, Any],
+        sections: dict[str, Any] | None = None,
         json_schema: dict[str, Any] | None = None,
         json_schema_validator: Any = None,
         **options: Any,
     ) -> None:
-        super().__init__(sections, **options)
+        super().__init__(sections or {}, **options)
         if json_schema and not JSONSCHEMA_AVAILABLE:
             msg = "jsonschema is not available"
             raise RuntimeError(msg)

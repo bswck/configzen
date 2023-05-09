@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from collections.abc import Callable
+from typing import Any
 
 from configzen.errors import MissingEngineError
-
-if TYPE_CHECKING:
-    pass
 
 try:
     import yaml
@@ -21,11 +19,18 @@ from configzen import Engine
 class YamlEngine(Engine):
     name = "yaml"
 
+    def __init__(
+        self,
+        sections: dict[str, Callable[[Any], Any]] | None = None,
+        **options: Any,
+    ) -> None:
+        super().__init__(sections or {}, **options)
+
     def load(
         self,
         blob,
         defaults=None,
-    ) -> dict[str, Any]:
+    ):
         if defaults is None:
             defaults = {}
         loaded = None
