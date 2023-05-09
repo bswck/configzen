@@ -1,14 +1,17 @@
 import os
-from collections.abc import ByteString, MutableMapping
-from typing import Any
+from collections.abc import MutableMapping
+from typing import Any, TYPE_CHECKING
 
 from configzen import Engine
+
+if TYPE_CHECKING:
+    pass
 
 if not os.getenv("CONFIGZEN_DISABLE_ORJSON"):
     try:
         import orjson as json
     except ImportError:
-        import json
+        import json  # type: ignore[no-redef]
 
 try:
     import jsonschema
@@ -24,24 +27,24 @@ class JSONEngine(Engine):
 
     def __init__(
         self,
-        schema: dict[str, Any] | None = None,
-        json_schema: dict[str, Any] = None,
-        json_schema_validator: Any =None,
+        sections: dict[str, Any],
+        json_schema: dict[str, Any] | None = None,
+        json_schema_validator: Any = None,
         **options: Any,
     ) -> None:
-        super().__init__(schema, **options)
+        super().__init__(sections, **options)
         if json_schema and not JSONSCHEMA_AVAILABLE:
             msg = "jsonschema is not available"
             raise RuntimeError(msg)
-        self.json_schema = json_schema
+        self.json_schema: dict[str, Any] = json_schema or {}
 
         self.json_schema_validator = json_schema_validator
 
     def load(
         self,
-        blob: str | ByteString | None,
-        defaults: MutableMapping[str, Any] | None = None,
-    ) -> MutableMapping[str, Any]:
+        blob,
+        defaults=None,
+    ) -> dict[str, Any]:
         if defaults is None:
             defaults = {}
         config = defaults | json.loads(blob or "{}", **self.engine_options)
@@ -55,7 +58,7 @@ class JSONEngine(Engine):
                 data, self.json_schema, cls=self.json_schema_validator,
             )
 
-    def _dump(self, config: MutableMapping[str, Any]) -> str | ByteString:
+    def _dump(self, config):
         if self.json_schema:
             self.validate(config)
         return json.dumps(config, **self.engine_options)

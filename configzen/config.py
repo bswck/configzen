@@ -43,14 +43,6 @@ except ImportError:
     aiofiles = None  # type: ignore[assignment]
     AIOFILES_AVAILABLE = False
 
-try:
-    import aiohttp
-
-    AIOHTTP_AVAILABLE = True
-except ImportError:
-    aiohttp = None  # type: ignore[assignment]
-    AIOHTTP_AVAILABLE = False
-
 __all__ = (
     "ConfigSpec",
     "BaseConfig",
@@ -65,7 +57,10 @@ _URL_SCHEMES: set[str] = set(uses_relative + uses_netloc + uses_params) - {""}
 _CONTEXT_ATTRIBUTE: str = "_context"
 
 ContextT = TypeVar("ContextT", bound="BaseConfigContext")
-BlobT = TypeVar("BlobT", str, ByteString)
+if sys.version_info >= (3, 10):
+    BlobT = TypeVar("BlobT", str, ByteString)
+else:
+    BlobT = TypeVar("BlobT", str, bytes, bytearray, memoryview)
 LoaderFactoryT = Callable[[dict[str, Callable]], "BaseLoader"]
 BaseConfigT = TypeVar("BaseConfigT", bound="BaseConfig")
 ConfigT = TypeVar("ConfigT", bound="Config")
