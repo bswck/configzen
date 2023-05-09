@@ -32,8 +32,8 @@ class Engine:
     def load(
         self,
         blob: str | ByteString | None,
-        defaults: MutableMapping[str, Any] | None = None,
-    ) -> MutableMapping[str, Any]:
+        defaults: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Load a config from a blob.
 
         Parameters

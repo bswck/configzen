@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import ByteString, Callable, MutableMapping
 from typing import Any
 

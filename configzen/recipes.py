@@ -30,7 +30,7 @@ def dataclass_load(
 ) -> ConfigT:
     if isinstance(value, cls):
         return value
-    if not isinstance(value, Mapping | Iterable):
+    if not isinstance(value, (Mapping, Iterable)):
         return cls(value)
     sig = inspect.signature(cls)
     try:
