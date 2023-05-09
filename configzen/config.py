@@ -336,7 +336,7 @@ if TYPE_CHECKING:
 
     class ConfigAt(NamedTuple, Generic[MutableMappingType]):
         config: MutableMappingType
-        path: list[str]
+        route: list[str]
 
         def get(self) -> Any:
             ...
@@ -356,21 +356,21 @@ else:
         """Metadata for a configuration item."""
 
         config: MutableMapping
-        path: list[str]
+        route: list[str]
 
         def get(self) -> Any:
             value = self.config
-            for key in self.path:
+            for key in self.route:
                 value = value[key]
             return value
 
         def update(self, value: Any) -> None:
-            path = list(self.path)
-            if len(path) == 1:
-                self.config[path[0]] = value
+            route = list(self.route)
+            if len(route) == 1:
+                self.config[route[0]] = value
             else:
-                key = path.pop()
-                self._replace(path=path).get()[key] = value
+                key = route.pop()
+                self._replace(route=route).get()[key] = value
 
         async def save_async(self) -> int:
             return await save_async(self)
@@ -434,7 +434,7 @@ def save(section: ConfigT | ConfigAt[ConfigT]) -> int:
     section = cast(ConfigAt[ConfigT], section)
     config = cast(ConfigT, section.config)
     data = config.original
-    at = ConfigAt(data, section.path)
+    at = ConfigAt(data, section.route)
     at.update(section.get())
     context = ConfigContext.get(config)
     spec = cast(ConfigSpec, context.spec)
@@ -453,7 +453,7 @@ async def save_async(section: AsyncConfigT | ConfigAt[AsyncConfigT]) -> int:
         section = cast(ConfigAt[AsyncConfigT], section)
     config = section.config
     data = config.original
-    ConfigAt(data, section.path).update(section.get())
+    ConfigAt(data, section.route).update(section.get())
     context = ConfigContext.get(config)
     spec = cast(ConfigSpec, context.spec)
     blob = spec.engine.dump(config_convert(data))
@@ -694,7 +694,7 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
 
     def at(
         self: BaseConfigT,
-        path: str | list[str],
+        route: str | list[str],
         *,
         parse_dotlist: bool = True,
     ) -> ConfigAt[BaseConfigT]:
@@ -702,11 +702,11 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
 
         Parameters
         ----------
-        path
-            The key of the item.
+        route
+            Route to the key of the item.
 
         parse_dotlist : bool, optional
-            Whether to parse the path as a dotlist, by default True
+            Whether to parse the route as a dotlist, by default True
 
 
         Returns
@@ -714,12 +714,12 @@ class BaseConfig(MutableMapping[str, Any], metaclass=FieldWatcher):
         ConfigAt
             The item metadata.
         """
-        if isinstance(path, str):
+        if isinstance(route, str):
             if parse_dotlist:
-                [*path] = path.split(".")
+                [*route] = route.split(".")
             else:
-                path = [path]
-        return ConfigAt(self, path)
+                route = [route]
+        return ConfigAt(self, route)
 
     def update(  # type: ignore[override]
         self,
