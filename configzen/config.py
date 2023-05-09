@@ -61,7 +61,8 @@ __all__ = (
     "save",
 )
 
-_URL_SCHEMES = set(uses_relative + uses_netloc + uses_params) - {""}
+_URL_SCHEMES: set[str] = set(uses_relative + uses_netloc + uses_params) - {""}
+_CONTEXT_ATTRIBUTE: str = "_context"
 
 ContextT = TypeVar("ContextT", bound="BaseConfigContext")
 BlobT = TypeVar("BlobT", str, ByteString)
@@ -473,12 +474,12 @@ class BaseConfigContext(abc.ABC, Generic[ConfigT]):
 
     @classmethod
     def get(cls, config: ConfigT) -> BaseConfigContext[ConfigT]:
-        return object.__getattribute__(config, "_context")
+        return object.__getattribute__(config, _CONTEXT_ATTRIBUTE)
 
     def bind_to(self, config: ConfigT) -> None:
         if config is None:
             return
-        object.__setattr__(config, "_context", self)
+        object.__setattr__(config, _CONTEXT_ATTRIBUTE, self)
 
     def enter(self, key: str) -> ConfigSubcontext[ConfigT]:
         return ConfigSubcontext(self, key)
