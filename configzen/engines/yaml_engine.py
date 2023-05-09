@@ -3,7 +3,15 @@ from __future__ import annotations
 from collections.abc import ByteString, Callable, MutableMapping
 from typing import Any
 
-import yaml
+from configzen.errors import MissingEngineError
+
+try:
+    import yaml
+except ModuleNotFoundError:
+    raise MissingEngineError(
+        "yaml engine requires pyyaml to be installed",
+    ) from None
+
 
 from configzen import Engine
 
