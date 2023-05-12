@@ -1,32 +1,35 @@
-from configzen import Config
+from __future__ import annotations
+
+import ipaddress
 
 
-class ConnSpec(Config):
-    host: str
+from configzen import Configuration
+
+
+class Point2D(Configuration):
+    x: int
+    y: int
+
+
+class MyConfig(Configuration):
+    spec: ConnSpec
+    point: Point2D = Point2D(x=0, y=0)
+
+
+class ConnSpec(Configuration):
+    host: ipaddress.IPv4Address
     port: int
     user: str
     password: str
     database: str
 
 
-class Point2D(Config):
-    x: int
-    y: int
-
-
-class MyConfig(Config):
-    spec: ConnSpec
-    point: Point2D = Point2D(0, 0)
-
-
-config = MyConfig.load("connspec.yaml")
+config = MyConfig.load("connspec.yaml", create_missing=True)
 original = config.original
+config.spec.host += 1
+config.spec.port += 1
+config.point.x += 1
+config.point.y += 1
 
-print(original)
-
-config.point.x += 100
-config.point.y -= 1
-
-config.at("point.x").save()  # leaving spec & point.y unchanged
-config(**original).save()  # rollback
-print(original)
+# config.__context__.spec.filepath_or_stream = "connspec2.yaml"
+print(config.save())
