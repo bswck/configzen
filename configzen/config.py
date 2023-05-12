@@ -552,7 +552,8 @@ class BaseConfiguration(BaseModel, metaclass=BaseConfigZenMetaclass, root=True):
         context = get_context(self)
         if (
             context 
-            and isinstance(value, BaseConfiguration)
+            # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
+            and BaseConfiguration in type(value).mro()
             and not hasattr(value, _CONTEXT_ATTRIBUTE)
         ):
             context.enter(name).bind_to(value)

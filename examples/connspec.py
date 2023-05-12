@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import ipaddress
 
+from pydantic import BaseModel
 
 from configzen import Configuration
 
 
-class Point2D(Configuration):
+class Point2D(BaseModel):
     x: int
     y: int
 
@@ -16,7 +17,7 @@ class MyConfig(Configuration):
     point: Point2D = Point2D(x=0, y=0)
 
 
-class ConnSpec(Configuration):
+class ConnSpec(BaseModel):
     host: ipaddress.IPv4Address
     port: int
     user: str
@@ -25,6 +26,7 @@ class ConnSpec(Configuration):
 
 
 config = MyConfig.load("connspec.yaml", create_missing=True)
+print(config.spec.dict())
 original = config.original
 config.spec.host += 1
 config.spec.port += 1
