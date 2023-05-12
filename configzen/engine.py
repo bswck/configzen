@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
-from collections.abc import ByteString, Mapping
+from collections.abc import ByteString
 from typing import Any, ClassVar, TypeVar, Generic
 
 __all__ = (
@@ -42,7 +42,7 @@ class Engine(Generic[ModelT]):
         """
         raise NotImplementedError
 
-    def dump_mapping(self, mapping: Mapping[str, Any]) -> str | ByteString:
+    def dump_object(self, obj: object) -> str | ByteString:
         raise NotImplementedError
 
     def dump(
@@ -61,7 +61,7 @@ class Engine(Generic[ModelT]):
         str | ByteString
             The dumped config blob.
         """
-        return self.dump_mapping(model.dict())
+        return self.dump_object(model)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

@@ -40,9 +40,9 @@ except ImportError:
 
 __all__ = (
     "ConfigSpec",
-    "BaseConfiguration",
-    "Configuration",
-    "AsyncConfiguration",
+    "BaseConfigModel",
+    "ConfigModel",
+    "AsyncConfigModel",
     "save",
 )
 
@@ -64,8 +64,11 @@ OpenedT = contextlib.AbstractContextManager
 def _get_defaults_from_model_class(model: type[BaseModel]) -> dict[str, Any]:
     defaults = {}
     for field in model.__fields__.values():
+        default = field.default
         if not field.required:
-            defaults[field.name] = field.default
+            if isinstance(default, BaseModel):
+                default = default.dict()
+            defaults[field.name] = default
     return defaults
 
 
@@ -74,7 +77,7 @@ class ConfigSpec(Generic[BlobT]):
 
     filepath_or_stream: OpenedT | str | os.PathLike | pathlib.Path
     defaults: dict[str, Any]
-    create_missing: bool
+    create_if_missing: bool
     engine_name: str
     _engine: Engine | None
     _engine_options: dict[str, Any]
@@ -87,7 +90,7 @@ class ConfigSpec(Generic[BlobT]):
         engine_name: str,
         *,
         cache_engine: bool = True,
-        create_missing: bool = False,
+        create_if_missing: bool = False,
         **engine_options: Any,
     ) -> None:
         """Parameters
@@ -101,7 +104,7 @@ class ConfigSpec(Generic[BlobT]):
         cache_engine : bool, optional
             Whether to cache the engine instance. Defaults to True.
             If False, a new engine instance will be created for each load and dump.
-        create_missing : bool, optional
+        create_if_missing : bool, optional
             Whether to automatically create missing keys when loading the configuration.
         **engine_options
             Additional keyword arguments to pass to the engine.
@@ -115,7 +118,7 @@ class ConfigSpec(Generic[BlobT]):
             self._engine = get_engine_class(self.engine_name)(**engine_options)
         self.cache_engine = cache_engine
 
-        self.create_missing = create_missing
+        self.create_if_missing = create_if_missing
 
     def _get_engine(self) -> Engine:
         """Get the engine instance to use for loading and saving the configuration."""
@@ -216,9 +219,9 @@ class ConfigSpec(Generic[BlobT]):
                 blob = fp.read()
         except FileNotFoundError:
             blob = None
-            if self.create_missing:
+            if self.create_if_missing:
                 defaults = _get_defaults_from_model_class(config_class)
-                blob = self.engine.dump_mapping(defaults)
+                blob = self.engine.dump_object(defaults)
                 if create_kwds is None:
                     create_kwds = {}
                 self.write(blob, **create_kwds)
@@ -250,8 +253,8 @@ class ConfigSpec(Generic[BlobT]):
             async with self.open_file_async(**kwds) as fp:
                 blob = await fp.read()
         except FileNotFoundError:
-            if self.create_missing:
-                blob = self.engine.dump_mapping(self.defaults)
+            if self.create_if_missing:
+                blob = self.engine.dump_object(self.defaults)
                 if create_kwds is None:
                     create_kwds = {}
                 await self.write_async(blob, **create_kwds)
@@ -318,7 +321,7 @@ else:
 
 
 def save(section: ConfigT | ConfigAt) -> int:
-    if isinstance(section, Configuration):
+    if isinstance(section, ConfigModel):
         config = section
         return config.save()
 
@@ -327,14 +330,14 @@ def save(section: ConfigT | ConfigAt) -> int:
     at = ConfigAt(config, data, section.route)
     data = at.update(section.get())
     context = AnyContext.get(config)
-    blob = context.spec.engine.dump_mapping(data)
+    blob = context.spec.engine.dump_object(data)
     result = config.write(blob)
     context.original = data
     return result
 
 
 async def save_async(section: AsyncConfigT | ConfigAt) -> int:
-    if isinstance(section, AsyncConfiguration):
+    if isinstance(section, AsyncConfigModel):
         config = section
         return await config.save_async()
 
@@ -343,7 +346,7 @@ async def save_async(section: AsyncConfigT | ConfigAt) -> int:
     at = ConfigAt(config, data, section.route)
     data = at.update(section.get())
     context = AnyContext.get(config)
-    blob = context.spec.engine.dump_mapping(data)
+    blob = context.spec.engine.dump_object(data)
     result = await config.write_async(blob)
     context.original = data
     return result
@@ -494,7 +497,7 @@ class BaseConfigZenMetaclass(ModelMetaclass):
         return super().__new__(mcs, name, bases, namespace, **kwargs)        
 
 
-class BaseConfiguration(BaseModel, metaclass=BaseConfigZenMetaclass, root=True):
+class BaseConfigModel(BaseModel, metaclass=BaseConfigZenMetaclass, root=True):
     """A configuration dictionary."""
     
     @property
@@ -548,12 +551,12 @@ class BaseConfiguration(BaseModel, metaclass=BaseConfigZenMetaclass, root=True):
         self.__setstate__(get_context(self).original)
         context.loaded = True
 
-    def _ensure_bound(self, name, value):
+    def _ensure_model_with_context(self, name, value):
         context = get_context(self)
         if (
             context 
             # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
-            and BaseConfiguration in type(value).mro()
+            and BaseConfigModel in type(value).mro()
             and not hasattr(value, _CONTEXT_ATTRIBUTE)
         ):
             context.enter(name).bind_to(value)
@@ -561,18 +564,18 @@ class BaseConfiguration(BaseModel, metaclass=BaseConfigZenMetaclass, root=True):
 
     def __getattribute__(self, attr):
         value = super().__getattribute__(attr)
-        if isinstance(value, BaseConfiguration):
-            return self._ensure_bound(attr, value)
+        if isinstance(value, BaseConfigModel):
+            return self._ensure_model_with_context(attr, value)
         return value
 
 
-class Configuration(BaseConfiguration, root=True):
+class ConfigModel(BaseConfigModel, root=True):
 
     @classmethod
     def load(
         cls: type[ConfigT],
         spec: ConfigSpec | str,
-        create_missing: bool | None = None,
+        create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigT:
         """Load the configuration file.
@@ -582,7 +585,7 @@ class Configuration(BaseConfiguration, root=True):
         ----------
         spec : ConfigSpec
             The configuration specification.
-        create_missing : bool
+        create_if_missing : bool
             Whether to create the configuration file if it does not exist.
         **kwargs
             Keyword arguments to pass to the read method.
@@ -594,10 +597,10 @@ class Configuration(BaseConfiguration, root=True):
         cls.update_forward_refs()
         if isinstance(spec, str):
             spec = ConfigSpec.from_str(spec)
-        if create_missing is not None:
-            spec.create_missing = create_missing
+        if create_if_missing is not None:
+            spec.create_if_missing = create_if_missing
         kwargs.setdefault("mode", "r")
-        if create_missing:
+        if create_if_missing:
             kwargs.setdefault("create_kwds", {"mode": "w"})
         context: Context[ConfigT] = Context(spec)
         config = spec.read(config_class=cls, **kwargs)
@@ -628,6 +631,7 @@ class Configuration(BaseConfiguration, root=True):
             kwargs.setdefault("mode", "r")
             kwargs.setdefault("create_kwds", {"mode": "w"})
             new_config = context.spec.read(**kwargs)
+            context.bind_to(new_config)
             context.original = new_config.dict()
             new_config.rollback()
             context.loaded = True
@@ -676,14 +680,14 @@ class Configuration(BaseConfiguration, root=True):
         return context.spec.write(blob, **kwargs)
 
 
-class AsyncConfiguration(BaseConfiguration, root=True):
+class AsyncConfigModel(BaseConfigModel, root=True):
 
     @classmethod
     async def load_async(
         cls: type[AsyncConfigT],
         spec: ConfigSpec | str,
         *,
-        create_missing: bool = False,
+        create_if_missing: bool = False,
         **kwargs: Any,
     ) -> AsyncConfigT:
         """Load the configuration file asynchronously.
@@ -693,7 +697,7 @@ class AsyncConfiguration(BaseConfiguration, root=True):
         ----------
         spec : ConfigSpec
             The configuration specification.
-        create_missing : bool
+        create_if_missing : bool
             Whether to create the configuration file if it does not exist.
         **kwargs
             Keyword arguments to pass to the read method.
@@ -705,7 +709,7 @@ class AsyncConfiguration(BaseConfiguration, root=True):
         if isinstance(spec, str):
             spec = ConfigSpec.from_str(spec)
         kwargs.setdefault("mode", "r")
-        if create_missing:
+        if create_if_missing:
             kwargs.setdefault("create_kwds", {"mode": "w"})
         context: Context[AsyncConfigT] = Context(spec)
         config = spec.read(config_class=cls, **kwargs)
@@ -734,7 +738,9 @@ class AsyncConfiguration(BaseConfiguration, root=True):
         kwargs.setdefault("mode", "r")
         kwargs.setdefault("create_kwds", {"mode": "w"})
         new_async_config = await context.spec.read_async(**kwargs)
+        context.bind_to(new_async_config)
         context.original = new_async_config.dict()
+        self.rollback()
         context.loaded = True
         return new_async_config
 
