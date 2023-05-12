@@ -47,7 +47,7 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(uses_relative + uses_netloc + uses_params) - {""}
-_CONTEXT_ATTRIBUTE: str = "__context__"
+_CONTEXT_ATTRIBUTE: str = "__config_context__"
 
 T = TypeVar("T")
 ContextT = TypeVar("ContextT", bound="AnyContext")
