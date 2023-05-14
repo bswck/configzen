@@ -118,7 +118,7 @@ ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
 AsyncConfigModelT = TypeVar("AsyncConfigModelT", bound="AsyncConfigModel")
 
 OpenedT = contextlib.AbstractContextManager
-ResourceT = OpenedT | str | os.PathLike | pathlib.Path
+RawResourceT = OpenedT | str | os.PathLike | pathlib.Path
 
 
 def _get_defaults_from_model_class(
@@ -381,7 +381,7 @@ class ConfigResource:
 
     def __init__(
         self: ConfigResource,
-        resource: ResourceT,
+        resource: RawResourceT,
         ac_parser: str | None = None,
         *,
         create_if_missing: bool = False,
@@ -411,7 +411,7 @@ class ConfigResource:
         self._ac_load_options, self._ac_dump_options = _split_ac_options(options)
 
     @property
-    def resource(self) -> ResourceT:
+    def resource(self) -> RawResourceT:
         """
         The resource of the configuration.
 
@@ -424,7 +424,7 @@ class ConfigResource:
         return self._resource
 
     @resource.setter
-    def resource(self, value: ResourceT) -> None:
+    def resource(self, value: RawResourceT) -> None:
         """
         The resource of the configuration.
 
@@ -1285,7 +1285,7 @@ class ConfigModelBase(
     @classmethod
     def _resolve_resource(
         cls,
-        resource_argument: ConfigResource | ResourceT | None = None,
+        resource_argument: ConfigResource | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
     ) -> ConfigResource:
@@ -1378,7 +1378,7 @@ class ConfigModel(ConfigModelBase, root=True):
     @classmethod
     def load(
         cls: type[ConfigModelT],
-        resource: ConfigResource | ResourceT | None = None,
+        resource: ConfigResource | RawResourceT | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -1477,7 +1477,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
     @classmethod
     async def load_async(
         cls: type[AsyncConfigModelT],
-        resource: ConfigResource | ResourceT | None,
+        resource: ConfigResource | RawResourceT | None,
         *,
         create_if_missing: bool = False,
         **kwargs: Any,
@@ -1587,4 +1587,4 @@ class Meta(pydantic.BaseSettings.Config):
 
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
-    resource: ResourceT | None = None
+    resource: ConfigResource | RawResourceT | None = None
