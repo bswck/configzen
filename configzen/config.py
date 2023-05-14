@@ -89,9 +89,9 @@ except ImportError:
 __all__ = (
     "ConfigResource",
     "ConfigModelBase",
-    "ConfigModel",
+    "SyncConfigModel",
     "AsyncConfigModel",
-    "DualIOConfigModel",
+    "ConfigModel",
     "ConfigMeta",
     "save",
     "save_async",
@@ -952,7 +952,7 @@ def save(section: ConfigModelT | ConfigAt, **kwargs: Any) -> int:
     -------
     The number of bytes written.
     """
-    if isinstance(section, ConfigModel):
+    if isinstance(section, SyncConfigModel):
         config = section
         return config.save()
 
@@ -1012,7 +1012,7 @@ def reload(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     -------
     The reloaded configuration or its belonging item.
     """
-    if isinstance(section, ConfigModel):
+    if isinstance(section, SyncConfigModel):
         config = section
         return config.reload()
 
@@ -1426,7 +1426,7 @@ class ConfigModelBase(
         return value
 
 
-class ConfigModel(ConfigModelBase, root=True):
+class SyncConfigModel(ConfigModelBase, root=True):
 
     @classmethod
     def load(
@@ -1627,7 +1627,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         return await context.resource.write_async(blob, **kwargs)
 
 
-class DualIOConfigModel(ConfigModel, AsyncConfigModel, root=True):
+class ConfigModel(SyncConfigModel, AsyncConfigModel, root=True):
     """
     A configuration model that can be used both synchronously and asynchronously.
     """
