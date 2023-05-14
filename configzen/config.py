@@ -822,7 +822,7 @@ else:
             -------
             The value of the item.
             """
-            scope = _vars(self.mapping or self.owner.dict())
+            scope = _vars(self.mapping or self.owner)
             route_here = []
             try:
                 for part in self.route:
@@ -846,7 +846,7 @@ else:
             The updated mapping.
             """
             route = list(self.route)
-            mapping = self.mapping or self.owner.dict()
+            mapping = self.mapping or self.owner
             key = route.pop()
             submapping = _vars(mapping)
             route_here = []
@@ -1001,9 +1001,9 @@ def reload(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
 
     config = section.owner
     context = get_context(config)
-    data = config.dict()
+    data = config.__dict__
     newest = context.resource.read(config_class=type(config), **kwargs)
-    section_data = ConfigAt(newest, newest.dict(), section.route).get()
+    section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
     config.__dict__.update(new_mapping)
     return section_data
@@ -1030,9 +1030,9 @@ async def reload_async(section: AsyncConfigModelT | ConfigAt, **kwargs: Any) -> 
 
     config = section.owner
     context = get_context(config)
-    data = config.dict()
+    data = config.__dict__
     newest = await context.resource.read_async(config_class=type(config), **kwargs)
-    section_data = ConfigAt(newest, newest.dict(), section.route).get()
+    section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
     config.__dict__.update(new_mapping)
     return new_mapping
@@ -1359,7 +1359,7 @@ class ConfigModelBase(
         None
         """
         context = get_context(self)
-        self.__dict__ = context.initial_state
+        self.__dict__.update(context.initial_state)
 
     def _ensure_settings_with_context(
         self,
