@@ -1,9 +1,9 @@
 """
 The core module of the _configzen_ library.
 
-This module provides a way to manage configuration files and resources
-in a consistent way. It also provides a way to load and save configuration
-files in a type-safe way.
+This module provides an API to manage configuration files and resources
+in a consistent way. It also provides tools to load and save configuration
+files in various formats and within a number of advanced methods.
 
 .. code-block:: python
 
