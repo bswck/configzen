@@ -111,4 +111,4 @@ or [submit a pull request](https://github.com/bswck/configzen/compare).
 * [@Lunarmagpie](https://github.com/Lunarmagpie) for _crucial_ design tips and ideas.
  
 ## Author
-* [bswck](https://github.com/bswck) (contact: mailto://bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck#8238`)
+* [bswck](https://github.com/bswck) (contact: bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck#8238`)
