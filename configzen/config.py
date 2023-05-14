@@ -403,6 +403,7 @@ class ConfigResource:
         return self.load_into(config_class, blob, **self._ac_load_options)
 
     def write(self, blob: str | collections.abc.ByteString, **kwds: Any) -> int:
+        kwds = self._get_default_kwargs("write", kwds)
         with self.open_resource(**kwds) as fp:
             return fp.write(blob)
 
@@ -895,7 +896,6 @@ class ConfigModel(ConfigModelBase, root=True):
             raise ValueError(msg)
         if context.owner is self:
             context.loaded = False
-            kwargs.setdefault("mode", "r")
             new_config = context.resource.read(**kwargs)
             context.bind_to(new_config)
             context.original = new_config.dict()
@@ -941,7 +941,6 @@ class ConfigModel(ConfigModelBase, root=True):
         if context.resource.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        kwargs.setdefault("mode", "w")
         return context.resource.write(blob, **kwargs)
 
 
@@ -972,7 +971,6 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         self
         """
         resource = cls._resolve_resource(resource, create_if_missing=create_if_missing)
-        kwargs.setdefault("mode", "r")
         context = Context(resource)  # type: Context[AsyncConfigModelT]
         config = resource.read(config_class=cls, **kwargs)
         context.owner = config
@@ -998,7 +996,6 @@ class AsyncConfigModel(ConfigModelBase, root=True):
             raise ValueError(msg)
         if context.owner is self:
             context.loaded = False
-            kwargs.setdefault("mode", "r")
             new_async_config = await context.resource.read_async(**kwargs)
             context.bind_to(new_async_config)
             context.original = new_async_config.dict()
@@ -1048,7 +1045,6 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         if context.resource.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        kwargs.setdefault("mode", "w")
         return await context.resource.write_async(blob, **kwargs)
 
 
