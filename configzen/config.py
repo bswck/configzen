@@ -66,7 +66,6 @@ import functools
 import io
 import os
 import pathlib
-import types
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
