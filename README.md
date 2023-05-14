@@ -7,7 +7,7 @@ and [anyconfig](https://github.com/ssato/python-anyconfig) to provide the most s
 way on Earth of managing configuration files in your Python projects.
 
 Thanks to this, instead of manually using 
-`pyyaml` for YAML configuration files, `configparser` for `ini` files, `json` for JSON files, etc. 
+`pyyaml` for YAML configuration files, `configparser` for INI files, `json` for JSON files, etc. 
 you can create a data model of your configuration and let _configzen_ do the rest and provide you 
 with some extra features on top of that, such as both synchronous and asynchronous, 
 preferably full or partial reloading and saving of your structured configuration.
