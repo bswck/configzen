@@ -1,7 +1,7 @@
 # configzen
 _configzen_ – managing configuration files easily.
 
-## 📖 About
+## What is it?
 _configzen_ combines the power of [pydantic](https://pydantic-docs.helpmanual.io/) 
 and [anyconfig](https://github.com/ssato/python-anyconfig) to provide the most simplistic
 way on Earth of managing configuration files in your Python projects.
@@ -90,9 +90,25 @@ or save the whole configuration:
 ```
 
 ## Setup
+For using _configzen_ in your project, you need to install it first:
+```bash
+pip install configzen
+```
+
+For development, you can clone the repository and install its dependencies with [poetry](https://python-poetry.org/):
+```bash
+poetry install --with dev
+```
+
 ## License
 [MIT License](https://choosealicense.com/licenses/mit/)
+
 ## Contributing
-## 📧 Contact
-* [bswck](https://github.com/bswck)
-## 🔗 Related Projects 
+Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose) 
+or [submit a pull request](https://github.com/bswck/configzen/compare).
+
+## Credits
+* [@Lunarmagpie](https://github.com/Lunarmagpie) for _crucial_ design tips and ideas.
+ 
+## Author
+* [bswck](https://github.com/bswck) (contact: mailto://bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck#8238`)
