@@ -18,6 +18,12 @@ anyconfig = "^0.13.0"
 yaml = ["pyyaml"]
 json = ["orjson"]
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.0.267"
+mypy = "^1.3.0"
+black = "^23.3.0"
+pre-commit = "^3.3.1"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
