@@ -12,6 +12,7 @@ typing-extensions = {version = "^4.5.0", python = ">=3.9,<3.11"}
 pyyaml = {version = "^6.0", optional = true}
 orjson = {version = "^3.8.12", optional = true}
 pydantic = "^1.10.7"
+anyconfig = "^0.13.0"
 
 [tool.poetry.extras]
 yaml = ["pyyaml"]
