@@ -66,6 +66,7 @@ import functools
 import io
 import os
 import pathlib
+import types
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
@@ -179,7 +180,8 @@ def convert(obj: Any) -> Any:
     return obj
 
 
-convert.registry = convert.registry | ENCODERS_BY_TYPE
+for obj_type, encoder in ENCODERS_BY_TYPE.items():
+    convert.register(obj_type, encoder)
 
 
 def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] | Any:
@@ -752,7 +754,7 @@ class ConfigResource:
 
     async def write_async(
         self,
-        blob: str | collections.abc.ByteString, 
+        blob: str | collections.abc.ByteString,
         **kwargs: Any,
     ) -> int:
         """
