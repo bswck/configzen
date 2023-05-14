@@ -7,13 +7,13 @@ files in a type-safe way.
 
 .. code-block:: python
 
-    from configzen import ConfigModel, ConfigResource, Meta
+    from configzen import ConfigModel, ConfigResource, ConfigField, Meta
 
     class DatabaseConfig(ConfigModel):
         host: str
         port: int
         user: str
-        password: str = Field(exclude=True)
+        password: str = ConfigField(exclude=True)
 
         class Config(Meta):
             resource = "examples/database.json"
