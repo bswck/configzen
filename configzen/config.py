@@ -73,8 +73,8 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple, TypeVar, ca
 
 import anyconfig
 import pydantic
-from pydantic.main import ModelMetaclass
 from pydantic.json import ENCODERS_BY_TYPE
+from pydantic.main import ModelMetaclass
 
 from configzen.errors import ConfigItemAccessError, UnknownParserError
 
