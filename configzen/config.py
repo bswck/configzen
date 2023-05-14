@@ -1580,11 +1580,11 @@ class Meta(pydantic.BaseSettings.Config):
 
     Attributes
     ----------
-    resource : ConfigResource | str | None
+    resource
         The configuration resource to read from/write to.
 
         If a string, it will be interpreted as a path to a file.
 
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
-    resource: ConfigResource | str | None = None
+    resource: ResourceT | None = None
