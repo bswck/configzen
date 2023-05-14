@@ -25,16 +25,16 @@ You can create a data model for it like this:
 # config.py
 from ipaddress import IPv4Address, IPv6Address
 from typing import Literal
-from configzen import ConfigModel, Meta, Field
+from configzen import ConfigModel, ConfigMeta, ConfigField
 
 
 class DatabaseConfig(ConfigModel):
     host: IPv4Address | IPv6Address | Literal['localhost']
     port: int
     user: str
-    password: str = Field(exclude=True)
+    password: str = ConfigField(exclude=True)
 
-    class Config(Meta):
+    class Config(ConfigMeta):
         resource = "database.yaml"
         env_prefix = "DB_"
 

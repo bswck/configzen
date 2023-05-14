@@ -90,7 +90,7 @@ __all__ = (
     "ConfigModelBase",
     "ConfigModel",
     "AsyncConfigModel",
-    "Meta",
+    "ConfigMeta",
     "save",
     "save_async",
     "reload",
@@ -1581,7 +1581,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         return await context.resource.write_async(blob, **kwargs)
 
 
-class Meta(pydantic.BaseSettings.Config):
+class ConfigMeta(pydantic.BaseSettings.Config):
     """
     Meta-configuration for the `ConfigModel` class.
 
