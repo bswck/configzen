@@ -273,6 +273,23 @@ def loader(func: Callable[[Any], T], cls: type[T] | None = None) -> type[T] | An
 
 
 @convert.register
+def convert_list(obj: list) -> list:
+    """
+    Convert a list to safely-serializable form.
+
+    Parameters
+    ----------
+    obj
+        The list to convert.
+
+    Returns
+    -------
+    The converted list.
+    """
+    return [convert(item) for item in obj]
+
+
+@convert.register
 def convert_mapping(obj: collections.abc.Mapping) -> dict[str, Any]:
     """
     Convert a mapping to safely-serializable form.
