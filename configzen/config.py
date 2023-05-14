@@ -34,25 +34,25 @@ files in a type-safe way.
 
     db_config.host = "otherhost"
     db_config.port = 5433
-    
+
     db_config.at("host").save()
-    
+
     print(db_config.host)
     print(db_config.port)
-    
+
     # Output:
     # otherhost
     # 5432  # <- not 5433, because we saved only host
 
     db_config.host = "anotherhost"
     db_config.at("port").reload()
-    
+
     print(db_config.host)
     print(db_config.port)
-    
+
     # Output:
     # otherhost  # <- not anotherhost, because we reloaded only port
-    # 5432 
+    # 5432
 """
 
 from __future__ import annotations
