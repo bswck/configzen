@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import collections.abc
 import contextlib
 import copy
 import dataclasses
@@ -10,18 +11,24 @@ import functools
 import io
 import os
 import pathlib
-import collections.abc
 import urllib.parse
 import urllib.request
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple, TypeVar, cast, \
-    overload
+from collections.abc import Callable, Generator
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    NamedTuple,
+    TypeVar,
+    cast,
+)
 
 import anyconfig
 import pydantic
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import UnknownParserError, ConfigItemAccessError
+from configzen.errors import ConfigItemAccessError, UnknownParserError
 
 try:
     import aiofiles
@@ -50,9 +57,9 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative 
-    + urllib.parse.uses_netloc 
-    + urllib.parse.uses_params
+    urllib.parse.uses_relative
+    + urllib.parse.uses_netloc
+    + urllib.parse.uses_params,
 ) - {""}
 _CONTEXT: str = "__config_context__"
 
@@ -64,10 +71,11 @@ ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
 AsyncConfigModelT = TypeVar("AsyncConfigModelT", bound="AsyncConfigModel")
 
 OpenedT = contextlib.AbstractContextManager
+ResourceT = OpenedT | str | os.PathLike | pathlib.Path
 
 
 def _get_defaults_from_model_class(
-    model: type[pydantic.BaseSettings]
+    model: type[pydantic.BaseSettings],
 ) -> dict[str, Any]:
     defaults = {}
     for field in model.__fields__.values():
@@ -91,13 +99,13 @@ def _is_namedtuple(
 ) -> bool:
     return (
         isinstance(obj, tuple) and
-        hasattr(obj, '_asdict') and
-        hasattr(obj, '_fields')
+        hasattr(obj, "_asdict") and
+        hasattr(obj, "_fields")
     )
 
 
 @functools.singledispatch
-def convert(obj):
+def convert(obj: Any) -> Any:
     """Convert a value to a format that can be safely serialized."""
     if dataclasses.is_dataclass(obj):
         return dataclasses.asdict(obj)
@@ -109,44 +117,34 @@ def convert(obj):
 _convert_register = convert.register
 
 
-@overload
-def converter(func: Callable[[T], Any], cls: None = None) -> Callable[[type[T]], Any]:
-    ...
-
-
-@overload
-def converter(func: Callable[[T], Any], cls: type[T] = ...) -> type[T]:
-    ...
-
-
-def converter(func, cls=None):
+def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] | Any:
     """Register a converter function for a type."""
     if cls is None:
         return functools.partial(converter, func)
 
     _convert_register(cls, func)
-    
+
     if not hasattr(cls, "__get_validators__"):
-        def validator_gen():
+        def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: load.dispatch(cls)(cls, value)
-        
-        cls.__get_validators__ = validator_gen
-    
+
+        cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
+
     return cls
 
 
 @functools.singledispatch
-def load(cls, value):
+def load(cls: Any, value: Any) -> Any:
     if isinstance(value, cls):
-        return value    
+        return value
     return cls(value)
 
 
-def loader(func, cls=None):
+def loader(func: Callable[[Any], T], cls: type[T] | None = None) -> type[T] | Any:
     """Register a loader function for a type."""
     if cls is None:
         return functools.partial(loader, func)
-    
+
     load.register(cls, func)
     return cls
 
@@ -157,7 +155,7 @@ def convert_mapping(obj: collections.abc.Mapping) -> dict[str, Any]:
 
 
 @functools.singledispatch
-def convert_namedtuple(obj) -> dict[str, Any]:
+def convert_namedtuple(obj: tuple) -> dict[str, Any]:
     # Initially I wanted it to be convert(obj._asdict()), but
     # pydantic doesn't seem to be friends with custom NamedTuples.
     return convert(list(obj))
@@ -165,21 +163,26 @@ def convert_namedtuple(obj) -> dict[str, Any]:
 
 def split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """Split a dictionary of options into those for loading and those for dumping."""
-    load_options = {}
-    dump_options = {}
+    load_options: dict[str, Any] = {}
+    dump_options: dict[str, Any] = {}
     for key, value in options.items():
+        final_key = key
         if key.startswith("dump_"):
-            key = key.removeprefix("dump_")
+            final_key = key.removeprefix("dump_")
             targets = [dump_options]
         elif key.startswith("load_"):
-            key = key.removeprefix("load_")
+            final_key = key.removeprefix("load_")
             targets = [dump_options]
         else:
             targets = [load_options, dump_options]
         for target in targets:
-            if key in target:
-                raise ValueError(f"overlapping option {key}={value!r}")
-            target[key] = value
+            if final_key in target:
+                msg = (
+                    f"option {key}={value!r} overlaps with "
+                    f"defined {final_key}={target[final_key]!r}"
+                )
+                raise ValueError(msg)
+            target[final_key] = value
 
     return load_options, dump_options
 
@@ -198,7 +201,7 @@ class ConfigResource:
 
     def __init__(
         self: ConfigResource,
-        resource: OpenedT[str] | str,
+        resource: ResourceT,
         ac_parser: str | None = None,
         *,
         create_if_missing: bool = False,
@@ -218,7 +221,7 @@ class ConfigResource:
             Whether to use Pydantic's JSON encoder/decoder instead of the default
             anyconfig one.
         **options
-            Additional keyword arguments to pass to 
+            Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
         self.ac_parser = ac_parser
@@ -228,11 +231,11 @@ class ConfigResource:
         self._ac_load_options, self._ac_dump_options = split_ac_options(options)
 
     @property
-    def resource(self) -> OpenedT[str] | str | os.PathLike | pathlib.Path:
+    def resource(self) -> ResourceT:
         return self._resource
-    
+
     @resource.setter
-    def resource(self, value: OpenedT[str] | str | os.PathLike | pathlib.Path) -> None:
+    def resource(self, value: ResourceT) -> None:
         self._resource = value
         self.ac_parser = self.ac_parser or self._guess_ac_parser()
 
@@ -241,17 +244,18 @@ class ConfigResource:
         if isinstance(self.resource, str):
             ac_parser = pathlib.Path(self.resource).suffix[1:].casefold()
             if not ac_parser:
+                msg = f"Could not guess the engine to use for {self.resource!r}."
                 raise UnknownParserError(
-                    f"Could not guess the engine to use for {self.resource!r}."
+                    msg,
                 )
         return ac_parser
 
     def load_into(
-        self, 
-        config_class: type[ConfigModelBaseT], 
+        self,
+        config_class: type[ConfigModelBaseT],
         blob: str,
-        ac_parser: str | None = None, 
-        **kwargs: Any
+        ac_parser: str | None = None,
+        **kwargs: Any,
     ) -> ConfigModelBaseT:
         config = self.load_into_dict(blob, ac_parser=ac_parser, **kwargs)
         if config is None:
@@ -261,19 +265,19 @@ class ConfigResource:
     def load_into_dict(
         self,
         blob: str,
-        ac_parser=None,
-        **kwargs: Any
+        ac_parser: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_load_options, **kwargs}        
+        kwargs = {**self._ac_load_options, **kwargs}
         return anyconfig.loads(blob, ac_parser=ac_parser, **kwargs)
 
     def dump_config(
-        self, 
+        self,
         config: ConfigModelBaseT,
-        ac_parser=None,
-        **kwargs: Any
+        ac_parser: str | None = None,
+        **kwargs: Any,
     ) -> str:
         if ac_parser is None:
             ac_parser = self.ac_parser
@@ -285,16 +289,16 @@ class ConfigResource:
     def dump_data(
         self,
         data: dict[str, Any],
-        ac_parser=None,
-        **kwargs: Any
+        ac_parser: str | None = None,
+        **kwargs: Any,
     ) -> str:
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_dump_options, **kwargs}        
+        kwargs = {**self._ac_dump_options, **kwargs}
         return anyconfig.dumps(
             convert(data),
             ac_parser=ac_parser,
-            **kwargs
+            **kwargs,
         )
 
     @property
@@ -325,8 +329,10 @@ class ConfigResource:
                     f"must be one of {self.allowed_url_schemes!r}"
                 )
                 raise ValueError(msg)
-            return urllib.request.urlopen(urllib.request.Request(url), **kwds)  # noqa: S310, ^
-        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
+            return urllib.request.urlopen(  # noqa: S310, ^
+                urllib.request.Request(url), **kwds
+            )
+        if isinstance(self.resource, str | os.PathLike | pathlib.Path):
             return pathlib.Path(self.resource).open(**kwds)
         return self.resource
 
@@ -350,8 +356,8 @@ class ConfigResource:
         return aiofiles.open(cast(str, self.resource), **kwds)
 
     def _get_default_kwargs(
-        self, operation: Literal["read", "write"], 
-        kwargs: dict[str, Any] | None = None
+        self, operation: Literal["read", "write"],
+        kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kwargs is None:
             kwargs = {}
@@ -361,7 +367,8 @@ class ConfigResource:
             elif operation == "write":
                 kwargs.setdefault("mode", "w")
             else:
-                raise ValueError(f"invalid method {operation!r}")
+                msg = f"invalid method {operation!r}"
+                raise ValueError(msg)
         return kwargs
 
     def read(
@@ -402,10 +409,10 @@ class ConfigResource:
     async def read_async(
         self,
         *,
-        config_class: type[ConfigModelT],
+        config_class: type[AsyncConfigModelT],
         create_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> ConfigModelT:
+    ) -> AsyncConfigModelT:
         """Read the configuration file asynchronously.
 
         Parameters
@@ -430,8 +437,8 @@ class ConfigResource:
         return self.load_into(config_class, blob, **self._ac_load_options)
 
     async def write_async(
-        self, 
-        blob: str | collections.abc.ByteString, **kwds: Any
+        self,
+        blob: str | collections.abc.ByteString, **kwds: Any,
     ) -> int:
         async with self.open_resource_async(**kwds) as fp:
             return await fp.write(blob)
@@ -460,6 +467,7 @@ if TYPE_CHECKING:
 else:
     class ConfigAt(NamedTuple):
         """Metadata for a configuration item."""
+
         owner: ConfigModelBaseT
         mapping: dict[str, Any] | None
         route: list[str]
@@ -485,8 +493,7 @@ else:
                 for part in route:
                     route_here.append(part)
                     submapping = _vars(submapping[part])
-                else:
-                    submapping[key] = value
+                submapping[key] = value
             except KeyError:
                 raise ConfigItemAccessError(self.owner, route_here) from None
             return mapping
@@ -540,14 +547,14 @@ def reload(section: ConfigModelT | ConfigAt) -> Any:
     if isinstance(section, ConfigModel):
         config = section
         return config.reload()
-    
+
     config = section.owner
     context = get_context(config)
     data = config.dict()
     newest = context.resource.read(config_class=type(config))
-    section_data = ConfigAt(newest, newest.dict(), section.route).get()    
+    section_data = ConfigAt(newest, newest.dict(), section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping) 
+    config.__dict__.update(new_mapping)
     return section_data
 
 
@@ -555,14 +562,14 @@ async def reload_async(section: AsyncConfigModelT | ConfigAt) -> Any:
     if isinstance(section, AsyncConfigModel):
         config = section
         return await config.reload_async()
-    
+
     config = section.owner
     context = get_context(config)
     data = config.dict()
     newest = await context.resource.read_async(config_class=type(config))
-    section_data = ConfigAt(newest, newest.dict(), section.route).get()    
+    section_data = ConfigAt(newest, newest.dict(), section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping) 
+    config.__dict__.update(new_mapping)
     return new_mapping
 
 
@@ -605,9 +612,9 @@ class AnyContext(abc.ABC, Generic[ConfigModelBaseT]):
 
 class Context(AnyContext, Generic[ConfigModelBaseT]):
     def __init__(
-        self, 
-        resource: ConfigResource, 
-        owner: ConfigModelBaseT | None = None
+        self,
+        resource: ConfigResource,
+        owner: ConfigModelBaseT | None = None,
     ) -> None:
         self._resource = resource
         self._owner = None
@@ -663,7 +670,7 @@ class Subcontext(AnyContext, Generic[ConfigModelBaseT]):
     @property
     def resource(self) -> ConfigResource:
         return self.parent.resource
-        
+
     def trace_route(self) -> collections.abc.Generator[str, None, None]:
         yield from self.parent.trace_route()
         yield self.key
@@ -706,7 +713,10 @@ def get_context(config: ConfigModelBaseT) -> AnyContext[ConfigModelBaseT]:
     return context
 
 
-def json_encoder(model_encoder, value, **kwargs):
+def json_encoder(
+    model_encoder: Callable,
+    value: Any, **kwargs: Any
+) -> Any:
     original_type = type(value)
     converted_value = convert(value)
     if isinstance(converted_value, original_type):
@@ -715,40 +725,50 @@ def json_encoder(model_encoder, value, **kwargs):
 
 
 class CMBMetaclass(ModelMetaclass):
-    def __new__(mcs, name, bases, namespace, **kwargs):
-        namespace[_CONTEXT] = pydantic.PrivateAttr()        
+    def __new__(
+        cls,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+        **kwargs: Any
+    ) -> type:
+        namespace[_CONTEXT] = pydantic.PrivateAttr()
         if kwargs.pop("root", None):
-            return type.__new__(mcs, name, bases, namespace, **kwargs)
-        new_class = super().__new__(mcs, name, bases, namespace, **kwargs)        
+            return type.__new__(cls, name, bases, namespace, **kwargs)
+        new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         new_class.__json_encoder__ = functools.partial(
-            json_encoder, 
-            new_class.__json_encoder__
+            json_encoder,
+            new_class.__json_encoder__,
         )
-        return new_class        
+        return new_class
 
 
 class ConfigModelBase(
-    pydantic.BaseSettings, 
-    metaclass=CMBMetaclass, 
-    root=True
+    pydantic.BaseSettings,
+    metaclass=CMBMetaclass,
+    root=True,
 ):
     """A configuration dictionary."""
-    
+
     @classmethod
     def _resolve_resource(
-        cls, 
-        resource=None, 
-        *, 
-        create_if_missing: bool | None = None
-    ):
-        if resource is None:
-            resource = getattr(cls.__config__, "resource", None)
-        if isinstance(resource, str):
-            resource = ConfigResource(resource)
+        cls,
+        resource_argument: ConfigResource | ResourceT | None = None,
+        *,
+        create_if_missing: bool | None = None,
+    ) -> ConfigResource:
+        if resource_argument is None:
+            resource_argument = getattr(cls.__config__, "resource", None)
+        if resource_argument is None:
+            raise ValueError("No resource specified")
+        if not isinstance(resource_argument, ConfigResource):
+            resource = ConfigResource(resource_argument)
+        else:
+            resource = resource_argument
         if create_if_missing is not None:
             resource.create_if_missing = create_if_missing
         return resource
-    
+
     @property
     def was_loaded(self) -> bool:
         """Whether the configuration has been loaded.
@@ -800,10 +820,14 @@ class ConfigModelBase(
         self.__dict__ = context.original
         context.loaded = True
 
-    def _ensure_settings_with_context(self, name, value):
+    def _ensure_settings_with_context(
+        self,
+        name: str,
+        value: ConfigModelBaseT
+    ) -> ConfigModelBaseT:
         context = get_context(self)
         if (
-            context 
+            context
             # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
             and ConfigModelBase in type(value).mro()
             and not hasattr(value, _CONTEXT)
@@ -811,7 +835,7 @@ class ConfigModelBase(
             context.enter(name).bind_to(value)
         return value
 
-    def __getattribute__(self, attr):
+    def __getattribute__(self, attr: str) -> Any:
         value = super().__getattribute__(attr)
         if isinstance(value, ConfigModelBase):
             return self._ensure_settings_with_context(attr, value)
@@ -823,7 +847,7 @@ class ConfigModel(ConfigModelBase, root=True):
     @classmethod
     def load(
         cls: type[ConfigModelT],
-        resource: ConfigResource | str | None = None,
+        resource: ConfigResource | ResourceT | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -845,7 +869,7 @@ class ConfigModel(ConfigModelBase, root=True):
         """
         cls.update_forward_refs()
         resource = cls._resolve_resource(resource, create_if_missing=create_if_missing)
-        context = Context(resource)
+        context = Context(resource)  # type: Context[ConfigModelT]
         config = resource.read(config_class=cls, **kwargs)
         context.owner = config
         context.loaded = True
@@ -926,7 +950,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
     @classmethod
     async def load_async(
         cls: type[AsyncConfigModelT],
-        resource: ConfigResource | str | None,
+        resource: ConfigResource | ResourceT | None,
         *,
         create_if_missing: bool = False,
         **kwargs: Any,
@@ -949,7 +973,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         """
         resource = cls._resolve_resource(resource, create_if_missing=create_if_missing)
         kwargs.setdefault("mode", "r")
-        context = Context(resource)
+        context = Context(resource)  # type: Context[AsyncConfigModelT]
         config = resource.read(config_class=cls, **kwargs)
         context.owner = config
         context.loaded = True
@@ -1000,7 +1024,11 @@ class AsyncConfigModel(ConfigModelBase, root=True):
             return result
         return await save_async(context.section)
 
-    async def write_async(self, blob: str | collections.abc.ByteString, **kwargs: Any) -> int:
+    async def write_async(
+        self,
+        blob: str | collections.abc.ByteString,
+        **kwargs: Any
+    ) -> int:
         """Overwrite the configuration file asynchronously with the given blob
         (config dump as string or bytes).
 

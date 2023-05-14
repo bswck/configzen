@@ -1,8 +1,8 @@
 # flake8: noqa
-from .config import *
+from pydantic import Field
 
 from . import config
-from pydantic import Field
+from .config import *
 
 __all__ = (
     *config.__all__,
