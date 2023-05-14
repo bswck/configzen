@@ -1414,7 +1414,7 @@ class ConfigModel(ConfigModelBase, root=True):
         context = Context(resource)  # type: Context[ConfigModelT]
         config = resource.read(config_class=cls, **kwargs)
         context.owner = config
-        context.initial_state = config.dict()
+        context.initial_state = config.__dict__
         return config
 
     def reload(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
@@ -1434,7 +1434,7 @@ class ConfigModel(ConfigModelBase, root=True):
         if context.owner is self:
             new_config = context.resource.read(**kwargs)
             context.bind_to(new_config)
-            context.initial_state = new_config.dict()
+            context.initial_state = new_config.__dict__
             new_config.rollback()
             return new_config
         return reload(context.section)
@@ -1456,7 +1456,7 @@ class ConfigModel(ConfigModelBase, root=True):
         if context.owner is self:
             blob = context.resource.dump_config(self)
             result = self.write(blob, **kwargs)
-            context.initial_state = self.dict()
+            context.initial_state = self.__dict__
             return result
         return save(context.section)
 
@@ -1532,7 +1532,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         if context.owner is self:
             new_async_config = await context.resource.read_async(**kwargs)
             context.bind_to(new_async_config)
-            context.initial_state = new_async_config.dict()
+            context.initial_state = new_async_config.__dict__
             self.rollback()
             return new_async_config
         return await reload_async(context.section)
@@ -1554,7 +1554,7 @@ class AsyncConfigModel(ConfigModelBase, root=True):
         if context.owner is self:
             blob = context.resource.dump_config(self)
             result = await self.write_async(blob, **kwargs)
-            context.initial_state = self.dict()
+            context.initial_state = self.__dict__
             return result
         return await save_async(context.section)
 
