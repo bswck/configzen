@@ -90,6 +90,7 @@ __all__ = (
     "ConfigModelBase",
     "ConfigModel",
     "AsyncConfigModel",
+    "DualIOConfigModel",
     "ConfigMeta",
     "save",
     "save_async",
@@ -372,12 +373,12 @@ class ConfigResource:
     ValueError
     """
 
-    _resource: OpenedT | str | os.PathLike | pathlib.Path
-    create_if_missing: bool
     ac_parser: str | None
+    create_if_missing: bool
+    allowed_url_schemes: set[str] = _URL_SCHEMES
+    _resource: OpenedT | str | os.PathLike | pathlib.Path
     _ac_load_options: dict[str, Any]
     _ac_dump_options: dict[str, Any]
-    allowed_url_schemes: set[str] = _URL_SCHEMES
 
     def __init__(
         self: ConfigResource,
@@ -390,14 +391,14 @@ class ConfigResource:
     ) -> None:
         """Parameters
         ----------
-        resource : str or file-like object, optional
+        resource
             The URL to the configuration file, or a file-like object.
-        ac_parser : str, optional
+        ac_parser
             The name of the engines to use for loading and saving the configuration.
             Defaults to 'yaml'.
-        create_if_missing : bool, optional
+        create_if_missing
             Whether to automatically create missing keys when loading the configuration.
-        use_pydantic_json : bool, optional
+        use_pydantic_json
             Whether to use Pydantic's JSON encoder/decoder instead of the default
             anyconfig one.
         **options
@@ -691,11 +692,10 @@ class ConfigResource:
             if self.create_if_missing:
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
-                create_kwargs = self._get_default_kwargs("write", kwargs=create_kwargs)
-                self.write(blob, **create_kwargs)
+                self.write(blob, **(create_kwargs or {}))
         return self.load_into(config_class, blob, **self._ac_load_options)
 
-    def write(self, blob: str | collections.abc.ByteString, **kwds: Any) -> int:
+    def write(self, blob: str | collections.abc.ByteString, **kwargs: Any) -> int:
         """
         Write the configuration file.
 
@@ -703,15 +703,15 @@ class ConfigResource:
         ----------
         blob
             The string/bytes to write into the resource.
-        kwds
+        kwargs
             Keyword arguments to pass to the opening routine.
 
         Returns
         -------
         The number of bytes written.
         """
-        kwds = self._get_default_kwargs("write", kwds)
-        with self.open_resource(**kwds) as fp:
+        kwargs = self._get_default_kwargs("write", kwargs=kwargs)
+        with self.open_resource(**kwargs) as fp:
             return fp.write(blob)
 
     async def read_async(
@@ -746,13 +746,13 @@ class ConfigResource:
             if self.create_if_missing:
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
-                create_kwargs = self._get_default_kwargs("write", kwargs=create_kwargs)
-                await self.write_async(blob, **create_kwargs)
+                await self.write_async(blob, **(create_kwargs or {}))
         return self.load_into(config_class, blob, **self._ac_load_options)
 
     async def write_async(
         self,
-        blob: str | collections.abc.ByteString, **kwds: Any,
+        blob: str | collections.abc.ByteString, 
+        **kwargs: Any,
     ) -> int:
         """
         Write the configuration file asynchronously.
@@ -761,14 +761,15 @@ class ConfigResource:
         ----------
         blob
             The string/bytes to write into the resource.
-        kwds
+        kwargs
             Keyword arguments to pass to the opening routine.
 
         Returns
         -------
         The number of bytes written.
         """
-        async with self.open_resource_async(**kwds) as fp:
+        kwargs = self._get_default_kwargs("write", kwargs=kwargs)
+        async with self.open_resource_async(**kwargs) as fp:
             return await fp.write(blob)
 
 
@@ -1055,7 +1056,7 @@ class AnyContext(abc.ABC, Generic[ConfigModelBaseT]):
 
     @abc.abstractmethod
     def trace_route(self) -> collections.abc.Generator[str, None, None]:
-        """Trace the route to the configuration context."""
+        """Trace the route to where the configuration subcontext points to."""
 
     @staticmethod
     def get(config: ConfigModelBaseT) -> AnyContext[ConfigModelBaseT]:
@@ -1495,9 +1496,9 @@ class AsyncConfigModel(ConfigModelBase, root=True):
 
         Parameters
         ----------
-        resource : ConfigResource
+        resource
             The configuration resource.
-        create_if_missing : bool
+        create_if_missing
             Whether to create the configuration file if it does not exist.
         **kwargs
             Keyword arguments to pass to the read method.
@@ -1579,6 +1580,12 @@ class AsyncConfigModel(ConfigModelBase, root=True):
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
         return await context.resource.write_async(blob, **kwargs)
+
+
+class DualIOConfigModel(ConfigModel, AsyncConfigModel, root=True):
+    """
+    A configuration model that can be used both synchronously and asynchronously.
+    """
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
