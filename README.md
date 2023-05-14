@@ -29,14 +29,14 @@ from configzen import ConfigModel, Meta, Field
 
 
 class DatabaseConfig(ConfigModel):
-	host: IPv4Address | IPv6Address | Literal['localhost']
-	port: int
-	user: str
-	password: str = Field(exclude=True)
+    host: IPv4Address | IPv6Address | Literal['localhost']
+    port: int
+    user: str
+    password: str = Field(exclude=True)
 
-	class Config(Meta):
-		resource = "database.yaml"
-		env_prefix = "DB_"
+    class Config(Meta):
+        resource = "database.yaml"
+        env_prefix = "DB_"
 
 
 db_config = DatabaseConfig.load()
