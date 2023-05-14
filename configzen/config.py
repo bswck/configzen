@@ -74,6 +74,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple, TypeVar, ca
 import anyconfig
 import pydantic
 from pydantic.main import ModelMetaclass
+from pydantic.json import ENCODERS_BY_TYPE
 
 from configzen.errors import ConfigItemAccessError, UnknownParserError
 
@@ -178,7 +179,7 @@ def convert(obj: Any) -> Any:
     return obj
 
 
-_convert_register = convert.register
+convert.registry = convert.registry | ENCODERS_BY_TYPE
 
 
 def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] | Any:
@@ -210,7 +211,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     if cls is None:
         return functools.partial(converter, func)
 
-    _convert_register(cls, func)
+    convert.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
@@ -288,7 +289,7 @@ def convert_mapping(obj: collections.abc.Mapping) -> dict[str, Any]:
 
 
 @functools.singledispatch
-def convert_namedtuple(obj: tuple) -> dict[str, Any]:
+def convert_namedtuple(obj: tuple) -> Any:
     """
     Convert a namedtuple to safely-serializable form.
 
