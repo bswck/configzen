@@ -1,3 +1,5 @@
+"""This module contains all the custom errors raised by _configzen_."""
+
 from __future__ import annotations
 
 import typing
@@ -29,4 +31,3 @@ class ConfigItemAccessError(ConfigError, LookupError):
         super().__init__(
             f"could not get {type(config).__name__}.{route}",
         )
-
