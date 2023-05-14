@@ -20,7 +20,7 @@ class DatabaseConfig(ConfigModel):
     class Config(Meta):
         resource = ConfigResource(
             "examples/database.json",
-            ac_safe=True,
+            create_if_missing=True
         )
         env_prefix = "DB_"
         arbitrary_types_allowed = True

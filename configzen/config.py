@@ -404,6 +404,13 @@ class ConfigResource:
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
+        if (
+            not options.get("ac_safe")
+            and options.get("load_ac_safe") is None
+            and options.get("dump_ac_safe") is None
+        ):
+            # Business is business.
+            options["ac_safe"] = True
         self.ac_parser = ac_parser
         self.resource = resource
         self.create_if_missing = create_if_missing
