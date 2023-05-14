@@ -7,7 +7,7 @@ files in various formats and within a number of advanced methods.
 
 .. code-block:: python
 
-    from configzen import ConfigModel, ConfigResource, ConfigField, Meta
+    from configzen import ConfigModel, ConfigResource, ConfigField, ConfigMeta
 
     class DatabaseConfig(ConfigModel):
         host: str
@@ -15,7 +15,7 @@ files in various formats and within a number of advanced methods.
         user: str
         password: str = ConfigField(exclude=True)
 
-        class Config(Meta):
+        class Config(ConfigMeta):
             resource = "examples/database.json"
 
     db_config = DatabaseConfig.load()
