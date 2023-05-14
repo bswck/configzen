@@ -1260,10 +1260,36 @@ def get_context(config: ConfigModelBaseT) -> AnyContext[ConfigModelBaseT]:
     -------
     The context of the configuration model.
     """
-    context = AnyContext.get(config)
-    if context is None:
-        msg = "Cannot get context for unbound configuration"
-        raise RuntimeError(msg)
+    try:
+        context = AnyContext.get(config)
+    except AttributeError:
+        msg = (
+            "Cannot get context for configuration. "
+            "It was likely not loaded from a resource, but instantiated directly"
+        )
+        raise RuntimeError(msg) from None
+    return context
+
+
+def get_context_or_none(
+    config: ConfigModelBaseT
+) -> AnyContext[ConfigModelBaseT] | None:
+    """
+    Get the context of the configuration model safely.
+
+    Parameters
+    ----------
+    config
+        The configuration model instance.
+
+    Returns
+    -------
+    The context of the configuration model.
+    """
+    try:
+        context = get_context(config)
+    except RuntimeError:
+        context = None        
     return context
 
 
@@ -1383,7 +1409,7 @@ class ConfigModelBase(
         name: str,
         value: ConfigModelBaseT
     ) -> ConfigModelBaseT:
-        context = get_context(self)
+        context = get_context_or_none(self)
         if (
             context
             # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
