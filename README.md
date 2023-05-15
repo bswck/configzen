@@ -1,7 +1,11 @@
 # configzen
 _configzen_ – managing configuration files easily.
+Currently under development, not ready for production use.
+⭐ Contributions welcome! ⭐
 
-## What is it?
+## What is this?
+For a more precise and also philosophic explanation, see the wiki article [configzen – explanation without code](https://github.com/bswck/configzen/wiki/configzen-%E2%80%93-explanation-without-code).
+
 _configzen_ combines the power of [pydantic](https://pydantic-docs.helpmanual.io/) 
 and [anyconfig](https://github.com/ssato/python-anyconfig) to provide the most simplistic
 way on Earth of managing configuration files in your Python projects.
@@ -15,7 +19,7 @@ preferably full or partial reloading and saving of your structured configuration
 Let's see how it looks like in practice. Let's say you have a YAML configuration file like this:
 ```yaml
 # database.yaml
-host: localhost
+host: 127.0.0.1
 port: 5432
 user: postgres
 ```
@@ -24,69 +28,76 @@ You can create a data model for it like this:
 ```python
 # config.py
 from ipaddress import IPv4Address, IPv6Address
-from typing import Literal
 from configzen import ConfigModel, ConfigMeta, ConfigField
 
 
 class DatabaseConfig(ConfigModel):
-    host: IPv4Address | IPv6Address | Literal['localhost']
+    host: IPv4Address | IPv6Address
     port: int
     user: str
     password: str = ConfigField(exclude=True)
-
+    
     class Config(ConfigMeta):
         resource = "database.yaml"
+        validate_assignment = True
         env_prefix = "DB_"
 
 
 db_config = DatabaseConfig.load()
-# Optionally change your config or just persist it, excluding the `password` field.
-db_config.save()
 ```
 
 As simple as that!
-This way, you can load your configuration from a file or environment variables.
+This way, you can load your configuration from a file and from environment variables.
 
-Pydantic will take care of parsing and validating the loaded data.
+[pydantic](https://docs.pydantic.dev/latest/) will take care of parsing and validating the loaded data.
 
 You can now use the `db_config` object to access the configuration values:
 
 ```python
 >>> db_config.host
-'localhost'
+IPv4Address('127.0.0.1')
 ```
 
 modify them, if the Pydantic model allows it:
 
 ```python
->>> db_config.host = "newhost"
+>>> db_config.host = "0.0.0.0"
 >>> db_config.host
-'newhost'
+IPv4Address('0.0.0.0')
 ```
 
 as well as reload particular values, without touching the rest of the configuration:
 
 ```python
->>> db_config.at('host').reload()
+>>> db_config.at("host").reload()
+IPv4Address('127.0.0.1')
 ```
 
 or reload the whole configuration:
 
 ```python
 >>> db_config.reload()
-'localhost'
+DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or save a particular value:
 
 ```python
->>> db_config.at('host').save()
+>>> db_config.host = "0.0.0.0"
+>>> db_config.port = 443
+>>> db_config
+DatabaseConfig(host=IPv4Address('0.0.0.0'), port=443, user='postgres', password='password')
+>>> db_config.at("host").save()
+40
+>>> db_config.reload()
+DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
 ```
 
 or save the whole configuration:
 
 ```python
 >>> db_config.save()
+39
 ```
 
 ## Setup
