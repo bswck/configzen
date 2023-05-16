@@ -117,15 +117,18 @@ your base configuration without writing any code.
 
 This way, you can write your configuration in a modular way, and avoid repeating yourself.
 
-Let's say you have a base configuration file like this:
+Let's say you have a base configuration file like this (`base.json`):
 
-```yaml
-# base.yaml
-i18n:
-    language: en
-    timezone: UTC
-app:
-    debug: true
+```json
+{
+  "i18n": {
+    "language": "en",
+    "timezone": "UTC"
+  },
+  "app": {
+    "debug": true
+  }
+}
 ```
 
 To extend this configuration, you can create another configuration file like this,
@@ -141,6 +144,18 @@ overriding desired sections as needed:
 
 Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it.
+
+Notice how configuration file format don't matter in _configzen_: you can 
+extend JSON configurations in YAML, but that might be as well any other format 
+among [JSON](https://en.wikipedia.org/wiki/JSON), [INI](https://en.wikipedia.org/wiki/INI_file),
+[XML](https://en.wikipedia.org/wiki/XML), [.properties](https://en.wikipedia.org/wiki/.properties), 
+shellvars (see [Augeas docs on shellvars](https://augeas.net/docs/references/1.4.0/lenses/files/shellvars-aug.html)), 
+[YAML](https://yaml.org), [TOML](https://en.wikipedia.org/wiki/TOML), 
+[Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format)), 
+[BSON](https://en.wikipedia.org/wiki/BSON), [CBOR](https://en.wikipedia.org/wiki/CBOR), 
+[ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) or 
+[MessagePack](https://en.wikipedia.org/wiki/MessagePack). 
+
 The above example is equivalent to
 
 ```yaml
@@ -155,6 +170,7 @@ app:
 
 If you load it and save it, _configzen_ will keep the import directive if it is still needed,
 up to date with changes to the imported configuration.
+
 
 ## Setup
 For using _configzen_ in your project, you need to install it first:
