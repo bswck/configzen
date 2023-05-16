@@ -169,6 +169,16 @@ app:
   debug: false
 ```
 
+because both behave roughly the same as
+```yaml
+# production.yaml
+i18n:
+  language: en
+  timezone: UTC
+app:
+   debug: false
+```
+
 If you load it and save it, _configzen_ will keep the import directive if it is still needed,
 up to date with changes to the imported configuration.
 
