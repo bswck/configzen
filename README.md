@@ -128,7 +128,8 @@ app:
     debug: true
 ```
 
-To extend this configuration, you can create another configuration file like this:
+To extend this configuration, you can create another configuration file like this,
+overriding as needed:
 
 ```yaml
 # production.yaml
@@ -136,6 +137,20 @@ To extend this configuration, you can create another configuration file like thi
 
 +app:
     debug: false
+```
+
+Using `+` in front of a key will update the dictionary defined at that key,
+instead of replacing it.
+The above example is equivalent to
+
+```yaml
+# production.yaml
+i18n:
+  .extends(i18n): base.yaml
+
+app:
+  .extends(app): base.yaml
+  debug: false
 ```
 
 If you load it and save it, _configzen_ will keep the import directive if it is still needed,
