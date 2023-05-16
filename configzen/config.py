@@ -1120,7 +1120,7 @@ def reload(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     newest = context.resource.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
+    config.__dict__ |= new_mapping
     return section_data
 
 
@@ -1149,7 +1149,7 @@ async def reload_async(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     newest = await context.resource.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
+    config.__dict__ |= new_mapping
     return new_mapping
 
 
@@ -1520,7 +1520,7 @@ class ConfigModel(
         None
         """
         context = get_context(self)
-        self.__dict__.update(context.initial_state)
+        self.__dict__ |= context.initial_state
 
     def _ensure_settings_with_context(
         self,

@@ -348,9 +348,9 @@ class _BaseProcessor:
             # the import directive is not needed
             arguments = [] if route is None else [route]
             import_directive = cls.directive(Directives.EXTENDS, arguments)
-            state.update({import_directive: context.resource.resource})
+            state |= {import_directive: context.resource.resource}
 
-        state.update(overrides)
+        state |= overrides
 
     def _preprocess(self, container: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -382,7 +382,7 @@ class _BaseProcessor:
                 )
                 self._call_directive(context)
                 new_container = self._preprocess(context.container)
-                result.update(new_container)
+                result |= new_container
             elif is_dict_like(value):
                 result[key] = self._preprocess(value)
             elif is_list_like(value):
