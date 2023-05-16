@@ -129,7 +129,7 @@ app:
 ```
 
 To extend this configuration, you can create another configuration file like this,
-overriding as needed:
+overriding desired sections as needed:
 
 ```yaml
 # production.yaml
