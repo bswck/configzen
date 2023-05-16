@@ -70,8 +70,15 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
 from typing import (
-    TYPE_CHECKING, Any, Generic, Literal, NamedTuple, TypeVar, cast, no_type_check,
-    Union
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    NamedTuple,
+    TypeVar,
+    cast,
+    no_type_check,
+    Union,
 )
 
 import anyconfig
@@ -79,8 +86,11 @@ import pydantic
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import ConfigItemAccessError, UnknownParserError, \
-    ProcessorLookupError
+from configzen.errors import (
+    ConfigItemAccessError,
+    UnknownParserError,
+    ProcessorLookupError,
+)
 from configzen.processor import Processor, IMPORT_METADATA
 
 try:
@@ -108,9 +118,7 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative
-    + urllib.parse.uses_netloc
-    + urllib.parse.uses_params,
+    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params,
 ) - {""}
 CONTEXT: str = "__configzen_context__"
 
@@ -148,9 +156,7 @@ def _is_namedtuple(
     obj: Any,
 ) -> bool:
     return (
-        isinstance(obj, tuple) and
-        hasattr(obj, "_asdict") and
-        hasattr(obj, "_fields")
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
     )
 
 
@@ -216,6 +222,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     convert.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
+
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: load.dispatch(cls)(cls, value)
 
@@ -674,7 +681,8 @@ class ConfigResource:
         return aiofiles.open(cast(str, self.resource), **kwds)
 
     def _get_default_kwargs(
-        self, operation: Literal["read", "write"],
+        self,
+        operation: Literal["read", "write"],
         kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kwargs is None:
@@ -912,8 +920,8 @@ if TYPE_CHECKING:
         def save(self) -> int:
             ...
 
-
 else:
+
     class ConfigAt(NamedTuple):
         """
         A configuration item at a specific location.
@@ -1168,6 +1176,7 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
         The initial configuration state.
 
     """
+
     initial_state: dict[str, Any]
     _initial_state: dict[str, Any]
 
@@ -1370,9 +1379,7 @@ def get_context(config: ConfigModelT) -> AnyContext[ConfigModelT]:
     return context
 
 
-def get_context_or_none(
-    config: ConfigModelT
-) -> AnyContext[ConfigModelT] | None:
+def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None:
     """
     Get the context of the configuration model safely.
 
@@ -1392,10 +1399,7 @@ def get_context_or_none(
     return context
 
 
-def _json_encoder(
-    model_encoder: Callable,
-    value: Any, **kwargs: Any
-) -> Any:
+def _json_encoder(model_encoder: Callable, value: Any, **kwargs: Any) -> Any:
     initial_state_type = type(value)
     converted_value = convert(value)
     if isinstance(converted_value, initial_state_type):
@@ -1409,7 +1413,7 @@ class CMBMetaclass(ModelMetaclass):
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
-        **kwargs: Any
+        **kwargs: Any,
     ) -> type:
         namespace[IMPORT_METADATA] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
@@ -1476,9 +1480,7 @@ class ConfigModel(
         elif isinstance(mby_resource, ConfigResource):
             resource = mby_resource
         else:
-            raise TypeError(
-                f"Invalid resource type: {type(mby_resource).__name__}"
-            )
+            raise TypeError(f"Invalid resource type: {type(mby_resource).__name__}")
         if create_if_missing is not None:
             resource.create_if_missing = create_if_missing
         return resource
@@ -1523,9 +1525,7 @@ class ConfigModel(
         self.__dict__ |= context.initial_state
 
     def _ensure_settings_with_context(
-        self,
-        name: str,
-        value: ConfigModelT
+        self, name: str, value: ConfigModelT
     ) -> ConfigModelT:
         context = get_context_or_none(self)
         if (
@@ -1714,9 +1714,7 @@ class ConfigModel(
         return await save_async(context.section)
 
     async def write_async(
-        self,
-        blob: str | collections.abc.ByteString,
-        **kwargs: Any
+        self, blob: str | collections.abc.ByteString, **kwargs: Any
     ) -> int:
         """
         Overwrite the configuration file asynchronously with the given string or bytes.
@@ -1752,4 +1750,5 @@ class ConfigMeta(pydantic.BaseSettings.Config):
 
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
+
     resource: ConfigResource | RawResourceT | None = None

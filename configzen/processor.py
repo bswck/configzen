@@ -20,7 +20,7 @@ DirectiveHandlerT = Callable[[ProcessorT, "DirectiveContext[DirectiveT]"], None]
 
 
 def directive(
-    name: str | enum.Enum
+    name: str | enum.Enum,
 ) -> Callable[[DirectiveHandlerT], DirectiveHandlerT]:
     """
     Decorator for creating processor directives.
@@ -37,9 +37,7 @@ def directive(
     if isinstance(name, enum.Enum):
         name = name.value.casefold()
 
-    def decorator(
-        func: DirectiveHandlerT
-    ) -> DirectiveHandlerT:
+    def decorator(func: DirectiveHandlerT) -> DirectiveHandlerT:
         if not hasattr(func, EXECUTES_DIRECTIVES):
             setattr(func, EXECUTES_DIRECTIVES, set())
         getattr(func, EXECUTES_DIRECTIVES).add(name)
@@ -135,7 +133,7 @@ def _parse_argument_string_impl(
             if string_ctx and not explicit_strings_ctx:
                 raise ArgumentSyntaxError(
                     f"Implicit string closed with explicit string character {ch}",
-                    (no, ch)
+                    (no, ch),
                 )
             explicit_strings_ctx = True
             if string_ctx is None:
@@ -202,9 +200,7 @@ def _parse_argument_string(
         charlist[no] = "^"
         indicator = "".join(charlist)
         raise ArgumentSyntaxError(
-            "\n" + displayed_argument_string
-            + "\n" + indicator
-            + "\n" + msg
+            "\n" + displayed_argument_string + "\n" + indicator + "\n" + msg
         ) from None
 
     return arguments
@@ -217,24 +213,20 @@ def parse_directive_call(
 ) -> tuple[str, list[str]]:
     arguments = []
     if directive_name.startswith(prefix):
-        directive_name = directive_name[len(prefix):].casefold()
+        directive_name = directive_name[len(prefix) :].casefold()
         if directive_name.endswith(tokens.RPAREN):
             try:
                 lpar = directive_name.index(tokens.LPAREN)
             except ValueError:
-                raise ValueError(
-                    f"invalid directive call: {directive_name}"
-                ) from None
-            (
-                directive_name,
-                raw_argument_string
-            ) = directive_name[:lpar], directive_name[lpar + 1:-1]
+                raise ValueError(f"invalid directive call: {directive_name}") from None
+            (directive_name, raw_argument_string) = (
+                directive_name[:lpar],
+                directive_name[lpar + 1 : -1],
+            )
             arguments = _parse_argument_string(raw_argument_string, tokens)
 
         if not directive_name.isidentifier():
-            raise ValueError(
-                f"Invalid directive name: {directive_name}"
-            )
+            raise ValueError(f"Invalid directive name: {directive_name}")
     return directive_name, arguments
 
 
@@ -329,12 +321,12 @@ class _BaseProcessor:
                     k: cv
                     for k, v in value.items()
                     if (
-                        (cv := counterpart_value.get(k, missing)) 
-                        is not missing and v != cv
+                        (cv := counterpart_value.get(k, missing)) is not missing
+                        and v != cv
                     )
                 }
                 if overrides_for_key:
-                    overrides["+" + key] = overrides_for_key 
+                    overrides["+" + key] = overrides_for_key
             else:
                 counterpart_value = convert(counterpart_value)
                 if counterpart_value != value:
@@ -354,7 +346,7 @@ class _BaseProcessor:
 
     def _preprocess(self, container: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}
-        
+
         for key, value in sorted(
             container.items(),
             key=lambda item: item[0] == self.prefix,
@@ -387,10 +379,7 @@ class _BaseProcessor:
                 result[key] = self._preprocess(value)
             elif is_list_like(value):
                 result[key] = [
-                    self._preprocess(v)
-                    if isinstance(v, dict)
-                    else v
-                    for v in value
+                    self._preprocess(v) if isinstance(v, dict) else v for v in value
                 ]
             else:
                 result[key] = value
@@ -399,9 +388,7 @@ class _BaseProcessor:
     def _call_directive(self, context: DirectiveContext) -> None:
         handler = self._directive_handlers.get(context.directive)
         if handler is None:
-            raise ValueError(
-                f"unknown processor directive: {context.directive!r}"
-            )
+            raise ValueError(f"unknown processor directive: {context.directive!r}")
         handler(self, context)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -416,19 +403,13 @@ class _BaseProcessor:
                     cls._directive_handlers[directive_name] = func
 
     @classmethod
-    def register_directive(
-        cls,
-        name: str,
-        func: DirectiveHandlerT
-    ) -> None:
+    def register_directive(cls, name: str, func: DirectiveHandlerT) -> None:
         if cls._directive_handlers is None:
             cls._directive_handlers = {}
         cls._directive_handlers[name] = func
 
     @classmethod
-    def directive(
-        cls, directive_name: str, arguments: list[str] | None = None
-    ) -> str:
+    def directive(cls, directive_name: str, arguments: list[str] | None = None) -> str:
         """
         Create a directive call.
 
@@ -455,9 +436,11 @@ class _BaseProcessor:
         if isinstance(directive_name, enum.Enum):
             directive_name = directive_name.value
 
-        return cls.prefix + directive_name + (",".join(
-            map(_fmt_argument, arguments)
-        ).join("()") if arguments else "")
+        return (
+            cls.prefix
+            + directive_name
+            + (",".join(map(_fmt_argument, arguments)).join("()") if arguments else "")
+        )
 
 
 class Directives(str, enum.Enum):
@@ -469,11 +452,9 @@ class Processor(_BaseProcessor):
     extension_prefix = "+"
 
     @directive(Directives.EXTENDS)
-    def _call_extends(
-        self,
-        directive_context: DirectiveContext
-    ) -> None:
+    def _call_extends(self, directive_context: DirectiveContext) -> None:
         from configzen.config import Context, CONTEXT, select_scope
+
         resource_class = type(self.resource)
         if len(directive_context.arguments) > 1:
             raise ValueError("'extends' directive can select only one section")
@@ -494,8 +475,7 @@ class Processor(_BaseProcessor):
         with resource.open_resource() as reader:
             imported_data = resource.load_into_dict(reader.read())
         import_route = (
-            directive_context.arguments[0]
-            if directive_context.arguments else None
+            directive_context.arguments[0] if directive_context.arguments else None
         )
         if import_route:
             try:
@@ -511,10 +491,11 @@ class Processor(_BaseProcessor):
                     f"from {resource.resource} is not a dictionary"
                 )
         context: Context = Context(resource)
-        directive_context.container = imported_data | directive_context.container | {
-            CONTEXT: context,
-            IMPORT_METADATA: ImportMetadata(
-                route=import_route,
-                context=context
-            )
-        }
+        directive_context.container = (
+            imported_data
+            | directive_context.container
+            | {
+                CONTEXT: context,
+                IMPORT_METADATA: ImportMetadata(route=import_route, context=context),
+            }
+        )
