@@ -17,6 +17,15 @@ you can create a data model of your configuration and let _configzen_ do the res
 with some extra features on top of that, such as both synchronous and asynchronous, 
 preferably full or partial reloading and saving of your structured configuration.
 
+_configzen_ will help you to organize your configuration files and make them easy to use 
+and maintain. One of the core features of _configzen_ is that it allows you to import 
+configuration files inside other configuration files, which is especially useful when you
+have a lot of configuration files, and you want to avoid repeating yourself.
+
+
+## Features
+
+### Managing content
 Let's see how it looks like in practice. Let's say you have a YAML configuration file like this:
 ```yaml
 # database.yaml
@@ -81,7 +90,7 @@ or reload the whole configuration:
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
-or save a particular value:
+or save a particular value, without touching the rest of the configuration:
 
 ```python
 >>> db_config.host = "0.0.0.0"
@@ -100,6 +109,36 @@ or save the whole configuration:
 >>> db_config.save()
 39
 ```
+
+### Parser directives
+_configzen_ allows you to use 'parser directives' in your configuration files,
+which can be used to import other configuration files in order to extend your base configuration.
+
+This way, you can write your configuration in a modular way, and avoid repeating yourself.
+
+Let's say you have a base configuration file like this:
+
+```yaml
+# base.yaml
+i18n:
+    language: en
+    timezone: UTC
+```
+
+To extend this configuration, you can create another configuration file like this:
+
+```yaml
+# extended.yaml
+.import: base.yaml
+
+app:
+    name: My App
+```
+
+If you load it and save it, _configzen_ will preserve information on the imported data.
+
+
+```python
 
 ## Setup
 For using _configzen_ in your project, you need to install it first:

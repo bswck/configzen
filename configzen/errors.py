@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import typing
+from typing import TYPE_CHECKING
 
 import anyconfig
 
-if typing.TYPE_CHECKING:
-    from configzen.config import ConfigModelBaseT
+if TYPE_CHECKING:
+    from configzen.config import ConfigModelT
 
 
 class ConfigError(Exception):
@@ -25,7 +25,7 @@ class UnknownParserError(ConfigError, anyconfig.UnknownFileTypeError):
 class ConfigItemAccessError(ConfigError, LookupError):
     """An error occurred while accessing configuration part."""
 
-    def __init__(self, config: ConfigModelBaseT, route: str | list[str]) -> None:
+    def __init__(self, config: ConfigModelT, route: str | list[str]) -> None:
         if not isinstance(route, str):
             route = ".".join(route)
         super().__init__(

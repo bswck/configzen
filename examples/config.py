@@ -1,31 +1,20 @@
-from dataclasses import dataclass
+from __future__ import annotations
 from ipaddress import IPv4Address, IPv6Address
-from typing import Literal
-from configzen import ConfigModel, ConfigMeta, ConfigResource, ConfigField
-
-
-@dataclass
-class Point:
-    x: int
-    y: int
+from configzen import ConfigModel, ConfigMeta, ConfigField
 
 
 class DatabaseConfig(ConfigModel):
-    host: IPv4Address | IPv6Address | Literal['localhost']
+    host: IPv4Address | IPv6Address
     port: int
     user: str
     password: str = ConfigField(exclude=True)
-    point: Point = Point(0, 0)
+    test: DatabaseConfig | None = None
 
     class Config(ConfigMeta):
-        resource = ConfigResource(
-            "examples/database.json",
-            create_if_missing=True
-        )
+        resource = "examples/database.yaml"
         env_prefix = "DB_"
 
 
 db_config = DatabaseConfig.load()
-db_config.point.x += 100
-db_config.point.y += 100
-db_config.at("point.x").save()
+# Optionally change your config or just persist it, excluding the `password` field.
+print(db_config.save())
