@@ -57,7 +57,7 @@ db_config = DatabaseConfig.load()
 ```
 
 As simple as that!
-This way, you can load your configuration from a file as well as from environment variables
+This way, you can load your configuration from a file as well as from the environment variables
 `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`.
 
 [pydantic](https://docs.pydantic.dev/latest/) will take care of parsing and validating the loaded data.
