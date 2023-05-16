@@ -137,7 +137,7 @@ overriding desired sections as needed:
 
 ```yaml
 # production.yaml
-.extends: base.json
+/extends: base.json
 
 +app:
     debug: false
@@ -162,10 +162,10 @@ The above example is equivalent to
 ```yaml
 # production.yaml
 i18n:
-  .extends(i18n): base.json
+  /extends(i18n): base.json
 
 app:
-  .extends(app): base.json
+  /extends(app): base.json
   debug: false
 ```
 
