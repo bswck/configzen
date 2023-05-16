@@ -139,7 +139,7 @@ overriding desired sections as needed:
     debug: false
 ```
 
-Using `+` in front of a key will update the dictionary defined at that key,
+Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it.
 The above example is equivalent to
 
