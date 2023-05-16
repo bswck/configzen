@@ -336,7 +336,7 @@ def _split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str
             targets = [dump_options]
         elif key.startswith("load_"):
             final_key = key.removeprefix("load_")
-            targets = [dump_options]
+            targets = [load_options]
         else:
             targets = [load_options, dump_options]
         for target in targets:
