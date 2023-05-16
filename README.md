@@ -110,9 +110,10 @@ or save the whole configuration:
 39
 ```
 
-### Parser directives
-_configzen_ allows you to use 'parser directives' in your configuration files,
-which can be used to import other configuration files in order to extend your base configuration.
+### Preprocessing directives
+_configzen_ allows you to use built-in preprocessing directives in your configuration files,
+offering features such as importing other configuration files in order to extend 
+your base configuration without writing any code.
 
 This way, you can write your configuration in a modular way, and avoid repeating yourself.
 
@@ -137,7 +138,8 @@ To extend this configuration, you can create another configuration file like thi
     debug: false
 ```
 
-If you load it and save it, _configzen_ will preserve information on the imported data.
+If you load it and save it, _configzen_ will keep the import directive if it is still needed,
+up to date with changes to the imported configuration.
 
 ## Setup
 For using _configzen_ in your project, you need to install it first:

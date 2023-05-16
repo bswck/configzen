@@ -80,8 +80,8 @@ from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
 from configzen.errors import ConfigItemAccessError, UnknownParserError, \
-    ConfigParserLookupError
-from configzen.parser import Parser, IMPORT_METADATA
+    ProcessorLookupError
+from configzen.processor import Processor, IMPORT_METADATA
 
 try:
     import aiofiles
@@ -364,12 +364,12 @@ class ConfigResource:
     ----------
     resource
         The resource to load the configuration from.
-    parser
-        The resource parser to use. If not specified, the parser used will
-        be :class:`DefaultParser`.
+    processor
+        The resource processor to use. If not specified, the processor used will
+        be :class:`DefaultProcessor`.
     ac_parser
         The name of the engines to use for loading and saving the
-        configuration. If not specified, the parser will be guessed
+        configuration. If not specified, the processor will be guessed
         from the file extension.
     create_if_missing
         Whether to create the file if it doesn't exist.
@@ -386,7 +386,7 @@ class ConfigResource:
         Whether to create the file if it doesn't exist.
     ac_parser
         The name of the engines to use for loading and saving the
-        configuration. If not specified, the parser will be guessed
+        configuration. If not specified, the processor will be guessed
         from the file extension.
     allowed_url_schemes
         The URL schemes that are allowed to be used.
@@ -397,7 +397,7 @@ class ConfigResource:
     """
 
     _resource: OpenedT | str | os.PathLike | pathlib.Path
-    parser_class: type[Parser]
+    processor_class: type[Processor]
     ac_parser: str | None
     create_if_missing: bool
     allowed_url_schemes: set[str] = _URL_SCHEMES
@@ -409,7 +409,7 @@ class ConfigResource:
         self: ConfigResource,
         resource: RawResourceT,
         ac_parser: str | None = None,
-        parser_class: type[Parser] | None = None,
+        processor_class: type[Processor] | None = None,
         *,
         create_if_missing: bool = False,
         **options: Any,
@@ -438,10 +438,10 @@ class ConfigResource:
             # Business is business.
             options["ac_safe"] = True
 
-        if parser_class is None:
-            parser_class = Parser
+        if processor_class is None:
+            processor_class = Processor
 
-        self.parser_class = parser_class
+        self.processor_class = processor_class
         self.ac_parser = ac_parser
         self.resource = resource
         self.create_if_missing = create_if_missing
@@ -469,7 +469,7 @@ class ConfigResource:
         This can be a file path, a URL, or a file-like object.
 
         .. note::
-            If the resource is a file path, the parser will be guessed
+            If the resource is a file path, the processor will be guessed
             from the file extension.
 
         Returns
@@ -548,7 +548,7 @@ class ConfigResource:
             ac_parser = self.ac_parser
         kwargs = {**self._ac_load_options, **kwargs}
         loaded = anyconfig.loads(blob, ac_parser=ac_parser, **kwargs)
-        return self.parser_class(self, loaded).parse()
+        return self.processor_class(self, loaded).preprocess()
 
     def dump_config(
         self,
@@ -889,7 +889,7 @@ def select_scope(
             route_here.append(part)
             scope = scope_converter(scope)[part]
     except KeyError:
-        raise ConfigParserLookupError(resource, route_here) from None
+        raise ProcessorLookupError(resource, route_here) from None
     return scope
 
 
@@ -1455,9 +1455,7 @@ class ConfigModel(
             metadata = getattr(self, IMPORT_METADATA, None)
             if metadata:
                 context = get_context(self)
-                context.resource.parser_class.preserve_importing_state(
-                    state, metadata
-                )
+                context.resource.processor_class.export(state, metadata)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)

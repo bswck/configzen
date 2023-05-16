@@ -10,20 +10,20 @@ if TYPE_CHECKING:
     from configzen.config import ConfigResource, AnyContext
 
 DirectiveT = TypeVar("DirectiveT")
-ParserT = TypeVar("ParserT", bound="_BaseParser")
+ProcessorT = TypeVar("ProcessorT", bound="_BaseProcessor")
 
 IMPORT_METADATA: str = "__configzen_import__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
-DirectiveHandlerT = Callable[[ParserT, "DirectiveContext[DirectiveT]"], None]
+DirectiveHandlerT = Callable[[ProcessorT, "DirectiveContext[DirectiveT]"], None]
 
 
 def directive(
     name: str | enum.Enum
 ) -> Callable[[DirectiveHandlerT], DirectiveHandlerT]:
     """
-    Decorator for creating parser directives.
+    Decorator for creating processor directives.
 
     Parameters
     ----------
@@ -51,12 +51,18 @@ def directive(
 @dataclasses.dataclass
 class DirectiveContext(Generic[DirectiveT]):
     """
-    Context for parser directives.
+    Context for processor directives.
 
     Attributes
     ----------
     directive
         The directive.
+    key
+        The key of the directive.
+    prefix
+        The prefix of the directive.
+    arguments
+        The arguments of the directive.
     snippet
         The config snippet where this directive was invoked.
     container
@@ -70,17 +76,6 @@ class DirectiveContext(Generic[DirectiveT]):
     arguments: list[str]
     snippet: dict[str, Any]
     container: dict[str, Any]
-
-    @property
-    def full_key(self) -> str:
-        """
-        Return the full key for the directive.
-
-        Returns
-        -------
-        The full key.
-        """
-        return self.prefix + self.key
 
     def has_duplicates(self, *, require_same_arguments: bool = True) -> bool:
         """
@@ -259,9 +254,9 @@ class ImportMetadata(TypedDict):
     context: AnyContext
 
 
-class _BaseParser:
+class _BaseProcessor:
     """
-    Parser that executes directives.
+    Processor that executes directives.
 
     Attributes
     ----------
@@ -283,7 +278,7 @@ class _BaseParser:
         self.resource = resource
         self.dict_config = dict_config
 
-    def parse(self) -> dict[str, Any]:
+    def preprocess(self) -> dict[str, Any]:
         """
         Parse the dictionary config and return the parsed config,
         ready for instantiating the model.
@@ -292,16 +287,16 @@ class _BaseParser:
         -------
         The parsed config.
         """
-        return self._parse(self.dict_config)
+        return self._preprocess(self.dict_config)
 
     @classmethod
-    def preserve_importing_state(
+    def export(
         cls,
         state: dict[str, Any],
         metadata: ImportMetadata,
     ) -> None:
         """
-        Preserve imported data information in the model state before dumping it.
+        Exports model state preserveing /extends directive calls in a model state.
 
         Parameters
         ----------
@@ -357,7 +352,7 @@ class _BaseParser:
 
         state.update(overrides)
 
-    def _parse(self, container: dict[str, Any]) -> dict[str, Any]:
+    def _preprocess(self, container: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         
         for key, value in sorted(
@@ -386,13 +381,13 @@ class _BaseParser:
                     container=context_container,
                 )
                 self._call_directive(context)
-                new_container = self._parse(context.container)
+                new_container = self._preprocess(context.container)
                 result.update(new_container)
             elif is_dict_like(value):
-                result[key] = self._parse(value)
+                result[key] = self._preprocess(value)
             elif is_list_like(value):
                 result[key] = [
-                    self._parse(v)
+                    self._preprocess(v)
                     if isinstance(v, dict)
                     else v
                     for v in value
@@ -405,7 +400,7 @@ class _BaseParser:
         handler = self._directive_handlers.get(context.directive)
         if handler is None:
             raise ValueError(
-                f"unknown parser directive: {context.directive!r}"
+                f"unknown processor directive: {context.directive!r}"
             )
         handler(self, context)
 
@@ -469,7 +464,7 @@ class Directives(str, enum.Enum):
     EXTENDS = "extends"
 
 
-class Parser(_BaseParser):
+class Processor(_BaseProcessor):
     prefix = "/"
     extension_prefix = "+"
 

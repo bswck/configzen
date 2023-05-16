@@ -33,8 +33,8 @@ class ConfigItemAccessError(ConfigError, LookupError):
         )
 
 
-class ConfigParserLookupError(ConfigError, LookupError):
-    """An error occurred while looking up a parser."""
+class ProcessorLookupError(ConfigError, LookupError):
+    """An error occurred while looking up a processor."""
 
     def __init__(self, resource: ConfigResource | None, route: list[str]) -> None:
         resource_name = resource.resource if resource else "the provided resource"
