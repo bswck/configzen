@@ -79,8 +79,9 @@ import pydantic
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import ConfigItemAccessError, UnknownParserError
-from configzen.parser import Parser, IMPORTED_ROUTE
+from configzen.errors import ConfigItemAccessError, UnknownParserError, \
+    ConfigParserLookupError
+from configzen.parser import Parser, IMPORT_METADATA
 
 try:
     import aiofiles
@@ -862,12 +863,14 @@ def select_scope(
     mapping: dict[str, Any],
     route: SupportsRoute,
     scope_converter: Callable[[Any], dict[str, Any]] = _vars,
+    resource: ConfigResource | None = None,
 ) -> Any:
     """
     Get an item at a route.
 
     Parameters
     ----------
+    resource
     scope_converter
     mapping
         The mapping to use.
@@ -886,7 +889,7 @@ def select_scope(
             route_here.append(part)
             scope = scope_converter(scope)[part]
     except KeyError:
-        raise LookupError(f"route {route_here!r} not found", route_here) from None
+        raise ConfigParserLookupError(resource, route_here) from None
     return scope
 
 
@@ -1408,7 +1411,7 @@ class CMBMetaclass(ModelMetaclass):
         namespace: dict[str, Any],
         **kwargs: Any
     ) -> type:
-        namespace[IMPORTED_ROUTE] = pydantic.PrivateAttr()
+        namespace[IMPORT_METADATA] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1449,12 +1452,11 @@ class ConfigModel(
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
-            missing = object()
-            route = getattr(self, IMPORTED_ROUTE, missing)
-            if route is not missing:
+            metadata = getattr(self, IMPORT_METADATA, None)
+            if metadata:
                 context = get_context(self)
-                context.resource.parser_class.preserve_state(
-                    state, at=route, context=context
+                context.resource.parser_class.preserve_importing_state(
+                    state, metadata
                 )
             yield from state.items()
         else:

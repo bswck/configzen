@@ -123,25 +123,25 @@ Let's say you have a base configuration file like this:
 i18n:
     language: en
     timezone: UTC
+app:
+    debug: true
 ```
 
 To extend this configuration, you can create another configuration file like this:
 
 ```yaml
-# extended.yaml
-.import: base.yaml
+# production.yaml
+.extends: base.yaml
 
-app:
-    name: My App
++app:
+    debug: false
 ```
 
 If you load it and save it, _configzen_ will preserve information on the imported data.
 
-
-```python
-
 ## Setup
 For using _configzen_ in your project, you need to install it first:
+
 ```bash
 pip install configzen
 ```

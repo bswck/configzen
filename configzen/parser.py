@@ -2,7 +2,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, ClassVar, TYPE_CHECKING, cast
+from typing import Any, Generic, TypeVar, ClassVar, TYPE_CHECKING, cast, TypedDict
 
 from anyconfig.utils import is_dict_like, is_list_like
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 DirectiveT = TypeVar("DirectiveT")
 ParserT = TypeVar("ParserT", bound="_BaseParser")
 
-IMPORTED_ROUTE: str = "__configzen_imported_route__"
+IMPORT_METADATA: str = "__configzen_import__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
@@ -243,6 +243,22 @@ def parse_directive_call(
     return directive_name, arguments
 
 
+class ImportMetadata(TypedDict):
+    """
+    Metadata for an import.
+
+    Attributes
+    ----------
+    route
+        The route to import from.
+    context
+        The context attached to the import.
+    """
+
+    route: str | None
+    context: AnyContext
+
+
 class _BaseParser:
     """
     Parser that executes directives.
@@ -257,6 +273,7 @@ class _BaseParser:
 
     _directive_handlers: dict[str, DirectiveHandlerT] = None  # type: ignore[assignment]
     prefix: ClassVar[str]
+    extension_prefix: ClassVar[str]
 
     def __init__(
         self,
@@ -278,30 +295,31 @@ class _BaseParser:
         return self._parse(self.dict_config)
 
     @classmethod
-    def preserve_state(
+    def preserve_importing_state(
         cls,
         state: dict[str, Any],
-        at: str | None,
-        context: AnyContext,
+        metadata: ImportMetadata,
     ) -> None:
         """
         Preserve imported data information in the model state before dumping it.
 
         Parameters
         ----------
-        context
-        at
+        metadata
         state
         """
         from configzen.config import convert, select_scope
 
         overrides = {}
 
+        context = metadata["context"]
+        route = metadata["route"]
         resource = context.resource
+
         with resource.open_resource() as reader:
             imported = resource.load_into_dict(reader.read())
-            if at:
-                imported = select_scope(imported, at)
+            if route:
+                imported = select_scope(imported, route, resource=resource)
 
         imported_values = imported.copy()
 
@@ -311,25 +329,51 @@ class _BaseParser:
             if counterpart_value is missing:
                 continue
             counterpart_value = convert(counterpart_value)
-            if counterpart_value != value:
-                overrides[key] = counterpart_value
-                del imported_values[key]
+            if is_dict_like(value):
+                overrides_for_key = {
+                    k: cv
+                    for k, v in value.items()
+                    if (
+                        (cv := counterpart_value.get(k, missing)) 
+                        is not missing and v != cv
+                    )
+                }
+                if overrides_for_key:
+                    overrides["+" + key] = overrides_for_key 
+            else:
+                counterpart_value = convert(counterpart_value)
+                if counterpart_value != value:
+                    overrides[key] = counterpart_value
+                    del imported_values[key]
 
         state.clear()
 
         if imported_values:
             # If no imported values are left,
             # the import directive is not needed
-            arguments = [] if at is None else [at]
-            import_directive = cls.directive(Directives.IMPORT, arguments)
+            arguments = [] if route is None else [route]
+            import_directive = cls.directive(Directives.EXTENDS, arguments)
             state.update({import_directive: context.resource.resource})
 
         state.update(overrides)
 
     def _parse(self, container: dict[str, Any]) -> dict[str, Any]:
-        result = {}
-        for key, value in container.items():
-            if key.startswith(self.prefix):
+        result: dict[str, Any] = {}
+        
+        for key, value in sorted(
+            container.items(),
+            key=lambda item: item[0] == self.prefix,
+        ):
+            if key.startswith(self.extension_prefix):
+                k = key.lstrip(self.extension_prefix)
+                overridden = result.get(k, {})
+                if not is_dict_like(overridden):
+                    raise ValueError(
+                        f"{self.extension_prefix} can be used only for overriding "
+                        f"dictionary sections but item at {k!r} is not a dictionary"
+                    )
+                result[k] = {**overridden, **value}
+            elif key.startswith(self.prefix):
                 directive_name, arguments = parse_directive_call(self.prefix, key)
                 context_container = container.copy()
                 del context_container[key]
@@ -342,7 +386,8 @@ class _BaseParser:
                     container=context_container,
                 )
                 self._call_directive(context)
-                result.update(self._parse(context.container))
+                new_container = self._parse(context.container)
+                result.update(new_container)
             elif is_dict_like(value):
                 result[key] = self._parse(value)
             elif is_list_like(value):
@@ -357,7 +402,12 @@ class _BaseParser:
         return result
 
     def _call_directive(self, context: DirectiveContext) -> None:
-        self._directive_handlers[context.directive](self, context)
+        handler = self._directive_handlers.get(context.directive)
+        if handler is None:
+            raise ValueError(
+                f"unknown parser directive: {context.directive!r}"
+            )
+        handler(self, context)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -416,24 +466,24 @@ class _BaseParser:
 
 
 class Directives(str, enum.Enum):
-    IMPORT = "import"
+    EXTENDS = "extends"
 
 
 class Parser(_BaseParser):
     prefix = "/"
+    extension_prefix = "+"
 
-    @directive(Directives.IMPORT)
-    def _call_import(
-        self, 
+    @directive(Directives.EXTENDS)
+    def _call_extends(
+        self,
         directive_context: DirectiveContext
     ) -> None:
         from configzen.config import Context, CONTEXT, select_scope
         resource_class = type(self.resource)
         if len(directive_context.arguments) > 1:
-            print(directive_context.arguments)
-            raise ValueError("import directive can select only one section")
+            raise ValueError("'extends' directive can select only one section")
         if directive_context.has_duplicates():
-            raise ValueError("duplicate import directive")
+            raise ValueError("duplicate 'extends' directive")
         if isinstance(directive_context.snippet, str):
             resource = resource_class(directive_context.snippet)
         elif is_dict_like(directive_context.snippet):
@@ -465,9 +515,13 @@ class Parser(_BaseParser):
                     f"imported item {import_route!r} "
                     f"from {resource.resource} is not a dictionary"
                 )
+        context: Context = Context(resource)
         directive_context.container = {
             **imported_data,
             **directive_context.container,
-            CONTEXT: Context(resource),
-            IMPORTED_ROUTE: import_route,
+            CONTEXT: context,
+            IMPORT_METADATA: ImportMetadata(
+                route=import_route,
+                context=context
+            )
         }
