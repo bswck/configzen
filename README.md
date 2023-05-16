@@ -146,7 +146,7 @@ overriding desired sections as needed:
 Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it.
 
-Notice how configuration file format don't matter in _configzen_: you can 
+Notice how configuration file formats don't matter in _configzen_: you can 
 extend JSON configurations in YAML, but that might be as well any other format 
 among [JSON](https://en.wikipedia.org/wiki/JSON), [INI](https://en.wikipedia.org/wiki/INI_file),
 [XML](https://en.wikipedia.org/wiki/XML), [.properties](https://en.wikipedia.org/wiki/.properties), 
