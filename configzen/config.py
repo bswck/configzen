@@ -546,7 +546,7 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_load_options, **kwargs}
+        kwargs = self._ac_load_options | kwargs
         loaded = anyconfig.loads(blob, ac_parser=ac_parser, **kwargs)
         return self.processor_class(self, loaded).preprocess()
 
@@ -602,7 +602,7 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_dump_options, **kwargs}
+        kwargs = self._ac_dump_options | kwargs
         return anyconfig.dumps(
             convert(data),
             ac_parser=ac_parser,

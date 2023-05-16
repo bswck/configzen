@@ -367,7 +367,7 @@ class _BaseProcessor:
                         f"{self.extension_prefix} can be used only for overriding "
                         f"dictionary sections but item at {k!r} is not a dictionary"
                     )
-                result[k] = {**overridden, **value}
+                result[k] = overridden | value
             elif key.startswith(self.prefix):
                 directive_name, arguments = parse_directive_call(self.prefix, key)
                 context_container = container.copy()
@@ -511,9 +511,7 @@ class Processor(_BaseProcessor):
                     f"from {resource.resource} is not a dictionary"
                 )
         context: Context = Context(resource)
-        directive_context.container = {
-            **imported_data,
-            **directive_context.container,
+        directive_context.container = imported_data | directive_context.container | {
             CONTEXT: context,
             IMPORT_METADATA: ImportMetadata(
                 route=import_route,
