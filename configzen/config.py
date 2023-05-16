@@ -121,7 +121,7 @@ ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
 SupportsRoute = Union[str, list[str], "Route"]
 
 OpenedT = contextlib.AbstractContextManager
-RawResourceT = OpenedT | str | os.PathLike | pathlib.Path
+RawResourceT = Union[OpenedT, str, os.PathLike, pathlib.Path]
 
 
 def _get_defaults_from_model_class(
@@ -645,7 +645,7 @@ class ConfigResource:
             return urllib.request.urlopen(  # noqa: S310, ^
                 urllib.request.Request(url), **kwds
             )
-        if isinstance(self.resource, str | os.PathLike | pathlib.Path):
+        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
             return pathlib.Path(self.resource).open(**kwds)
         return self.resource
 
@@ -1471,7 +1471,7 @@ class ConfigModel(
             mby_resource = getattr(cls.__config__, "resource", None)
         if mby_resource is None:
             raise ValueError("No resource specified")
-        if isinstance(mby_resource, str | bytes):
+        if isinstance(mby_resource, (str, bytes)):
             resource = ConfigResource(mby_resource)
         elif isinstance(mby_resource, ConfigResource):
             resource = mby_resource
