@@ -336,6 +336,7 @@ def convert_namedtuple(obj: tuple) -> Any:
 def _split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     load_options: dict[str, Any] = {}
     dump_options: dict[str, Any] = {}
+
     for key, value in options.items():
         final_key = key
         if key.startswith("dump_"):
@@ -437,14 +438,6 @@ class ConfigResource:
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
-        if (
-            not options.get("ac_safe")
-            and options.get("load_ac_safe") is None
-            and options.get("dump_ac_safe") is None
-        ):
-            # Business is business.
-            options["ac_safe"] = True
-
         if processor_class is None:
             processor_class = Processor
 
@@ -452,7 +445,7 @@ class ConfigResource:
         self.ac_parser = ac_parser
         self.resource = resource
         self.create_if_missing = create_if_missing
-        self.use_pydantic_json = options.get("use_pydantic_json", True)
+        self.use_pydantic_json = options.pop("use_pydantic_json", True)
         self._ac_load_options, self._ac_dump_options = _split_ac_options(options)
 
     @property
@@ -1460,6 +1453,7 @@ class ConfigModel(
             if metadata:
                 context = get_context(self)
                 context.resource.processor_class.export(state, metadata)
+            print(state)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)

@@ -22,6 +22,4 @@ class DatabaseConfig(ConfigModel):
 
 db_config = DatabaseConfig.load()
 print("loaded", db_config)
-input()
-# Optionally change your config or just persist it, excluding the `password` field.
 print(db_config.save())

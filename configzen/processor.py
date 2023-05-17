@@ -9,6 +9,14 @@ from anyconfig.utils import is_dict_like, is_list_like
 if TYPE_CHECKING:
     from configzen.config import ConfigResource, AnyContext
 
+
+__all__ = (
+    "DirectiveContext",
+    "directive",
+    "Processor",
+)
+
+
 DirectiveT = TypeVar("DirectiveT")
 ProcessorT = TypeVar("ProcessorT", bound="_BaseProcessor")
 
@@ -254,12 +262,12 @@ class _BaseProcessor:
     ----------
     dict_config
         The dictionary config to parse and update.
-    prefix
+    directive_prefix
         The prefix for directives.
     """
 
     _directive_handlers: dict[str, DirectiveHandlerT] = None  # type: ignore[assignment]
-    prefix: ClassVar[str]
+    directive_prefix: ClassVar[str]
     extension_prefix: ClassVar[str]
 
     def __init__(
@@ -349,7 +357,7 @@ class _BaseProcessor:
 
         for key, value in sorted(
             container.items(),
-            key=lambda item: item[0] == self.prefix,
+            key=lambda item: item[0] == self.directive_prefix,
         ):
             if key.startswith(self.extension_prefix):
                 k = key.lstrip(self.extension_prefix)
@@ -360,14 +368,14 @@ class _BaseProcessor:
                         f"dictionary sections but item at {k!r} is not a dictionary"
                     )
                 result[k] = overridden | value
-            elif key.startswith(self.prefix):
-                directive_name, arguments = parse_directive_call(self.prefix, key)
+            elif key.startswith(self.directive_prefix):
+                directive_name, arguments = parse_directive_call(self.directive_prefix, key)
                 context_container = container.copy()
                 del context_container[key]
                 context = DirectiveContext(
                     directive=directive_name,
                     key=key,
-                    prefix=self.prefix,
+                    prefix=self.directive_prefix,
                     arguments=arguments,
                     snippet=value,
                     container=context_container,
@@ -437,7 +445,7 @@ class _BaseProcessor:
             directive_name = directive_name.value
 
         return (
-            cls.prefix
+            cls.directive_prefix
             + directive_name
             + (",".join(map(_fmt_argument, arguments)).join("()") if arguments else "")
         )
@@ -448,7 +456,7 @@ class Directives(str, enum.Enum):
 
 
 class Processor(_BaseProcessor):
-    prefix = "/"
+    directive_prefix = "/"
     extension_prefix = "+"
 
     @directive(Directives.EXTENDS)
