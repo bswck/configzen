@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, ClassVar, TYPE_CHECKING, cast, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
 from anyconfig.utils import is_dict_like, is_list_like
 
 if TYPE_CHECKING:
-    from configzen.config import ConfigResource, AnyContext
+    from configzen.config import AnyContext, ConfigResource
 
 
 __all__ = (
@@ -24,7 +25,7 @@ IMPORT_METADATA: str = "__configzen_import__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
-DirectiveHandlerT = Callable[[ProcessorT, "DirectiveContext[DirectiveT]"], None]
+DirectiveHandlerT = Callable[[ProcessorT, "DirectiveContext"], None]
 
 
 def directive(
@@ -369,7 +370,9 @@ class _BaseProcessor:
                     )
                 result[k] = overridden | value
             elif key.startswith(self.directive_prefix):
-                directive_name, arguments = parse_directive_call(self.directive_prefix, key)
+                directive_name, arguments = parse_directive_call(
+                    self.directive_prefix, key
+                )
                 context_container = container.copy()
                 del context_container[key]
                 context = DirectiveContext(
@@ -461,7 +464,7 @@ class Processor(_BaseProcessor):
 
     @directive(Directives.EXTENDS)
     def _call_extends(self, directive_context: DirectiveContext) -> None:
-        from configzen.config import Context, CONTEXT, select_scope
+        from configzen.config import CONTEXT, Context, select_scope
 
         resource_class = type(self.resource)
         if len(directive_context.arguments) > 1:

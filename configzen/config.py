@@ -76,9 +76,9 @@ from typing import (
     Literal,
     NamedTuple,
     TypeVar,
+    Union,
     cast,
     no_type_check,
-    Union,
 )
 
 import anyconfig
@@ -88,10 +88,10 @@ from pydantic.main import ModelMetaclass
 
 from configzen.errors import (
     ConfigItemAccessError,
-    UnknownParserError,
     ProcessorLookupError,
+    UnknownParserError,
 )
-from configzen.processor import Processor, IMPORT_METADATA
+from configzen.processor import IMPORT_METADATA, Processor
 
 try:
     import aiofiles
@@ -446,6 +446,7 @@ class ConfigResource:
         self.resource = resource
         self.create_if_missing = create_if_missing
         self.use_pydantic_json = options.pop("use_pydantic_json", True)
+        self.encoding = options.pop("encoding", "UTF-8")
         self._ac_load_options, self._ac_dump_options = _split_ac_options(options)
 
     @property
@@ -681,6 +682,7 @@ class ConfigResource:
         if kwargs is None:
             kwargs = {}
         if not self.is_url:
+            kwargs.setdefault("encoding", self.encoding)
             if operation == "read":
                 kwargs.setdefault("mode", "r")
             elif operation == "write":

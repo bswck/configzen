@@ -1,7 +1,7 @@
 # flake8: noqa
 from pydantic import Field as ConfigField
 
-from . import config
+from . import config, processor
 from .config import *
 from .processor import *
 
