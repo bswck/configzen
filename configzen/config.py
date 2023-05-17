@@ -70,8 +70,15 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
 from typing import (
-    TYPE_CHECKING, Any, Generic, Literal, NamedTuple, TypeVar, cast, no_type_check,
-    Union
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    NamedTuple,
+    TypeVar,
+    cast,
+    no_type_check,
+    Union,
 )
 
 import anyconfig
@@ -79,8 +86,11 @@ import pydantic
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import ConfigItemAccessError, UnknownParserError, \
-    ProcessorLookupError
+from configzen.errors import (
+    ConfigItemAccessError,
+    UnknownParserError,
+    ProcessorLookupError,
+)
 from configzen.processor import Processor, IMPORT_METADATA
 
 try:
@@ -108,9 +118,7 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative
-    + urllib.parse.uses_netloc
-    + urllib.parse.uses_params,
+    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params,
 ) - {""}
 CONTEXT: str = "__configzen_context__"
 
@@ -121,7 +129,7 @@ ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
 SupportsRoute = Union[str, list[str], "Route"]
 
 OpenedT = contextlib.AbstractContextManager
-RawResourceT = OpenedT | str | os.PathLike | pathlib.Path
+RawResourceT = Union[OpenedT, str, os.PathLike, pathlib.Path]
 
 
 def _get_defaults_from_model_class(
@@ -148,9 +156,7 @@ def _is_namedtuple(
     obj: Any,
 ) -> bool:
     return (
-        isinstance(obj, tuple) and
-        hasattr(obj, "_asdict") and
-        hasattr(obj, "_fields")
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
     )
 
 
@@ -216,6 +222,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     convert.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
+
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: load.dispatch(cls)(cls, value)
 
@@ -546,7 +553,7 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_load_options, **kwargs}
+        kwargs = self._ac_load_options | kwargs
         loaded = anyconfig.loads(blob, ac_parser=ac_parser, **kwargs)
         return self.processor_class(self, loaded).preprocess()
 
@@ -602,7 +609,7 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = {**self._ac_dump_options, **kwargs}
+        kwargs = self._ac_dump_options | kwargs
         return anyconfig.dumps(
             convert(data),
             ac_parser=ac_parser,
@@ -645,7 +652,7 @@ class ConfigResource:
             return urllib.request.urlopen(  # noqa: S310, ^
                 urllib.request.Request(url), **kwds
             )
-        if isinstance(self.resource, str | os.PathLike | pathlib.Path):
+        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
             return pathlib.Path(self.resource).open(**kwds)
         return self.resource
 
@@ -674,7 +681,8 @@ class ConfigResource:
         return aiofiles.open(cast(str, self.resource), **kwds)
 
     def _get_default_kwargs(
-        self, operation: Literal["read", "write"],
+        self,
+        operation: Literal["read", "write"],
         kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kwargs is None:
@@ -912,8 +920,8 @@ if TYPE_CHECKING:
         def save(self) -> int:
             ...
 
-
 else:
+
     class ConfigAt(NamedTuple):
         """
         A configuration item at a specific location.
@@ -1120,7 +1128,7 @@ def reload(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     newest = context.resource.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
+    config.__dict__ |= new_mapping
     return section_data
 
 
@@ -1149,7 +1157,7 @@ async def reload_async(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     newest = await context.resource.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
+    config.__dict__ |= new_mapping
     return new_mapping
 
 
@@ -1168,6 +1176,7 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
         The initial configuration state.
 
     """
+
     initial_state: dict[str, Any]
     _initial_state: dict[str, Any]
 
@@ -1370,9 +1379,7 @@ def get_context(config: ConfigModelT) -> AnyContext[ConfigModelT]:
     return context
 
 
-def get_context_or_none(
-    config: ConfigModelT
-) -> AnyContext[ConfigModelT] | None:
+def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None:
     """
     Get the context of the configuration model safely.
 
@@ -1392,10 +1399,7 @@ def get_context_or_none(
     return context
 
 
-def _json_encoder(
-    model_encoder: Callable,
-    value: Any, **kwargs: Any
-) -> Any:
+def _json_encoder(model_encoder: Callable, value: Any, **kwargs: Any) -> Any:
     initial_state_type = type(value)
     converted_value = convert(value)
     if isinstance(converted_value, initial_state_type):
@@ -1409,7 +1413,7 @@ class CMBMetaclass(ModelMetaclass):
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
-        **kwargs: Any
+        **kwargs: Any,
     ) -> type:
         namespace[IMPORT_METADATA] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
@@ -1471,14 +1475,12 @@ class ConfigModel(
             mby_resource = getattr(cls.__config__, "resource", None)
         if mby_resource is None:
             raise ValueError("No resource specified")
-        if isinstance(mby_resource, str | bytes):
+        if isinstance(mby_resource, (str, bytes)):
             resource = ConfigResource(mby_resource)
         elif isinstance(mby_resource, ConfigResource):
             resource = mby_resource
         else:
-            raise TypeError(
-                f"Invalid resource type: {type(mby_resource).__name__}"
-            )
+            raise TypeError(f"Invalid resource type: {type(mby_resource).__name__}")
         if create_if_missing is not None:
             resource.create_if_missing = create_if_missing
         return resource
@@ -1520,12 +1522,10 @@ class ConfigModel(
         None
         """
         context = get_context(self)
-        self.__dict__.update(context.initial_state)
+        self.__dict__ |= context.initial_state
 
     def _ensure_settings_with_context(
-        self,
-        name: str,
-        value: ConfigModelT
+        self, name: str, value: ConfigModelT
     ) -> ConfigModelT:
         context = get_context_or_none(self)
         if (
@@ -1714,9 +1714,7 @@ class ConfigModel(
         return await save_async(context.section)
 
     async def write_async(
-        self,
-        blob: str | collections.abc.ByteString,
-        **kwargs: Any
+        self, blob: str | collections.abc.ByteString, **kwargs: Any
     ) -> int:
         """
         Overwrite the configuration file asynchronously with the given string or bytes.
@@ -1752,4 +1750,5 @@ class ConfigMeta(pydantic.BaseSettings.Config):
 
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
+
     resource: ConfigResource | RawResourceT | None = None
