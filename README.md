@@ -60,7 +60,7 @@ As simple as that!
 This way, you can load your configuration from a file as well as from the environment variables
 `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. Since `password` is a field created with 
 the option `exclude=True`, it will not be included in the configuration's exported data: that
-guarantees your password won't leak into `database.yaml` on save – but you may still pass it 
+guarantees that your password won't leak into `database.yaml` on save – but you may still pass it 
 through an environment variable (here – the mentioned `DB_PASSWORD`).
 
 [pydantic](https://docs.pydantic.dev/latest/) will take care of parsing and validating the loaded data.
