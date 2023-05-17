@@ -59,7 +59,8 @@ db_config = DatabaseConfig.load()
 As simple as that!
 This way, you can load your configuration from a file as well as from the environment variables
 `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. Since `password` is marked as `exclude=True`,
-it will not be saved to the configuration file, but it will it be loaded from the environment variables.
+it will not be be included when saving the configuration, 
+but it can be loaded from the environment variables instead.
 
 [pydantic](https://docs.pydantic.dev/latest/) will take care of parsing and validating the loaded data.
 
@@ -70,7 +71,7 @@ You can now use the `db_config` object to access the configuration values:
 IPv4Address('127.0.0.1')
 ```
 
-modify them, if the Pydantic model allows it:
+modify them, if the pydantic model allows it:
 
 ```python
 >>> db_config.host = "0.0.0.0"
@@ -81,13 +82,20 @@ IPv4Address('0.0.0.0')
 as well as reload particular values, without touching the rest of the configuration:
 
 ```python
+>>> db_config.at("port").reload()
+5432
+>>> db_config
+DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
 >>> db_config.at("host").reload()
 IPv4Address('127.0.0.1')
+>>> db_config
+DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or reload the whole configuration:
 
 ```python
+>>> db_config.port = 1234
 >>> db_config.reload()
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
@@ -115,9 +123,11 @@ or save the whole configuration:
 ### Preprocessing directives
 _configzen_ allows you to use built-in preprocessing directives in your configuration files,
 offering features such as importing other configuration files in order to extend 
-your base configuration without writing any code.
+your base configuration without writing any code. You might think of it as something
+that is analogous to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
+but for configuration files, broadened to any configuration file format and with some extra features planned.
 
-This way, you can write your configuration in a modular way, and avoid repeating yourself.
+Thanks to this, you can write your configuration in a modular way, and avoid repeating yourself.
 
 Let's say you have a base configuration file like this (`base.json`):
 
@@ -170,7 +180,7 @@ app:
   debug: false
 ```
 
-because both behave roughly the same as
+because both behave roughly the same as if you used:
 ```yaml
 # production.yaml
 i18n:
@@ -180,8 +190,9 @@ app:
    debug: false
 ```
 
-If you load it and save it, _configzen_ will keep the import directive if it is still needed,
-up to date with changes to the imported configuration.
+With the difference that the first two examples, while saving the configuration,
+will preserve the relation to the base configuration file, so that you can reload
+the configuration and it will be updated with the changes made in the base configuration file.
 
 
 ## Setup
