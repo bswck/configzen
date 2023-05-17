@@ -318,8 +318,8 @@ class _BaseProcessor:
 
         imported_values = imported.copy()
 
+        missing = object()
         for key, value in imported.items():
-            missing = object()
             counterpart_value = state.get(key, missing)
             if counterpart_value is missing:
                 continue

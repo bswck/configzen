@@ -1436,8 +1436,8 @@ class ConfigModel(
         # Allow to set private attributes
         # (e.g. for the context) via the constructor
         # for convenience
+        missing = object()
         for private_attr in self.__private_attributes__:
-            missing = object()
             value = kwargs.pop(private_attr, missing)
             if value is not missing:
                 setattr(self, private_attr, value)
