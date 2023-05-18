@@ -662,15 +662,13 @@ class ConfigLoader:
             return pathlib.Path(self.resource).open(**kwds)
         return self.resource
 
-    def processor_open_resource(self, **kwds: Any) -> OpenedT:
+    def processor_open_resource(self, **kwargs: Any) -> OpenedT:
         """
-        Open the configuration file.
-        This is the same as `open_resource()`, but it is called by the
-        `ConfigProcessor` automatically when it needs to open the resource.
+        Called by the processor to open a configuration resource with reading intention.
 
         Parameters
         ----------
-        **kwds
+        **kwargs
             Keyword arguments to pass to the opening routine.
             For URLs, these are passed to ``urllib.request.urlopen()``.
             For local files, these are passed to ``builtins.open()``.
@@ -679,7 +677,8 @@ class ConfigLoader:
         -------
         The opened resource.
         """
-        return self.open_resource(**kwds)
+        kwargs = self._get_default_kwargs("read", kwargs)
+        return self.open_resource(**kwargs)
 
     def open_resource_async(self, **kwds: Any) -> Any:
         """
@@ -710,18 +709,18 @@ class ConfigLoader:
 
     def _get_default_kwargs(
         self,
-        operation: Literal["read", "write"],
+        method: Literal["read", "write"],
         kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        if kwargs is None:
+        if not kwargs:
             kwargs = self.default_kwargs
         if not self.is_url:
-            if operation == "read":
+            if method == "read":
                 kwargs.setdefault("mode", "r")
-            elif operation == "write":
+            elif method == "write":
                 kwargs.setdefault("mode", "w")
             else:
-                msg = f"invalid method {operation!r}"
+                msg = f"invalid resource access method: {method!r}"
                 raise ValueError(msg)
         return kwargs
 
