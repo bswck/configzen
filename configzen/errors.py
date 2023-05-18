@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import anyconfig
 
 if TYPE_CHECKING:
-    from configzen.config import ConfigModelT, ConfigResource
+    from configzen.config import ConfigLoader, ConfigModelT
 
 
 class ConfigError(Exception):
@@ -36,6 +36,6 @@ class ConfigItemAccessError(ConfigError, LookupError):
 class ProcessorLookupError(ConfigError, LookupError):
     """An error occurred while looking up a processor."""
 
-    def __init__(self, resource: ConfigResource | None, route: list[str]) -> None:
+    def __init__(self, resource: ConfigLoader | None, route: list[str]) -> None:
         resource_name = resource.resource if resource else "the provided resource"
         super().__init__(f"{route} not found in {resource_name}")

@@ -3,12 +3,12 @@ from __future__ import annotations
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
 
 from anyconfig.utils import is_dict_like, is_list_like
 
 if TYPE_CHECKING:
-    from configzen.config import AnyContext, ConfigResource
+    from configzen.config import AnyContext, ConfigLoader
 
 
 __all__ = (
@@ -19,9 +19,9 @@ __all__ = (
 
 
 DirectiveT = TypeVar("DirectiveT")
-ProcessorT = TypeVar("ProcessorT", bound="_BaseProcessor")
+ProcessorT = TypeVar("ProcessorT", bound="Processor")
 
-IMPORT_METADATA: str = "__configzen_import__"
+SUBST_METADATA: str = "__configzen_substitute__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
@@ -222,7 +222,8 @@ def parse_directive_call(
 ) -> tuple[str, list[str]]:
     arguments = []
     if directive_name.startswith(prefix):
-        directive_name = directive_name[len(prefix) :].casefold()
+        directive_name = directive_name[len(prefix):].casefold()
+
         if directive_name.endswith(tokens.RPAREN):
             try:
                 lpar = directive_name.index(tokens.LPAREN)
@@ -230,18 +231,19 @@ def parse_directive_call(
                 raise ValueError(f"invalid directive call: {directive_name}") from None
             (directive_name, raw_argument_string) = (
                 directive_name[:lpar],
-                directive_name[lpar + 1 : -1],
+                directive_name[lpar + 1: -1],
             )
             arguments = _parse_argument_string(raw_argument_string, tokens)
 
         if not directive_name.isidentifier():
             raise ValueError(f"Invalid directive name: {directive_name}")
+
     return directive_name, arguments
 
 
-class ImportMetadata(TypedDict):
+class SubstitutionMetadata(TypedDict):
     """
-    Metadata for an import.
+    Metadata for a substitution directive: either EXPAND or EXTEND call.
 
     Attributes
     ----------
@@ -253,9 +255,10 @@ class ImportMetadata(TypedDict):
 
     route: str | None
     context: AnyContext
+    preprocess: bool
 
 
-class _BaseProcessor:
+class BaseProcessor:
     """
     Processor that executes directives.
 
@@ -273,11 +276,19 @@ class _BaseProcessor:
 
     def __init__(
         self,
-        resource: ConfigResource,
+        resource: ConfigLoader,
         dict_config: dict[str, Any],
     ) -> None:
-        self.resource = resource
+        self.loader = resource
         self.dict_config = dict_config
+
+    @classmethod
+    def export(
+        cls,
+        state: dict[str, Any],
+        metadata: SubstitutionMetadata,
+    ) -> None:
+        pass
 
     def preprocess(self) -> dict[str, Any]:
         """
@@ -290,69 +301,6 @@ class _BaseProcessor:
         """
         return self._preprocess(self.dict_config)
 
-    @classmethod
-    def export(
-        cls,
-        state: dict[str, Any],
-        metadata: ImportMetadata,
-    ) -> None:
-        """
-        Exports model state preserveing /extends directive calls in a model state.
-
-        Parameters
-        ----------
-        metadata
-        state
-        """
-        from configzen.config import convert, select_scope
-
-        overrides = {}
-
-        context = metadata["context"]
-        route = metadata["route"]
-        resource = context.resource
-
-        with resource.open_resource() as reader:
-            imported = resource.load_into_dict(reader.read())
-            if route:
-                imported = select_scope(imported, route, resource=resource)
-
-        imported_values = imported.copy()
-
-        missing = object()
-        for key, value in imported.items():
-            counterpart_value = state.get(key, missing)
-            if counterpart_value is missing:
-                continue
-            counterpart_value = convert(counterpart_value)
-            if is_dict_like(value):
-                overrides_for_key = {
-                    k: cv
-                    for k, v in value.items()
-                    if (
-                        (cv := counterpart_value.get(k, missing)) is not missing
-                        and v != cv
-                    )
-                }
-                if overrides_for_key:
-                    overrides["+" + key] = overrides_for_key
-            else:
-                counterpart_value = convert(counterpart_value)
-                if counterpart_value != value:
-                    overrides[key] = counterpart_value
-                    del imported_values[key]
-
-        state.clear()
-
-        if imported_values:
-            # If no imported values are left,
-            # the import directive is not needed
-            arguments = [] if route is None else [route]
-            import_directive = cls.directive(Directives.EXTENDS, arguments)
-            state |= {import_directive: context.resource.resource}
-
-        state |= overrides
-
     def _preprocess(self, container: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}
 
@@ -361,14 +309,15 @@ class _BaseProcessor:
             key=lambda item: item[0] == self.directive_prefix,
         ):
             if key.startswith(self.extension_prefix):
-                k = key.lstrip(self.extension_prefix)
-                overridden = result.get(k, {})
+                actual_key = key.lstrip(self.extension_prefix)
+                overridden = result.get(actual_key, {})
                 if not is_dict_like(overridden):
                     raise ValueError(
                         f"{self.extension_prefix} can be used only for overriding "
-                        f"dictionary sections but item at {k!r} is not a dictionary"
+                        f"dictionary sections but item at {actual_key!r} "
+                        f"is not a dictionary"
                     )
-                result[k] = overridden | value
+                result[actual_key] = overridden | value
             elif key.startswith(self.directive_prefix):
                 directive_name, arguments = parse_directive_call(
                     self.directive_prefix, key
@@ -455,58 +404,259 @@ class _BaseProcessor:
 
 
 class Directives(str, enum.Enum):
-    EXTENDS = "extends"
+    EXPAND = "expand"
+    EXTEND = "extend"
+    INCLUDE = "include"
+    COPY = "copy"
+    PROCESSOR = "processor"
+    DEFINE = "define"
 
 
-class Processor(_BaseProcessor):
-    directive_prefix = "/"
+class Processor(BaseProcessor):
+    directive_prefix = "^"
     extension_prefix = "+"
 
-    @directive(Directives.EXTENDS)
-    def _call_extends(self, directive_context: DirectiveContext) -> None:
+    @directive(Directives.EXPAND)
+    def expand(self, ctx: DirectiveContext) -> None:
+        """
+        Expand a configuration with another configuration.
+        Recursively preprocess the referenced configuration.
+        Preserve information about the referenced configuration.
+
+        Visual example
+        --------------
+
+        With `base.yaml` containing:
+        ```yaml
+        section:
+          foo: 1
+          bar: 2
+        ```
+
+        and `config.yaml` containing:
+
+        ```yaml
+        ^expand: base.yaml
+        +section:
+          foo: 3
+        ```
+
+        -> `load()` -> `save()` ->
+
+        ```yaml
+        ^expand: base.yaml
+        +section:
+          foo: 3
+        ```
+        """
+        return self._substitute(ctx, preprocess=True, preserve=True)
+
+    @directive(Directives.INCLUDE)
+    def include(self, ctx: DirectiveContext) -> None:
+        """
+        Include a configuration in another configuration.
+        Recursively preprocess the referenced configuration.
+        Do not preserve information about the referenced configuration.
+
+        Visual example
+        --------------
+        With `biz.yaml` containing:
+
+        ```yaml
+        section:
+          biz: 3
+        ```
+
+        and `base.yaml` containing:
+
+        ```yaml
+        ^expand: biz.yaml
+        +section:
+          foo: 1
+          bar: 2
+        ```
+
+        and `config.yaml` containing:
+
+        ```yaml
+        ^include: base.yaml
+        +section:
+          foo: 3
+        ```
+
+        -> `load()` -> `save()` ->
+
+        ```yaml
+        ^expand: biz.yaml
+        +section:
+          bar: 2
+          foo: 3
+        ```
+        """
+        return self._substitute(ctx, preprocess=True, preserve=False)
+
+    @directive(Directives.EXTEND)
+    def extend(self, ctx: DirectiveContext) -> None:
+        """
+        Extend a configuration with another configuration.
+        Do not preprocess the referenced configuration.
+        Preserve information about the referenced configuration.
+
+        Visual example
+        --------------
+        TODO
+        """
+        return self._substitute(ctx, preprocess=False, preserve=True)
+
+    @directive(Directives.COPY)
+    def copy(self, ctx: DirectiveContext) -> None:
+        """
+        Copy a configuration and paste into another configuration.
+        This is just a literal copy-paste.
+        Do not preprocess the referenced configuration.
+        Do not preserve information about the referenced configuration.
+
+        Visual example
+        --------------
+        With `base.yaml` containing:
+
+        ```yaml
+        section:
+          foo: 1
+          bar: 2
+        ```
+
+        and `config.yaml` containing:
+
+        ```yaml
+        ^copy: base.yaml
+        +section:
+          foo: 3
+        ```
+
+        -> `load()` -> `save()` ->
+
+        ```yaml
+        section:
+          foo: 3
+          bar: 2
+        ```
+        """
+        return self._substitute(ctx, preprocess=False, preserve=False)
+
+    def _substitute(
+        self,
+        ctx: DirectiveContext,
+        *,
+        preprocess: bool,
+        preserve: bool
+    ) -> None:
         from configzen.config import CONTEXT, Context, select_scope
 
-        resource_class = type(self.resource)
-        if len(directive_context.arguments) > 1:
-            raise ValueError("'extends' directive can select only one section")
-        if directive_context.has_duplicates():
-            raise ValueError("duplicate 'extends' directive")
-        if isinstance(directive_context.snippet, str):
-            resource = resource_class(directive_context.snippet)
-        elif is_dict_like(directive_context.snippet):
-            resource = resource_class(**directive_context.snippet)
-        elif is_list_like(directive_context.snippet):
-            resource = resource_class(*cast(list, directive_context.snippet))
-        else:
-            raise ValueError(
-                f"invalid snippet for import directive: {directive_context.snippet!r}"
-            )
-        if resource.resource == self.resource.resource:
-            raise ValueError(f"{resource.resource} tried to import itself")
-        with resource.open_resource() as reader:
-            imported_data = resource.load_into_dict(reader.read())
-        import_route = (
-            directive_context.arguments[0] if directive_context.arguments else None
-        )
-        if import_route:
+        loader_class = type(self.loader)
+        if len(ctx.arguments) > 1:
+            msg = f"{ctx.directive!r} directive can select only one section"
+            raise ValueError(msg)
+        if ctx.has_duplicates():
+            msg = f"duplicate {ctx.directive!r} directive"
+            raise ValueError(msg)
+
+        loader = loader_class.from_directive_context(ctx)
+
+        if loader.resource == self.loader.resource:
+            raise ValueError(f"{loader.resource} tried to {ctx.directive!r} on itself")
+
+        with loader.processor_open_resource() as reader:
+            substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
+
+        substitution_route = ctx.arguments[0] if ctx.arguments else None
+        if substitution_route:
             try:
-                imported_data = select_scope(imported_data, import_route)
+                substituted = select_scope(substituted, substitution_route)
             except LookupError:
                 raise LookupError(
-                    f"attempted to import item at {import_route!r} "
-                    f"from {resource.resource} that does not exist"
+                    f"attempted to import item at {substitution_route!r} "
+                    f"from {loader.resource} that does not exist"
                 ) from None
-            if not is_dict_like(imported_data):
+            if not is_dict_like(substituted):
                 raise ValueError(
-                    f"imported item {import_route!r} "
-                    f"from {resource.resource} is not a dictionary"
+                    f"imported item {substitution_route!r} "
+                    f"from {loader.resource} is not a dictionary"
                 )
-        context: Context = Context(resource)
-        directive_context.container = (
-            imported_data
-            | directive_context.container
-            | {
+        context: Context = Context(loader)
+        ctx.container = substituted | ctx.container
+
+        if preserve:
+            ctx.container |= {
                 CONTEXT: context,
-                IMPORT_METADATA: ImportMetadata(route=import_route, context=context),
+                SUBST_METADATA: SubstitutionMetadata(
+                    route=substitution_route,
+                    context=context,
+                    preprocess=preprocess
+                ),
             }
-        )
+
+    @classmethod
+    def export(
+        cls,
+        state: dict[str, Any],
+        metadata: SubstitutionMetadata,
+    ) -> None:
+        """
+        Exports model state preserving substition directive calls in the model state.
+
+        Parameters
+        ----------
+        metadata
+        state
+        """
+        from configzen.config import convert, select_scope
+
+        overrides = {}
+
+        context = metadata["context"]
+        route = metadata["route"]
+        preprocess = metadata["preprocess"]
+        loader = context.loader
+
+        with loader.processor_open_resource() as reader:
+            loaded = loader.load_into_dict(reader.read(), preprocess=preprocess)
+            if route:
+                loaded = select_scope(loaded, route, loader=loader)
+
+        substituted_values = loaded.copy()
+
+        missing = object()
+
+        for key, value in loaded.items():
+            counterpart_value = state.get(key, missing)
+            if counterpart_value is missing:
+                continue
+            counterpart_value = convert(counterpart_value)
+            if is_dict_like(value):
+                overrides_for_key = {
+                    sub_key: comp
+                    for sub_key, orig in value.items()
+                    if (
+                        (comp := counterpart_value.get(sub_key, missing)) is not missing
+                        and orig != comp
+                    )
+                }
+                if overrides_for_key:
+                    export_key = loader.processor_class.extension_prefix + key
+                    overrides[export_key] = overrides_for_key
+            else:
+                counterpart_value = convert(counterpart_value)
+                if counterpart_value != value:
+                    overrides[key] = counterpart_value
+                    del substituted_values[key]
+
+        state.clear()
+
+        if substituted_values:
+            arguments = [] if route is None else [route]
+            directive_name = Directives.EXPAND if preprocess else Directives.EXTEND
+            substitution_directive = cls.directive(directive_name, arguments)
+            state |= {substitution_directive: context.loader.resource}
+
+        state |= overrides

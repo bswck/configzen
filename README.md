@@ -149,7 +149,7 @@ overriding desired sections as needed:
 
 ```yaml
 # production.yaml
-/extends: base.json
+^extend: base.json
 
 +app:
     debug: false
@@ -174,10 +174,10 @@ The above example is equivalent to
 ```yaml
 # production.yaml
 i18n:
-  /extends(i18n): base.json
+  ^extend(i18n): base.json
 
 app:
-  /extends(app): base.json
+  ^extend(app): base.json
   debug: false
 ```
 
@@ -188,7 +188,7 @@ i18n:
   language: en
   timezone: UTC
 app:
-   debug: false
+  debug: false
 ```
 
 With the difference that the first two examples, while saving the configuration,

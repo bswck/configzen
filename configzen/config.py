@@ -69,29 +69,18 @@ import pathlib
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    NamedTuple,
-    TypeVar,
-    Union,
-    cast,
-    no_type_check,
-)
+from typing import (TYPE_CHECKING, Any, ClassVar, Generic, Literal, NamedTuple, TypeVar,
+                    Union, cast, no_type_check)
 
 import anyconfig
 import pydantic
+from anyconfig.utils import filter_options, is_dict_like, is_list_like
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import (
-    ConfigItemAccessError,
-    ProcessorLookupError,
-    UnknownParserError,
-)
-from configzen.processor import IMPORT_METADATA, Processor
+from configzen.errors import (ConfigItemAccessError, ProcessorLookupError,
+                              UnknownParserError)
+from configzen.processor import SUBST_METADATA, DirectiveContext, Processor
 
 try:
     import aiofiles
@@ -102,7 +91,7 @@ except ImportError:
     AIOFILES_AVAILABLE = False
 
 __all__ = (
-    "ConfigResource",
+    "ConfigLoader",
     "ConfigModel",
     "ConfigMeta",
     "save",
@@ -113,8 +102,8 @@ __all__ = (
     "converter",
     "convert_namedtuple",
     "convert_mapping",
-    "load",
-    "loader",
+    "generic_validate",
+    "generic_validator",
 )
 
 _URL_SCHEMES: set[str] = set(
@@ -224,7 +213,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     if not hasattr(cls, "__get_validators__"):
 
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
-            yield lambda value: load.dispatch(cls)(cls, value)
+            yield lambda value: generic_validate.dispatch(cls)(cls, value)
 
         cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
 
@@ -232,7 +221,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
 
 
 @functools.singledispatch
-def load(cls: Any, value: Any) -> Any:
+def generic_validate(cls: Any, value: Any) -> Any:
     """
     Load a value into a type.
 
@@ -257,7 +246,9 @@ def load(cls: Any, value: Any) -> Any:
     return cls(value)
 
 
-def loader(func: Callable[[Any], T], cls: type[T] | None = None) -> type[T] | Any:
+def generic_validator(
+    func: Callable[[Any], T], cls: type[T] | None = None
+) -> type[T] | Any:
     """
     Register a loader function for a type.
 
@@ -274,9 +265,9 @@ def loader(func: Callable[[Any], T], cls: type[T] | None = None) -> type[T] | An
     """
 
     if cls is None:
-        return functools.partial(loader, func)
+        return functools.partial(generic_validator, func)
 
-    load.register(cls, func)
+    generic_validate.register(cls, func)
     return cls
 
 
@@ -338,30 +329,30 @@ def _split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str
     dump_options: dict[str, Any] = {}
 
     for key, value in options.items():
-        final_key = key
         if key.startswith("dump_"):
-            final_key = key.removeprefix("dump_")
+            actual_key = key.removeprefix("dump_")
             targets = [dump_options]
         elif key.startswith("load_"):
-            final_key = key.removeprefix("load_")
+            actual_key = key.removeprefix("load_")
             targets = [load_options]
         else:
+            actual_key = key
             targets = [load_options, dump_options]
         for target in targets:
-            if final_key in target:
+            if actual_key in target:
                 msg = (
                     f"option {key}={value!r} overlaps with "
-                    f"defined {final_key}={target[final_key]!r}"
+                    f"defined {actual_key}={target[actual_key]!r}"
                 )
                 raise ValueError(msg)
-            target[final_key] = value
+            target[actual_key] = value
 
     return load_options, dump_options
 
 
-class ConfigResource:
+class ConfigLoader:
     """
-    A configuration resource.
+    A configuration resource loader.
 
     This class is used to represent a configuration resource, which
     can be a file, a URL, or a file-like object. It is used internally
@@ -385,7 +376,7 @@ class ConfigResource:
         Whether to use pydantic's JSON serialization for saving the
         configuration. This is useful for preserving the type of
         values that are not supported by `anyconfig`.
-    options
+    kwargs
         Additional options to pass to `anyconfig` API functions.
 
     Attributes
@@ -408,19 +399,28 @@ class ConfigResource:
     processor_class: type[Processor]
     ac_parser: str | None
     create_if_missing: bool
-    allowed_url_schemes: set[str] = _URL_SCHEMES
+    allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
-    _ac_load_options: dict[str, Any]
-    _ac_dump_options: dict[str, Any]
+    load_options: dict[str, Any]
+    dump_options: dict[str, Any]
+
+    _DEFAULT_RESOURCE_KWARGS: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}
+    _DEFAULT_ALLOWED_URL_SCHEMES: ClassVar[set[str]] = {"file", "http", "https"}
+    _OPEN_KWARGS: ClassVar[frozenset] = frozenset((
+        "mode", "buffering", "encoding", "errors", "newline"
+    ))
+    _URLOPEN_KWARGS: ClassVar[frozenset] = frozenset((
+        "data", "timeout", "cafile", "capath", "cadefault", "context",
+    ))
 
     def __init__(
-        self: ConfigResource,
+        self,
         resource: RawResourceT,
         ac_parser: str | None = None,
         processor_class: type[Processor] | None = None,
         *,
         create_if_missing: bool = False,
-        **options: Any,
+        **kwargs: Any,
     ) -> None:
         """Parameters
         ----------
@@ -431,10 +431,12 @@ class ConfigResource:
             Defaults to 'yaml'.
         create_if_missing
             Whether to automatically create missing keys when loading the configuration.
+        default_kwargs
+            Default keyword arguments to pass while opening the resource.
         use_pydantic_json
             Whether to use Pydantic's JSON encoder/decoder instead of the default
             anyconfig one.
-        **options
+        **kwargs
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
@@ -445,9 +447,16 @@ class ConfigResource:
         self.ac_parser = ac_parser
         self.resource = resource
         self.create_if_missing = create_if_missing
-        self.use_pydantic_json = options.pop("use_pydantic_json", True)
-        self.encoding = options.pop("encoding", "UTF-8")
-        self._ac_load_options, self._ac_dump_options = _split_ac_options(options)
+        self.use_pydantic_json = kwargs.pop("use_pydantic_json", True)
+        self.default_kwargs = kwargs.pop(
+            "default_kwargs",
+            self._DEFAULT_RESOURCE_KWARGS.copy()
+        )
+        self.allowed_url_schemes = kwargs.pop(
+            "allowed_url_schemes",
+            self._DEFAULT_ALLOWED_URL_SCHEMES.copy()
+        )
+        self.load_options, self.dump_options = _split_ac_options(kwargs)
 
     @property
     def resource(self) -> RawResourceT:
@@ -525,6 +534,8 @@ class ConfigResource:
         self,
         blob: str,
         ac_parser: str | None = None,
+        *,
+        preprocess: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """
@@ -547,9 +558,11 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = self._ac_load_options | kwargs
+        kwargs = self.load_options | kwargs
         loaded = anyconfig.loads(blob, ac_parser=ac_parser, **kwargs)
-        return self.processor_class(self, loaded).preprocess()
+        if preprocess:
+            loaded = self.processor_class(self, loaded).preprocess()
+        return loaded
 
     def dump_config(
         self,
@@ -576,6 +589,7 @@ class ConfigResource:
         if ac_parser is None:
             ac_parser = self.ac_parser
         if ac_parser == "json" and self.use_pydantic_json:
+            # xxx: Filter JSON kwargs to ensure safety?
             return config.json(**kwargs)
         return self.dump_data(config.dict(), ac_parser=ac_parser, **kwargs)
 
@@ -603,12 +617,8 @@ class ConfigResource:
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
-        kwargs = self._ac_dump_options | kwargs
-        return anyconfig.dumps(
-            convert(data),
-            ac_parser=ac_parser,
-            **kwargs,
-        )
+        kwargs = self.dump_options | kwargs
+        return anyconfig.dumps(convert(data), ac_parser=ac_parser, **kwargs)
 
     @property
     def is_url(self) -> bool:
@@ -636,19 +646,40 @@ class ConfigResource:
         if self.resource is None:
             return io.StringIO()
         if self.is_url:
-            url = cast(str, self.resource)
-            if urllib.parse.urlparse(url).scheme not in self.allowed_url_schemes:
+            url = urllib.parse.urlparse(cast(str, self.resource))
+
+            if url.scheme not in self.allowed_url_schemes:
                 msg = (
-                    f"URL scheme {urllib.parse.urlparse(url).scheme!r} is not allowed, "
+                    f"URL scheme {url.scheme!r} is not allowed, "
                     f"must be one of {self.allowed_url_schemes!r}"
                 )
                 raise ValueError(msg)
-            return urllib.request.urlopen(  # noqa: S310, ^
-                urllib.request.Request(url), **kwds
-            )
+            kwds = filter_options(self._URLOPEN_KWARGS, kwds)
+            request = urllib.request.Request(url.geturl())
+            return urllib.request.urlopen(request, **kwds)  # noqa: S310
         if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
+            kwds = filter_options(self._OPEN_KWARGS, kwds)
             return pathlib.Path(self.resource).open(**kwds)
         return self.resource
+
+    def processor_open_resource(self, **kwds: Any) -> OpenedT:
+        """
+        Open the configuration file.
+        This is the same as `open_resource()`, but it is called by the
+        `ConfigProcessor` automatically when it needs to open the resource.
+
+        Parameters
+        ----------
+        **kwds
+            Keyword arguments to pass to the opening routine.
+            For URLs, these are passed to ``urllib.request.urlopen()``.
+            For local files, these are passed to ``builtins.open()``.
+
+        Returns
+        -------
+        The opened resource.
+        """
+        return self.open_resource(**kwds)
 
     def open_resource_async(self, **kwds: Any) -> Any:
         """
@@ -672,7 +703,10 @@ class ConfigResource:
                 "asynchronously (install with `pip install aiofiles`)"
             )
             raise RuntimeError(msg)
-        return aiofiles.open(cast(str, self.resource), **kwds)
+        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
+            kwds = filter_options(self._OPEN_KWARGS, kwds)
+            return aiofiles.open(self.resource, **kwds)
+        raise TypeError("cannot open resource asynchronously")
 
     def _get_default_kwargs(
         self,
@@ -680,9 +714,8 @@ class ConfigResource:
         kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kwargs is None:
-            kwargs = {}
+            kwargs = self.default_kwargs
         if not self.is_url:
-            kwargs.setdefault("encoding", self.encoding)
             if operation == "read":
                 kwargs.setdefault("mode", "r")
             elif operation == "write":
@@ -726,7 +759,7 @@ class ConfigResource:
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
                 self.write(blob, **(create_kwargs or {}))
-        return self.load_into(config_class, blob, **self._ac_load_options)
+        return self.load_into(config_class, blob, **self.load_options)
 
     def write(self, blob: str | collections.abc.ByteString, **kwargs: Any) -> int:
         """
@@ -780,7 +813,7 @@ class ConfigResource:
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
                 await self.write_async(blob, **(create_kwargs or {}))
-        return self.load_into(config_class, blob, **self._ac_load_options)
+        return self.load_into(config_class, blob, **self.load_options)
 
     async def write_async(
         self,
@@ -804,6 +837,34 @@ class ConfigResource:
         kwargs = self._get_default_kwargs("write", kwargs=kwargs)
         async with self.open_resource_async(**kwargs) as fp:
             return await fp.write(blob)
+
+    @classmethod
+    def from_directive_context(cls, ctx: DirectiveContext, /) -> ConfigLoader:
+        """
+        Create a configuration loader from a preprocessor directive context.
+
+        Parameters
+        ----------
+        ctx
+
+        Returns
+        -------
+        The configuration loader.
+        """
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+        if isinstance(ctx.snippet, str):
+            args.append(ctx.snippet)
+        elif is_dict_like(ctx.snippet):
+            kwargs |= ctx.snippet
+        elif is_list_like(ctx.snippet):
+            args += list(ctx.snippet)
+        else:
+            msg = (
+                f"invalid snippet for the {ctx.directive!r} directive: {ctx.snippet!r}"
+            )
+            raise ValueError(msg)
+        return cls(*args, **kwargs)
 
 
 class Route:
@@ -866,19 +927,19 @@ def select_scope(
     mapping: dict[str, Any],
     route: SupportsRoute,
     scope_converter: Callable[[Any], dict[str, Any]] = _vars,
-    resource: ConfigResource | None = None,
+    loader: ConfigLoader | None = None,
 ) -> Any:
     """
     Get an item at a route.
 
     Parameters
     ----------
-    resource
-    scope_converter
     mapping
         The mapping to use.
     route
         The route to the item.
+    scope_converter
+    loader
 
     Returns
     -------
@@ -892,7 +953,7 @@ def select_scope(
             route_here.append(part)
             scope = scope_converter(scope)[part]
     except KeyError:
-        raise ProcessorLookupError(resource, route_here) from None
+        raise ProcessorLookupError(loader, route_here) from None
     return scope
 
 
@@ -913,6 +974,12 @@ if TYPE_CHECKING:
             ...
 
         def save(self) -> int:
+            ...
+
+        async def reload_async(self) -> Any:
+            ...
+
+        def reload(self) -> Any:
             ...
 
 else:
@@ -1062,7 +1129,7 @@ def save(section: ConfigModelT | ConfigAt, **kwargs: Any) -> int:
     at = ConfigAt(config, data, section.route)
     data = at.update(section.get())
     context = get_context(config)
-    blob = context.resource.dump_config(config.copy(update=data))
+    blob = context.loader.dump_config(config.copy(update=data))
     result = config.write(blob, **kwargs)
     context.initial_state = data
     return result
@@ -1092,7 +1159,7 @@ async def save_async(section: ConfigModelT | ConfigAt, **kwargs: Any) -> int:
     at = ConfigAt(config, data, section.route)
     data = at.update(section.get())
     context = get_context(config)
-    blob = context.resource.dump_config(config.copy(update=data))
+    blob = context.loader.dump_config(config.copy(update=data))
     result = await config.write_async(blob, **kwargs)
     context.initial_state = data
     return result
@@ -1120,7 +1187,7 @@ def reload(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     config = section.owner
     context = get_context(config)
     data = config.__dict__
-    newest = context.resource.read(config_class=type(config), **kwargs)
+    newest = context.loader.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
     config.__dict__ |= new_mapping
@@ -1149,7 +1216,7 @@ async def reload_async(section: ConfigModelT | ConfigAt, **kwargs: Any) -> Any:
     config = section.owner
     context = get_context(config)
     data = config.__dict__
-    newest = await context.resource.read_async(config_class=type(config), **kwargs)
+    newest = await context.loader.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     new_mapping = ConfigAt(config, data, section.route).update(section_data)
     config.__dict__ |= new_mapping
@@ -1229,8 +1296,8 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
 
     @property
     @abc.abstractmethod
-    def resource(self) -> ConfigResource:
-        """The configuration resource."""
+    def loader(self) -> ConfigLoader:
+        """The configuration resource loader."""
 
     @property
     @abc.abstractmethod
@@ -1255,7 +1322,7 @@ class Context(AnyContext, Generic[ConfigModelT]):
 
     Parameters
     ----------
-    resource
+    loader
         The configuration resource.
     owner
         The top-level configuration model instance,
@@ -1264,10 +1331,10 @@ class Context(AnyContext, Generic[ConfigModelT]):
 
     def __init__(
         self,
-        resource: ConfigResource,
+        loader: ConfigLoader,
         owner: ConfigModelT | None = None,
     ) -> None:
-        self._resource = resource
+        self._loader = loader
         self._owner = None
         self._initial_state = {}
 
@@ -1277,8 +1344,8 @@ class Context(AnyContext, Generic[ConfigModelT]):
         yield from ()
 
     @property
-    def resource(self) -> ConfigResource:
-        return self._resource
+    def loader(self) -> ConfigLoader:
+        return self._loader
 
     @property
     def section(self) -> ConfigModelT | None:
@@ -1321,8 +1388,8 @@ class Subcontext(AnyContext, Generic[ConfigModelT]):
         self._part = part
 
     @property
-    def resource(self) -> ConfigResource:
-        return self._parent.resource
+    def loader(self) -> ConfigLoader:
+        return self._parent.loader
 
     def trace_route(self) -> collections.abc.Generator[str, None, None]:
         yield from self._parent.trace_route()
@@ -1410,7 +1477,7 @@ class CMBMetaclass(ModelMetaclass):
         namespace: dict[str, Any],
         **kwargs: Any,
     ) -> type:
-        namespace[IMPORT_METADATA] = pydantic.PrivateAttr()
+        namespace[SUBST_METADATA] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1451,35 +1518,34 @@ class ConfigModel(
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
-            metadata = getattr(self, IMPORT_METADATA, None)
+            metadata = getattr(self, SUBST_METADATA, None)
             if metadata:
                 context = get_context(self)
-                context.resource.processor_class.export(state, metadata)
-            print(state)
+                context.loader.processor_class.export(state, metadata)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
 
     @classmethod
-    def _resolve_resource(
+    def _resolve_loader(
         cls,
-        mby_resource: ConfigResource | RawResourceT | None = None,
+        resource: ConfigLoader | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
-    ) -> ConfigResource:
-        if mby_resource is None:
-            mby_resource = getattr(cls.__config__, "resource", None)
-        if mby_resource is None:
+    ) -> ConfigLoader:
+        if resource is None:
+            resource = getattr(cls.__config__, "resource", None)
+        if resource is None:
             raise ValueError("No resource specified")
-        if isinstance(mby_resource, (str, bytes)):
-            resource = ConfigResource(mby_resource)
-        elif isinstance(mby_resource, ConfigResource):
-            resource = mby_resource
+        if isinstance(resource, (str, bytes)):
+            loader = ConfigLoader(resource)
+        elif isinstance(resource, ConfigLoader):
+            loader = resource
         else:
-            raise TypeError(f"Invalid resource type: {type(mby_resource).__name__}")
+            raise TypeError(f"Invalid resource type: {type(resource).__name__}")
         if create_if_missing is not None:
-            resource.create_if_missing = create_if_missing
-        return resource
+            loader.create_if_missing = create_if_missing
+        return loader
 
     @property
     def initial_state(self) -> dict[str, Any]:
@@ -1542,7 +1608,7 @@ class ConfigModel(
     @classmethod
     def load(
         cls: type[ConfigModelT],
-        resource: ConfigResource | RawResourceT | None = None,
+        resource: ConfigLoader | RawResourceT | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -1564,9 +1630,9 @@ class ConfigModel(
         self
         """
         cls.update_forward_refs()
-        resource = cls._resolve_resource(resource, create_if_missing=create_if_missing)
-        context = Context(resource)  # type: Context[ConfigModelT]
-        config = resource.read(config_class=cls, **kwargs)
+        loader = cls._resolve_loader(resource, create_if_missing=create_if_missing)
+        context = Context(loader)  # type: Context[ConfigModelT]
+        config = loader.read(config_class=cls, **kwargs)
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -1586,7 +1652,7 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            new_config = context.resource.read(config_class=type(self), **kwargs)
+            new_config = context.loader.read(config_class=type(self), **kwargs)
             context.bind_to(new_config)
             context.initial_state = new_config.__dict__
             new_config.rollback()
@@ -1608,7 +1674,7 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            blob = context.resource.dump_config(self)
+            blob = context.loader.dump_config(self)
             result = self.write(blob, **kwargs)
             context.initial_state = self.__dict__
             return result
@@ -1630,15 +1696,15 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.resource.is_url:
+        if context.loader.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return context.resource.write(blob, **kwargs)
+        return context.loader.write(blob, **kwargs)
 
     @classmethod
     async def load_async(
         cls: type[ConfigModelT],
-        resource: ConfigResource | RawResourceT | None,
+        resource: ConfigLoader | RawResourceT | None,
         *,
         create_if_missing: bool = False,
         **kwargs: Any,
@@ -1649,7 +1715,7 @@ class ConfigModel(
 
         Parameters
         ----------
-        resource
+        loader
             The configuration resource.
         create_if_missing
             Whether to create the configuration file if it does not exist.
@@ -1660,9 +1726,9 @@ class ConfigModel(
         -------
         self
         """
-        resource = cls._resolve_resource(resource, create_if_missing=create_if_missing)
-        context = Context(resource)  # type: Context[ConfigModelT]
-        config = resource.read(config_class=cls, **kwargs)
+        loader = cls._resolve_loader(resource, create_if_missing=create_if_missing)
+        context = Context(loader)  # type: Context[ConfigModelT]
+        config = loader.read(config_class=cls, **kwargs)
         context.owner = config
         return config
 
@@ -1681,7 +1747,7 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            new_async_config = await context.resource.read_async(**kwargs)
+            new_async_config = await context.loader.read_async(**kwargs)
             context.bind_to(new_async_config)
             context.initial_state = new_async_config.__dict__
             self.rollback()
@@ -1703,7 +1769,7 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            blob = context.resource.dump_config(self)
+            blob = context.loader.dump_config(self)
             result = await self.write_async(blob, **kwargs)
             context.initial_state = self.__dict__
             return result
@@ -1727,10 +1793,10 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.resource.is_url:
+        if context.loader.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return await context.resource.write_async(blob, **kwargs)
+        return await context.loader.write_async(blob, **kwargs)
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
@@ -1747,4 +1813,4 @@ class ConfigMeta(pydantic.BaseSettings.Config):
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
 
-    resource: ConfigResource | RawResourceT | None = None
+    resource: ConfigLoader | RawResourceT | None = None
