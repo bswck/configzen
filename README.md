@@ -159,29 +159,19 @@ Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it.
 
 Notice how configuration file formats don't matter in _configzen_: you can 
-extend JSON configurations in YAML, but that might be as well any other format 
+extend JSON configurations in YAML, but that might be as well any other format
 among [JSON](https://en.wikipedia.org/wiki/JSON), [INI](https://en.wikipedia.org/wiki/INI_file),
-[XML](https://en.wikipedia.org/wiki/XML), [.properties](https://en.wikipedia.org/wiki/.properties), 
-shellvars (see [Augeas docs on shellvars](https://augeas.net/docs/references/1.4.0/lenses/files/shellvars-aug.html)), 
-[YAML](https://yaml.org), [TOML](https://en.wikipedia.org/wiki/TOML), 
-[Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format)), 
-[BSON](https://en.wikipedia.org/wiki/BSON), [CBOR](https://en.wikipedia.org/wiki/CBOR), 
-[ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) or 
-[MessagePack](https://en.wikipedia.org/wiki/MessagePack). 
+[XML](https://en.wikipedia.org/wiki/XML), [.properties](https://en.wikipedia.org/wiki/.properties),
+shellvars (
+see [Augeas docs on shellvars](https://augeas.net/docs/references/1.4.0/lenses/files/shellvars-aug.html)),
+[YAML](https://yaml.org), [TOML](https://en.wikipedia.org/wiki/TOML),
+[Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format)),
+[BSON](https://en.wikipedia.org/wiki/BSON), [CBOR](https://en.wikipedia.org/wiki/CBOR),
+[ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) or
+[MessagePack](https://en.wikipedia.org/wiki/MessagePack).
 
-The above example is equivalent to
+The above example is equivalent to as if you used:
 
-```yaml
-# production.yaml
-i18n:
-  ^extend(i18n): base.json
-
-app:
-  ^extend(app): base.json
-  debug: false
-```
-
-because both behave roughly the same as if you used:
 ```yaml
 # production.yaml
 i18n:
@@ -191,9 +181,9 @@ app:
   debug: false
 ```
 
-With the difference that the first two examples, while saving the configuration,
+With the difference that the primary example, while saving the configuration,
 will preserve the relation to the base configuration file, so that you can reload
-the configuration and it will be updated with the changes made in the base configuration file.
+the configuration, and it will be updated with the changes made in the base configuration file.
 
 
 ## Setup
