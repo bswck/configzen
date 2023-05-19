@@ -634,9 +634,8 @@ class Processor(BaseProcessor[ConfigModelT]):
             arguments = [] if route is None else [route]
             substitution_directive = cls.directive(Directives.EXTEND, arguments)
             # Put the substitution directive at the beginning of the state in-place.
-            state |= (
-                {substitution_directive: context.loader.resource}
-                | {key: state.pop(key) for key in set(state)}
-            )
+            state |= {substitution_directive: context.loader.resource} | {
+                key: state.pop(key) for key in set(state)
+            }
 
         state |= overrides
