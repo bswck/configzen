@@ -149,7 +149,7 @@ overriding desired sections as needed:
 
 ```yaml
 # production.yaml
-^expand: base.json
+^extend: base.json
 
 +app:
   debug: false
