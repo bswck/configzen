@@ -3,13 +3,15 @@ from __future__ import annotations
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, TypeVar, Generic
 
 from anyconfig.utils import is_dict_like, is_list_like
 
+from configzen.errors import InternalConfigError, format_syntax_error
+from configzen.typedefs import ConfigModelT
+
 if TYPE_CHECKING:
     from configzen.config import AnyContext, ConfigLoader
-
 
 __all__ = (
     "DirectiveContext",
@@ -19,18 +21,14 @@ __all__ = (
 
 
 DirectiveT = TypeVar("DirectiveT")
-ProcessorT = TypeVar("ProcessorT", bound="Processor")
 
 SUBST_METADATA: str = "__configzen_substitute__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
-DirectiveHandlerT = Callable[[ProcessorT, "DirectiveContext"], None]
-
-
 def directive(
     name: str | enum.Enum,
-) -> Callable[[DirectiveHandlerT], DirectiveHandlerT]:
+) -> Callable[..., Any]:
     """
     Decorator for creating processor directives.
 
@@ -46,7 +44,7 @@ def directive(
     if isinstance(name, enum.Enum):
         name = name.value.casefold()
 
-    def decorator(func: DirectiveHandlerT) -> DirectiveHandlerT:
+    def decorator(func: Any) -> Any:
         if not hasattr(func, EXECUTES_DIRECTIVES):
             setattr(func, EXECUTES_DIRECTIVES, set())
         getattr(func, EXECUTES_DIRECTIVES).add(name)
@@ -56,7 +54,7 @@ def directive(
 
 
 @dataclasses.dataclass
-class DirectiveContext(Generic[DirectiveT]):
+class DirectiveContext:
     """
     Context for processor directives.
 
@@ -77,7 +75,7 @@ class DirectiveContext(Generic[DirectiveT]):
 
     """
 
-    directive: DirectiveT
+    directive: str
     key: str
     prefix: str
     arguments: list[str]
@@ -102,11 +100,11 @@ class DirectiveContext(Generic[DirectiveT]):
 
 
 class Tokens(str, enum.Enum):
-    LPAREN = "("
-    RPAREN = ")"
-    COMMA = ",;"
-    STRING = "\"'"
-    ESCAPE = "\\"
+    LPAREN: str = "("
+    RPAREN: str = ")"
+    COMMA: str = ",;"
+    STRING: str = "\"'"
+    ESCAPE: str = "\\"
 
 
 class ArgumentSyntaxError(ValueError):
@@ -119,8 +117,7 @@ def _parse_argument_string_impl(
     raw_argument_string: str,
     tokens: type[Tokens] = Tokens,
 ) -> list[str]:
-    prev_ch = None
-
+    prev_char = None
     string_ctx = None
     escape_ctx = False
     arguments: list[str] = []
@@ -132,29 +129,27 @@ def _parse_argument_string_impl(
     tok_string = tokens.STRING
     tok_comma = tokens.COMMA
 
-    for no, ch in enumerate(raw_argument_string, start=1):
+    for char_no, char in enumerate(raw_argument_string, start=1):
         if escape_ctx:
             escape_ctx = False
-            argument += ch
-        elif ch in tok_escape:
+            argument += char
+        elif char in tok_escape:
             escape_ctx = True
-        elif ch in tok_string:
+        elif char in tok_string:
             if string_ctx and not explicit_strings_ctx:
-                raise ArgumentSyntaxError(
-                    f"Implicit string closed with explicit string character {ch}",
-                    (no, ch),
-                )
+                msg = f"Implicit string closed with explicit string character {char}"
+                raise InternalConfigError(msg, extra=char_no)
             explicit_strings_ctx = True
             if string_ctx is None:
                 # we enter a string
-                string_ctx = ch
-            elif string_ctx == ch:
+                string_ctx = char
+            elif string_ctx == char:
                 # we exit a string
                 string_ctx = None
             else:
                 # we are in a string
-                argument += ch
-        elif ch in tok_comma:
+                argument += char
+        elif char in tok_comma:
             if string_ctx:
                 if not explicit_strings_ctx:
                     string_ctx = None
@@ -162,23 +157,23 @@ def _parse_argument_string_impl(
                     emit(argument)
                     argument = ""
             else:
-                if prev_ch in {*tok_comma, None}:
-                    raise ArgumentSyntaxError("Empty argument", (no, ch))
+                if prev_char in {*tok_comma, None}:
+                    msg = "Empty argument"
+                    raise InternalConfigError(msg, extra=char_no)
                 emit(argument)
                 argument = ""
                 explicit_strings_ctx = False
-        elif not string_ctx and not ch.isspace():
-            if prev_ch in {*tok_comma, None}:
-                string_ctx = ch
-                argument += ch
+        elif not string_ctx and not char.isspace():
+            if prev_char in {*tok_comma, None}:
+                string_ctx = char
+                argument += char
                 explicit_strings_ctx = False
             if explicit_strings_ctx:
-                raise ArgumentSyntaxError(
-                    "Unexpected character after explicit string", (no, ch)
-                )
+                msg = "Unexpected character after explicit string"
+                raise InternalConfigError(msg, extra=char_no)
         else:
-            argument += ch
-        prev_ch = ch
+            argument += char
+        prev_char = char
     return arguments
 
 
@@ -188,31 +183,14 @@ def _parse_argument_string(
 ) -> list[str]:
     """Half for jokes, half for serious use"""
 
-    no = 0
     tok_comma = tokens.COMMA
 
     if any(raw_argument_string.endswith(tok) for tok in tok_comma):
         raw_argument_string = raw_argument_string[:-1]
     raw_argument_string += tok_comma[0]
 
-    # Parse arguments with respect to strings
-    try:
-        arguments = _parse_argument_string_impl(raw_argument_string, tokens)
-    except ArgumentSyntaxError as e:
-        msg, (no, ch) = e.args
-        charlist = ["~"] * (len(raw_argument_string) + 1)
-        displayed_argument_string = (
-            raw_argument_string[:-1]
-            if no == len(raw_argument_string) + 1
-            else raw_argument_string
-        ).join((tokens.LPAREN[0], tokens.RPAREN[0]))
-        charlist[no] = "^"
-        indicator = "".join(charlist)
-        raise ArgumentSyntaxError(
-            "\n" + displayed_argument_string + "\n" + indicator + "\n" + msg
-        ) from None
-
-    return arguments
+    with format_syntax_error(raw_argument_string):
+        return _parse_argument_string_impl(raw_argument_string, tokens)
 
 
 def parse_directive_call(
@@ -222,7 +200,7 @@ def parse_directive_call(
 ) -> tuple[str, list[str]]:
     arguments = []
     if directive_name.startswith(prefix):
-        directive_name = directive_name[len(prefix):].casefold()
+        directive_name = directive_name[len(prefix) :].casefold()
 
         if directive_name.endswith(tokens.RPAREN):
             try:
@@ -231,7 +209,7 @@ def parse_directive_call(
                 raise ValueError(f"invalid directive call: {directive_name}") from None
             (directive_name, raw_argument_string) = (
                 directive_name[:lpar],
-                directive_name[lpar + 1: -1],
+                directive_name[lpar + 1 : -1],
             )
             arguments = _parse_argument_string(raw_argument_string, tokens)
 
@@ -241,24 +219,31 @@ def parse_directive_call(
     return directive_name, arguments
 
 
-class SubstitutionMetadata(TypedDict):
-    """
-    Metadata for a substitution directive: either EXPAND or EXTEND call.
+if TYPE_CHECKING:
+    class SubstitutionMetadata(TypedDict, Generic[ConfigModelT]):
+        route: str | None
+        context: AnyContext[ConfigModelT]
+        preprocess: bool
 
-    Attributes
-    ----------
-    route
-        The route to import from.
-    context
-        The context attached to the import.
-    """
+else:
+    class SubstitutionMetadata(TypedDict):
+        """
+        Metadata for a substitution directive: either EXPAND or EXTEND call.
 
-    route: str | None
-    context: AnyContext
-    preprocess: bool
+        Attributes
+        ----------
+        route
+            The route to import from.
+        context
+            The context attached to the import.
+        """
+
+        route: str | None
+        context: AnyContext[ConfigModelT]
+        preprocess: bool
 
 
-class BaseProcessor:
+class BaseProcessor(Generic[ConfigModelT]):
     """
     Processor that executes directives.
 
@@ -270,13 +255,13 @@ class BaseProcessor:
         The prefix for directives.
     """
 
-    _directive_handlers: dict[str, DirectiveHandlerT] = None  # type: ignore[assignment]
+    _directive_handlers: dict[str, Any] = None  # type: ignore[assignment]
     directive_prefix: ClassVar[str]
     extension_prefix: ClassVar[str]
 
     def __init__(
         self,
-        resource: ConfigLoader,
+        resource: ConfigLoader[ConfigModelT],
         dict_config: dict[str, Any],
     ) -> None:
         self.loader = resource
@@ -286,7 +271,7 @@ class BaseProcessor:
     def export(
         cls,
         state: dict[str, Any],
-        metadata: SubstitutionMetadata,
+        metadata: SubstitutionMetadata[ConfigModelT],
     ) -> None:
         pass
 
@@ -363,13 +348,17 @@ class BaseProcessor:
                     cls._directive_handlers[directive_name] = func
 
     @classmethod
-    def register_directive(cls, name: str, func: DirectiveHandlerT) -> None:
+    def register_directive(cls, name: str, func: Any) -> None:
         if cls._directive_handlers is None:
             cls._directive_handlers = {}
         cls._directive_handlers[name] = func
 
     @classmethod
-    def directive(cls, directive_name: str, arguments: list[str] | None = None) -> str:
+    def directive(
+        cls,
+        directive_name: str,
+        arguments: list[str] | None = None
+    ) -> str:
         """
         Create a directive call.
 
@@ -396,11 +385,11 @@ class BaseProcessor:
         if isinstance(directive_name, enum.Enum):
             directive_name = directive_name.value
 
-        return (
-            cls.directive_prefix
-            + directive_name
-            + (",".join(map(_fmt_argument, arguments)).join("()") if arguments else "")
+        fmt_arguments = (
+            ",".join(map(_fmt_argument, arguments)).join("()")
+            if arguments else ""
         )
+        return cls.directive_prefix + directive_name + fmt_arguments
 
 
 class Directives(str, enum.Enum):
@@ -412,7 +401,7 @@ class Directives(str, enum.Enum):
     DEFINE = "define"
 
 
-class Processor(BaseProcessor):
+class Processor(BaseProcessor[ConfigModelT]):
     directive_prefix = "^"
     extension_prefix = "+"
 
@@ -545,11 +534,7 @@ class Processor(BaseProcessor):
         return self._substitute(ctx, preprocess=False, preserve=False)
 
     def _substitute(
-        self,
-        ctx: DirectiveContext,
-        *,
-        preprocess: bool,
-        preserve: bool
+        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
     ) -> None:
         from configzen.config import CONTEXT, Context, select_scope
 
@@ -583,16 +568,14 @@ class Processor(BaseProcessor):
                     f"imported item {substitution_route!r} "
                     f"from {loader.resource} is not a dictionary"
                 )
-        context: Context = Context(loader)
+        context: Context[ConfigModelT] = Context(loader)
         ctx.container = substituted | ctx.container
 
         if preserve:
             ctx.container |= {
                 CONTEXT: context,
                 SUBST_METADATA: SubstitutionMetadata(
-                    route=substitution_route,
-                    context=context,
-                    preprocess=preprocess
+                    route=substitution_route, context=context, preprocess=preprocess
                 ),
             }
 
@@ -600,7 +583,7 @@ class Processor(BaseProcessor):
     def export(
         cls,
         state: dict[str, Any],
-        metadata: SubstitutionMetadata,
+        metadata: SubstitutionMetadata[ConfigModelT],
     ) -> None:
         """
         Exports model state preserving substition directive calls in the model state.
@@ -616,11 +599,13 @@ class Processor(BaseProcessor):
 
         context = metadata["context"]
         route = metadata["route"]
-        preprocess = metadata["preprocess"]
         loader = context.loader
+        preprocess = metadata["preprocess"]
 
         with loader.processor_open_resource() as reader:
-            loaded = loader.load_into_dict(reader.read(), preprocess=preprocess)
+            # Here, we intentionally always preprocess the loaded configuration.
+            loaded = loader.load_into_dict(reader.read(), preprocess=True)
+
             if route:
                 loaded = select_scope(loaded, route, loader=loader)
 
