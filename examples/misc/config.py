@@ -1,11 +1,12 @@
 import os
 from ipaddress import IPv4Address, IPv6Address
+from typing import Union
 
 from configzen import ConfigModel, ConfigMeta, ConfigField
 
 
 class DatabaseConfig(ConfigModel):
-    host: IPv4Address | IPv6Address
+    host: Union[IPv4Address, IPv6Address]
     port: int
     user: str
     password: str = ConfigField(exclude=True)
