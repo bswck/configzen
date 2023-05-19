@@ -213,6 +213,7 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     convert.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
+
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: generic_validate.dispatch(cls)(cls, value)
 
@@ -326,9 +327,7 @@ def convert_namedtuple(obj: tuple[Any, ...]) -> Any:
 
 
 def _delegate_ac_options(
-    load_options: dict[str, Any],
-    dump_options: dict[str, Any],
-    options: dict[str, Any]
+    load_options: dict[str, Any], dump_options: dict[str, Any], options: dict[str, Any]
 ) -> None:
     for key, value in options.items():
         if key.startswith("dump_"):
@@ -409,7 +408,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         # `dump_options` instance attributes to make a local change.
         "allow_unicode": True,
         "ensure_ascii": False,
-        "indent": 2
+        "indent": 2,
     }
 
     predefined_default_kwargs: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}

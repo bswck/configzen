@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
 
 from anyconfig.utils import is_dict_like, is_list_like
 
-from configzen.errors import InternalConfigError, format_syntax_error, \
-    ConfigPreprocessingError
+from configzen.errors import (
+    InternalConfigError,
+    format_syntax_error,
+    ConfigPreprocessingError,
+)
 from configzen.typedefs import ConfigModelT
 
 if TYPE_CHECKING:
@@ -207,7 +210,8 @@ def parse_directive_call(
             try:
                 lpar = directive_name.index(tokens.LPAREN)
             except ValueError:
-                raise ValueError(f"invalid directive call: {directive_name}") from None
+                msg = f"invalid directive call: {directive_name}"
+                raise ConfigPreprocessingError(msg) from None
             (directive_name, raw_argument_string) = (
                 directive_name[:lpar],
                 directive_name[lpar + 1 : -1],
@@ -215,7 +219,8 @@ def parse_directive_call(
             arguments = _parse_argument_string(raw_argument_string, tokens)
 
         if not directive_name.isidentifier():
-            raise ValueError(f"Invalid directive name: {directive_name}")
+            msg = f"invalid directive name: {directive_name}"
+            raise ConfigPreprocessingError(msg)
 
     return directive_name, arguments
 
@@ -300,7 +305,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                 actual_key = key.lstrip(self.extension_prefix)
                 overridden = result.get(actual_key, {})
                 if not is_dict_like(overridden):
-                    raise ValueError(
+                    raise ConfigPreprocessingError(
                         f"{self.extension_prefix} can be used only for overriding "
                         f"dictionary sections but item at {actual_key!r} "
                         f"is not a dictionary"
@@ -338,7 +343,9 @@ class BaseProcessor(Generic[ConfigModelT]):
     def _call_directive(self, context: DirectiveContext) -> None:
         handler = self._directive_handlers.get(context.directive)
         if handler is None:
-            raise ValueError(f"unknown processor directive: {context.directive!r}")
+            raise ConfigPreprocessingError(
+                f"unknown preprocessing directive: {context.directive!r}"
+            )
         handler(self, context)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
