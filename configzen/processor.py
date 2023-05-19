@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, TypeVar, Generic
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
 
 from anyconfig.utils import is_dict_like, is_list_like
 
@@ -220,12 +220,14 @@ def parse_directive_call(
 
 
 if TYPE_CHECKING:
+
     class SubstitutionMetadata(TypedDict, Generic[ConfigModelT]):
         route: str | None
         context: AnyContext[ConfigModelT]
         preprocess: bool
 
 else:
+
     class SubstitutionMetadata(TypedDict):
         """
         Metadata for a substitution directive: either EXPAND or EXTEND call.
@@ -354,11 +356,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         cls._directive_handlers[name] = func
 
     @classmethod
-    def directive(
-        cls,
-        directive_name: str,
-        arguments: list[str] | None = None
-    ) -> str:
+    def directive(cls, directive_name: str, arguments: list[str] | None = None) -> str:
         """
         Create a directive call.
 
@@ -386,8 +384,7 @@ class BaseProcessor(Generic[ConfigModelT]):
             directive_name = directive_name.value
 
         fmt_arguments = (
-            ",".join(map(_fmt_argument, arguments)).join("()")
-            if arguments else ""
+            ",".join(map(_fmt_argument, arguments)).join("()") if arguments else ""
         )
         return cls.directive_prefix + directive_name + fmt_arguments
 
@@ -536,7 +533,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     def _substitute(
         self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
     ) -> None:
-        from configzen.config import CONTEXT, Context, select_scope
+        from configzen.config import CONTEXT, Context, at
 
         loader_class = type(self.loader)
         if len(ctx.arguments) > 1:
@@ -556,13 +553,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         substitution_route = ctx.arguments[0] if ctx.arguments else None
         if substitution_route:
-            try:
-                substituted = select_scope(substituted, substitution_route)
-            except LookupError:
-                raise LookupError(
-                    f"attempted to import item at {substitution_route!r} "
-                    f"from {loader.resource} that does not exist"
-                ) from None
+            substituted = at(substituted, substitution_route)
             if not is_dict_like(substituted):
                 raise ValueError(
                     f"imported item {substitution_route!r} "
@@ -593,7 +584,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import convert, select_scope
+        from configzen.config import at, convert
 
         overrides = {}
 
@@ -607,7 +598,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             loaded = loader.load_into_dict(reader.read(), preprocess=True)
 
             if route:
-                loaded = select_scope(loaded, route, loader=loader)
+                loaded = at(loaded, route, loader=loader)
 
         substituted_values = loaded.copy()
 

@@ -68,14 +68,7 @@ import pathlib
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
-from typing import (
-    Any,
-    ClassVar,
-    Generic,
-    Literal,
-    cast,
-    no_type_check
-)
+from typing import Any, ClassVar, Generic, Literal, cast, no_type_check
 
 import anyconfig
 import pydantic
@@ -83,22 +76,12 @@ from anyconfig.utils import filter_options, is_dict_like, is_list_like
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import (
-    ConfigItemAccessError,
-    InternalConfigError,
-    ProcessorLookupError,
-    UnknownParserError,
-    format_syntax_error,
-)
+from configzen.errors import (ConfigAccessError, InternalConfigError,
+                              ResourceLookupError, UnspecifiedParserError,
+                              format_syntax_error)
 from configzen.processor import SUBST_METADATA, DirectiveContext, Processor
-from configzen.typedefs import (
-    T,
-    ConfigModelT,
-    SupportsRoute,
-    ConfigIO,
-    AsyncConfigIO,
-    RawResourceT,
-)
+from configzen.typedefs import (AsyncConfigIO, ConfigIO, ConfigModelT, RawResourceT,
+                                SupportsRoute, T)
 
 try:
     import aiofiles
@@ -404,7 +387,7 @@ class ConfigLoader(Generic[ConfigModelT]):
     ValueError
     """
 
-    _resource: ConfigIO | str | os.PathLike[str] | pathlib.Path
+    _resource: RawResourceT
     processor_class: type[Processor[ConfigModelT]]
     ac_parser: str | None
     create_if_missing: bool
@@ -509,9 +492,7 @@ class ConfigLoader(Generic[ConfigModelT]):
             ac_parser = pathlib.Path(self.resource).suffix[1:].casefold()
             if not ac_parser:
                 msg = f"Could not guess the engine to use for {self.resource!r}."
-                raise UnknownParserError(
-                    msg,
-                )
+                raise UnspecifiedParserError(msg)
         return ac_parser
 
     def load_into(
@@ -575,9 +556,7 @@ class ConfigLoader(Generic[ConfigModelT]):
             ac_parser = self.ac_parser
         kwargs = self.load_options | kwargs
         loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
-            blob,
-            ac_parser=ac_parser,
-            **kwargs
+            blob, ac_parser=ac_parser, **kwargs
         )
         if not isinstance(loaded, collections.abc.Mapping):
             msg = (
@@ -681,12 +660,18 @@ class ConfigLoader(Generic[ConfigModelT]):
                 raise ValueError(msg)
             kwds = filter_options(self._URLOPEN_KWARGS, kwds)
             request = urllib.request.Request(url.geturl())
-            return cast(
-                ConfigIO,
-                urllib.request.urlopen(request, **kwds)  # noqa: S310
-            )
-        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
+            return cast(ConfigIO, urllib.request.urlopen(request, **kwds))  # noqa: S310
+        if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
             kwds = filter_options(self._OPEN_KWARGS, kwds)
+            if isinstance(self.resource, int):
+                return cast(
+                    ConfigIO,
+                    # We intentionally do not use the context manager here
+                    # because we do not want to close the file.
+                    # Moreover, we want to allow the file to be opened
+                    # from a file descriptor, not supported by Path().
+                    open(self.resource, **kwds),  # noqa: PTH123, SIM115
+                )
             return cast(ConfigIO, pathlib.Path(self.resource).open(**kwds))
         return self.resource
 
@@ -730,10 +715,10 @@ class ConfigLoader(Generic[ConfigModelT]):
                 "asynchronously (install with `pip install aiofiles`)"
             )
             raise RuntimeError(msg)
-        if isinstance(self.resource, (str, os.PathLike, pathlib.Path)):
+        if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
             kwds = filter_options(self._OPEN_KWARGS, kwds)
             return aiofiles.open(self.resource, **kwds)
-        raise TypeError("cannot open resource asynchronously")
+        raise RuntimeError("cannot open resource asynchronously")
 
     def _get_default_kwargs(
         self,
@@ -870,9 +855,7 @@ class ConfigLoader(Generic[ConfigModelT]):
 
     @classmethod
     def from_directive_context(
-        cls,
-        ctx: DirectiveContext,
-        /
+        cls, ctx: DirectiveContext, /
     ) -> ConfigLoader[ConfigModelT]:
         """
         Create a configuration loader from a preprocessor directive context.
@@ -965,10 +948,10 @@ class Route:
         yield from self.list_route
 
 
-def select_scope(
+def at(
     mapping: Any,
     route: SupportsRoute,
-    scope_converter: Callable[[Any], dict[str, Any]] = _vars,
+    converter_func: Callable[[Any], dict[str, Any]] = _vars,
     loader: ConfigLoader[ConfigModelT] | None = None,
 ) -> Any:
     """
@@ -980,7 +963,7 @@ def select_scope(
         The mapping to use.
     route
         The route to the item.
-    scope_converter
+    converter_func
     loader
 
     Returns
@@ -993,9 +976,9 @@ def select_scope(
     try:
         for part in route:
             route_here.append(part)
-            scope = scope_converter(scope)[part]
+            scope = converter_func(scope)[part]
     except KeyError:
-        raise ProcessorLookupError(loader, route_here) from None
+        raise ResourceLookupError(loader, route_here) from None
     return scope
 
 
@@ -1027,10 +1010,10 @@ class ConfigAt(Generic[ConfigModelT]):
         The value of the item.
         """
         try:
-            scope = select_scope(self.mapping or self.owner, self.route)
+            scope = at(self.mapping or self.owner, self.route)
         except KeyError as err:
             route_here = err.args[1]
-            raise ConfigItemAccessError(self.owner, route_here) from None
+            raise ConfigAccessError(self.owner, route_here) from None
         return scope
 
     def update(self, value: Any) -> Any:
@@ -1057,7 +1040,7 @@ class ConfigAt(Generic[ConfigModelT]):
                 submapping = _vars(submapping[part])
             submapping[key] = value
         except KeyError:
-            raise ConfigItemAccessError(self.owner, route_here) from None
+            raise ConfigAccessError(self.owner, route_here) from None
         return mapping
 
     async def save_async(self, **kwargs: Any) -> int:
@@ -1152,8 +1135,7 @@ def save(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> int:
 
 
 async def save_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT],
-    **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
 ) -> int:
     """
     Save the configuration asynchronously.
@@ -1214,8 +1196,7 @@ def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any
 
 
 async def reload_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT],
-    **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
 ) -> Any:
     """
     Reload the configuration asynchronously.
@@ -1349,6 +1330,7 @@ class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
         The top-level configuration model instance,
         holding all belonging subcontexts.
     """
+
     _initial_state: dict[str, Any]
 
     def __init__(
@@ -1483,11 +1465,7 @@ def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None
     return context
 
 
-def _json_encoder(
-    model_encoder: Callable[..., Any],
-    value: Any,
-    **kwargs: Any
-) -> Any:
+def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
     initial_state_type = type(value)
     converted_value = convert(value)
     if isinstance(converted_value, initial_state_type):
@@ -1780,8 +1758,7 @@ class ConfigModel(
             self.rollback()
             return new_async_config
         return cast(
-            ConfigModelT,
-            await reload_async(cast(ConfigAt[ConfigModelT], context.at))
+            ConfigModelT, await reload_async(cast(ConfigAt[ConfigModelT], context.at))
         )
 
     async def save_async(self: ConfigModelT, **kwargs: Any) -> int:
@@ -1805,9 +1782,7 @@ class ConfigModel(
             return result
         return await save_async(cast(ConfigAt[ConfigModelT], context.at))
 
-    async def write_async(
-        self, blob: str, **kwargs: Any
-    ) -> int:
+    async def write_async(self, blob: str, **kwargs: Any) -> int:
         """
         Overwrite the configuration file asynchronously with the given string or bytes.
 

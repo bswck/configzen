@@ -47,28 +47,35 @@ def format_syntax_error(source: str) -> Generator[None, None, None]:
         raise ArgumentSyntaxError(msg) from None
 
 
-class UnknownParserError(ConfigError, anyconfig.UnknownFileTypeError):
-    """Engine was attempted to be used but is not registered."""
+class UnspecifiedParserError(ConfigError, anyconfig.UnknownFileTypeError):
+    """Could not determine the parser to use."""
 
 
-class ConfigItemAccessError(ConfigError, LookupError):
+class ConfigAccessError(ConfigError, LookupError):
     """An error occurred while accessing configuration part."""
 
     def __init__(self, config: ConfigModelT, route: str | list[str]) -> None:
         if not isinstance(route, str):
             route = ".".join(route)
+        self.route = route
         super().__init__(
             f"could not get {type(config).__name__}.{route}",
         )
 
 
-class ProcessorLookupError(ConfigError, LookupError):
-    """An error occurred while looking up a processor."""
+class ConfigProcessorError(ConfigError):
+    """An error occurred while preprocessing/exporting a configuration."""
+
+
+class ResourceLookupError(ConfigError, LookupError):
+    """An error occurred while looking up a resource."""
 
     def __init__(
-        self,
-        resource: ConfigLoader[ConfigModelT] | None,
-        route: list[str]
+        self, resource: ConfigLoader[ConfigModelT] | None, route: list[str]
     ) -> None:
         resource_name = resource.resource if resource else "the provided resource"
         super().__init__(f"{route} not found in {resource_name}")
+
+
+class ConfigPreprocessingError(ConfigProcessorError, ValueError):
+    """An error occurred while preprocessing a configuration value."""
