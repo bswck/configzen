@@ -152,7 +152,7 @@ overriding desired sections as needed:
 ^extend: base.json
 
 +app:
-    debug: false
+  debug: false
 ```
 
 Using `+` in front of a key will update the section already defined at that key,
