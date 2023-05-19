@@ -626,11 +626,9 @@ class Processor(BaseProcessor[ConfigModelT]):
                 if overrides_for_key:
                     export_key = loader.processor_class.extension_prefix + key
                     overrides[export_key] = overrides_for_key
-            else:
-                counterpart_value = convert(counterpart_value)
-                if counterpart_value != value:
-                    overrides[key] = counterpart_value
-                    del substituted_values[key]
+            elif counterpart_value != value:
+                overrides[key] = counterpart_value
+                del substituted_values[key]
 
         if substituted_values:
             arguments = [] if route is None else [route]
