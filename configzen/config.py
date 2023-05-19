@@ -76,12 +76,22 @@ from anyconfig.utils import filter_options, is_dict_like, is_list_like
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
-from configzen.errors import (ConfigAccessError, InternalConfigError,
-                              ResourceLookupError, UnspecifiedParserError,
-                              format_syntax_error)
+from configzen.errors import (
+    ConfigAccessError,
+    InternalConfigError,
+    ResourceLookupError,
+    UnspecifiedParserError,
+    format_syntax_error,
+)
 from configzen.processor import SUBST_METADATA, DirectiveContext, Processor
-from configzen.typedefs import (AsyncConfigIO, ConfigIO, ConfigModelT, RawResourceT,
-                                SupportsRoute, T)
+from configzen.typedefs import (
+    AsyncConfigIO,
+    ConfigIO,
+    ConfigModelT,
+    RawResourceT,
+    SupportsRoute,
+    T,
+)
 
 try:
     import aiofiles

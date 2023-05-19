@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from aiofiles.base import AiofilesContextManager
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-    from configzen.config import Route
+    from configzen.config import ConfigModel, Route
 
 T = TypeVar("T")
 
