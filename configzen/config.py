@@ -880,7 +880,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         """
         args: list[Any] = []
         kwargs: dict[str, Any] = {}
-        if isinstance(ctx.snippet, str):
+        if isinstance(ctx.snippet, (str, int)):
             args.append(ctx.snippet)
         elif is_dict_like(ctx.snippet):
             kwargs |= ctx.snippet
