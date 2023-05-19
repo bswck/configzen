@@ -1,0 +1,4 @@
+^extend: base.yaml
+bar: 5
++section:
+  b: 7

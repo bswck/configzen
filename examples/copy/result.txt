@@ -1,0 +1,4 @@
+python -m configzen --source=before.yaml after.yaml
+section={'a': 1, 'b': 2, 'c': 3} bar=2 biz=3 foo=1
+python -m configzen --source=before.yaml after.yaml --async
+section={'a': 1, 'b': 2, 'c': 3} bar=2 biz=3 foo=1

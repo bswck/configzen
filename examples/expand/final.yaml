@@ -1,0 +1,3 @@
+^expand: intermediate.yaml
++section:
+  a: 12
