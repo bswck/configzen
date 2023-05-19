@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
 
 from anyconfig.utils import is_dict_like, is_list_like
 
-from configzen.errors import InternalConfigError, format_syntax_error
+from configzen.errors import InternalConfigError, format_syntax_error, \
+    ConfigPreprocessingError
 from configzen.typedefs import ConfigModelT
 
 if TYPE_CHECKING:
@@ -92,7 +93,7 @@ class DirectiveContext:
         """
         for key in self.container:
             directive_name, arguments = parse_directive_call(self.prefix, key)
-            if directive_name == self.key:
+            if directive_name == self.directive:
                 if require_same_arguments and arguments != self.arguments:
                     continue
                 return True
@@ -230,7 +231,7 @@ else:
 
     class SubstitutionMetadata(TypedDict):
         """
-        Metadata for a substitution directive: either EXPAND or EXTEND call.
+        Metadata for the `extend` substitution directive call.
 
         Attributes
         ----------
@@ -304,7 +305,9 @@ class BaseProcessor(Generic[ConfigModelT]):
                         f"dictionary sections but item at {actual_key!r} "
                         f"is not a dictionary"
                     )
-                result[actual_key] = overridden | value
+                replacement = overridden | value
+                self._preprocess(replacement)
+                result[actual_key] = replacement
             elif key.startswith(self.directive_prefix):
                 directive_name, arguments = parse_directive_call(
                     self.directive_prefix, key
@@ -390,7 +393,6 @@ class BaseProcessor(Generic[ConfigModelT]):
 
 
 class Directives(str, enum.Enum):
-    EXPAND = "expand"
     EXTEND = "extend"
     INCLUDE = "include"
     COPY = "copy"
@@ -402,10 +404,10 @@ class Processor(BaseProcessor[ConfigModelT]):
     directive_prefix = "^"
     extension_prefix = "+"
 
-    @directive(Directives.EXPAND)
-    def expand(self, ctx: DirectiveContext) -> None:
+    @directive(Directives.EXTEND)
+    def extend(self, ctx: DirectiveContext) -> None:
         """
-        Expand a configuration with another configuration.
+        extend a configuration with another configuration.
         Recursively preprocess the referenced configuration.
         Preserve information about the referenced configuration.
 
@@ -422,7 +424,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         and `config.yaml` containing:
 
         ```yaml
-        ^expand: base.yaml
+        ^extend: base.yaml
         +section:
           foo: 3
         ```
@@ -430,7 +432,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         -> `load()` -> `save()` ->
 
         ```yaml
-        ^expand: base.yaml
+        ^extend: base.yaml
         +section:
           foo: 3
         ```
@@ -456,7 +458,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         and `base.yaml` containing:
 
         ```yaml
-        ^expand: biz.yaml
+        ^extend: biz.yaml
         +section:
           foo: 1
           bar: 2
@@ -473,26 +475,13 @@ class Processor(BaseProcessor[ConfigModelT]):
         -> `load()` -> `save()` ->
 
         ```yaml
-        ^expand: biz.yaml
+        ^extend: biz.yaml
         +section:
           bar: 2
           foo: 3
         ```
         """
         return self._substitute(ctx, preprocess=True, preserve=False)
-
-    @directive(Directives.EXTEND)
-    def extend(self, ctx: DirectiveContext) -> None:
-        """
-        Extend a configuration with another configuration.
-        Do not preprocess the referenced configuration.
-        Preserve information about the referenced configuration.
-
-        Visual example
-        --------------
-        TODO
-        """
-        return self._substitute(ctx, preprocess=False, preserve=True)
 
     @directive(Directives.COPY)
     def copy(self, ctx: DirectiveContext) -> None:
@@ -536,26 +525,33 @@ class Processor(BaseProcessor[ConfigModelT]):
         from configzen.config import CONTEXT, Context, at
 
         loader_class = type(self.loader)
+
         if len(ctx.arguments) > 1:
             msg = f"{ctx.directive!r} directive can select only one section"
-            raise ValueError(msg)
-        if ctx.has_duplicates():
-            msg = f"duplicate {ctx.directive!r} directive"
-            raise ValueError(msg)
+            raise ConfigPreprocessingError(msg)
+
+        if ctx.has_duplicates(require_same_arguments=False):
+            msg = (
+                f"using more than one {ctx.directive!r} directive "
+                "in the same section is not allowed"
+            )
+            raise ConfigPreprocessingError(msg)
 
         loader = loader_class.from_directive_context(ctx)
 
         if loader.resource == self.loader.resource:
-            raise ValueError(f"{loader.resource} tried to {ctx.directive!r} on itself")
+            raise ConfigPreprocessingError(
+                f"{loader.resource} tried to {ctx.directive!r} on itself"
+            )
 
         with loader.processor_open_resource() as reader:
             substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
 
         substitution_route = ctx.arguments[0] if ctx.arguments else None
         if substitution_route:
-            substituted = at(substituted, substitution_route)
+            substituted = at(substituted, substitution_route, loader=loader)
             if not is_dict_like(substituted):
-                raise ValueError(
+                raise ConfigPreprocessingError(
                     f"imported item {substitution_route!r} "
                     f"from {loader.resource} is not a dictionary"
                 )
@@ -584,18 +580,17 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import at, convert
+        from configzen.config import at, convert, CONTEXT
 
         overrides = {}
 
-        context = metadata["context"]
         route = metadata["route"]
+        context = metadata["context"]
         loader = context.loader
-        preprocess = metadata["preprocess"]
 
         with loader.processor_open_resource() as reader:
-            # Here, we intentionally always preprocess the loaded configuration.
-            loaded = loader.load_into_dict(reader.read(), preprocess=True)
+            # Here we intentionally always preprocess the loaded configuration.
+            loaded = loader.load_into_dict(reader.read())
 
             if route:
                 loaded = at(loaded, route, loader=loader)
@@ -605,11 +600,14 @@ class Processor(BaseProcessor[ConfigModelT]):
         missing = object()
 
         for key, value in loaded.items():
-            counterpart_value = state.get(key, missing)
+            counterpart_value = state.pop(key, missing)
             if counterpart_value is missing:
                 continue
             counterpart_value = convert(counterpart_value)
             if is_dict_like(value):
+                if SUBST_METADATA in value:
+                    value.pop(CONTEXT, None)
+                    cls.export(value, value.pop(SUBST_METADATA))
                 overrides_for_key = {
                     sub_key: comp
                     for sub_key, orig in value.items()
@@ -627,12 +625,9 @@ class Processor(BaseProcessor[ConfigModelT]):
                     overrides[key] = counterpart_value
                     del substituted_values[key]
 
-        state.clear()
-
         if substituted_values:
             arguments = [] if route is None else [route]
-            directive_name = Directives.EXPAND if preprocess else Directives.EXTEND
-            substitution_directive = cls.directive(directive_name, arguments)
+            substitution_directive = cls.directive(Directives.EXTEND, arguments)
             state |= {substitution_directive: context.loader.resource}
 
         state |= overrides

@@ -1,0 +1,4 @@
+python -m configzen final.yaml
+biz=3 bar=5 section={'a': 12, 'b': 7, 'c': 3} foo=1
+python -m configzen final.yaml --async
+biz=3 bar=5 section={'a': 12, 'b': 7, 'c': 3} foo=1

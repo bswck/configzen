@@ -213,7 +213,6 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     convert.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
-
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: generic_validate.dispatch(cls)(cls, value)
 
@@ -326,10 +325,11 @@ def convert_namedtuple(obj: tuple[Any, ...]) -> Any:
     return convert(list(obj))
 
 
-def _split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    load_options: dict[str, Any] = {}
-    dump_options: dict[str, Any] = {}
-
+def _delegate_ac_options(
+    load_options: dict[str, Any],
+    dump_options: dict[str, Any],
+    options: dict[str, Any]
+) -> None:
     for key, value in options.items():
         if key.startswith("dump_"):
             actual_key = key.removeprefix("dump_")
@@ -348,8 +348,6 @@ def _split_ac_options(options: dict[str, Any]) -> tuple[dict[str, Any], dict[str
                 )
                 raise ValueError(msg)
             target[actual_key] = value
-
-    return load_options, dump_options
 
 
 class ConfigLoader(Generic[ConfigModelT]):
@@ -403,11 +401,20 @@ class ConfigLoader(Generic[ConfigModelT]):
     create_if_missing: bool
     allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
-    load_options: dict[str, Any]
-    dump_options: dict[str, Any]
+    global_load_options: dict[str, Any] = {}
+    global_dump_options: dict[str, Any] = {
+        # These are usually desirable for configuration files.
+        # If you want to change them, you can do so by monkey-patching
+        # these variables. You can also change `load_options` and
+        # `dump_options` instance attributes to make a local change.
+        "allow_unicode": True,
+        "ensure_ascii": False,
+        "indent": 2
+    }
 
-    _DEFAULT_RESOURCE_KWARGS: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}
-    _DEFAULT_ALLOWED_URL_SCHEMES: ClassVar[set[str]] = {"file", "http", "https"}
+    predefined_default_kwargs: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}
+    default_allowed_url_schemes: ClassVar[set[str]] = {"file", "http", "https"}
+
     _OPEN_KWARGS: ClassVar[frozenset[str]] = frozenset(
         ("mode", "buffering", "encoding", "errors", "newline")
     )
@@ -458,12 +465,16 @@ class ConfigLoader(Generic[ConfigModelT]):
         self.create_if_missing = create_if_missing
         self.use_pydantic_json = kwargs.pop("use_pydantic_json", True)
         self.default_kwargs = kwargs.pop(
-            "default_kwargs", self._DEFAULT_RESOURCE_KWARGS.copy()
+            "default_kwargs", self.predefined_default_kwargs.copy()
         )
         self.allowed_url_schemes = kwargs.pop(
-            "allowed_url_schemes", self._DEFAULT_ALLOWED_URL_SCHEMES.copy()
+            "allowed_url_schemes", self.default_allowed_url_schemes.copy()
         )
-        self.load_options, self.dump_options = _split_ac_options(kwargs)
+
+        self.load_options = self.global_load_options.copy()
+        self.dump_options = self.global_dump_options.copy()
+
+        _delegate_ac_options(self.load_options, self.dump_options, kwargs)
 
     @property
     def resource(self) -> RawResourceT:

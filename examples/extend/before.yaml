@@ -1,4 +1,4 @@
 ^extend: intermediate.yaml
 +section:
+  ^extend(test): base.yaml
   a: 12
-  b: 2
