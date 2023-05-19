@@ -1,7 +1,13 @@
 import contextlib
 import os
 import pathlib
-from typing import TYPE_CHECKING, TextIO, TypeAlias, TypeVar, Union
+import sys
+from typing import TYPE_CHECKING, TextIO, TypeVar, Union
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from aiofiles.base import AiofilesContextManager
