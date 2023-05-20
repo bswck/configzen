@@ -565,7 +565,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             msg = f"{ctx.directive!r} directive can select only one section"
             raise ConfigPreprocessingError(msg)
 
-        if ctx.has_duplicates(require_same_arguments=False):
+        if preserve and ctx.has_duplicates(require_same_arguments=False):
             msg = (
                 f"using more than one {ctx.directive!r} directive "
                 "in the same section is not allowed"
