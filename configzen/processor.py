@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
 from anyconfig.utils import is_dict_like, is_list_like
 
@@ -278,10 +278,40 @@ class BaseProcessor(Generic[ConfigModelT]):
     @classmethod
     def export(
         cls,
-        state: dict[str, Any],
+        state: Any,
+        *,
+        metadata: SubstitutionMetadata[ConfigModelT] | None = None,
+    ) -> None:
+        """
+        Export the state.
+
+        Parameters
+        ----------
+        state
+            The state to export.
+        metadata
+            The metadata of the substitution.
+        """
+        if is_dict_like(state):
+            if metadata is None:
+                from configzen.config import CONTEXT
+                state.pop(CONTEXT, None)
+                metadata = state.pop(SUBST_METADATA, None)
+            if metadata:
+                cls._export(state, metadata)
+            else:
+                cls.export(list(state.values()), metadata=None)
+        elif is_list_like(state):
+            for item in state:
+                cls.export(item, metadata=None)
+
+    @classmethod
+    def _export(
+        cls,
+        state: Any,
         metadata: SubstitutionMetadata[ConfigModelT],
     ) -> None:
-        pass
+        raise NotImplementedError
 
     def preprocess(self) -> dict[str, Any]:
         """
@@ -292,13 +322,18 @@ class BaseProcessor(Generic[ConfigModelT]):
         -------
         The parsed config.
         """
-        return self._preprocess(self.dict_config)
+        return cast(dict[str, Any], self._preprocess(self.dict_config))
 
-    def _preprocess(self, container: dict[str, Any]) -> dict[str, Any]:
+    def _preprocess(self, container: Any) -> Any:
+        if not is_dict_like(container):
+            if is_list_like(container):
+                return [self._preprocess(v) for v in container]
+            return container
+
         result: dict[str, Any] = {}
 
         for key, value in sorted(
-            container.items(),
+            cast(dict[str, Any], container).items(),
             key=lambda item: item[0] == self.directive_prefix,
         ):
             if key.startswith(self.extension_prefix):
@@ -311,8 +346,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                         f"is not a dictionary"
                     )
                 replacement = overridden | value
-                self._preprocess(replacement)
-                result[actual_key] = replacement
+                result[actual_key] = self._preprocess(replacement)
             elif key.startswith(self.directive_prefix):
                 directive_name, arguments = parse_directive_call(
                     self.directive_prefix, key
@@ -330,14 +364,8 @@ class BaseProcessor(Generic[ConfigModelT]):
                 self._call_directive(context)
                 new_container = self._preprocess(context.container)
                 result |= new_container
-            elif is_dict_like(value):
-                result[key] = self._preprocess(value)
-            elif is_list_like(value):
-                result[key] = [
-                    self._preprocess(v) if isinstance(v, dict) else v for v in value
-                ]
             else:
-                result[key] = value
+                result[key] = self._preprocess(value)
         return result
 
     def _call_directive(self, context: DirectiveContext) -> None:
@@ -574,7 +602,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             }
 
     @classmethod
-    def export(
+    def _export(
         cls,
         state: dict[str, Any],
         metadata: SubstitutionMetadata[ConfigModelT],
@@ -611,10 +639,11 @@ class Processor(BaseProcessor[ConfigModelT]):
             if counterpart_value is missing:
                 continue
             counterpart_value = convert(counterpart_value)
+
             if is_dict_like(value):
                 if SUBST_METADATA in value:
                     value.pop(CONTEXT, None)
-                    cls.export(value, value.pop(SUBST_METADATA))
+                    cls.export(value, metadata=value.pop(SUBST_METADATA))
                 overrides_for_key = {
                     sub_key: comp
                     for sub_key, orig in value.items()
@@ -626,9 +655,16 @@ class Processor(BaseProcessor[ConfigModelT]):
                 if overrides_for_key:
                     export_key = loader.processor_class.extension_prefix + key
                     overrides[export_key] = overrides_for_key
+
+            elif is_list_like(value):
+                cls.export(value, metadata=None)
+
             elif counterpart_value != value:
                 overrides[key] = counterpart_value
                 del substituted_values[key]
+
+        for value in state.values():
+            cls.export(value, metadata=None)
 
         if substituted_values:
             arguments = [] if route is None else [route]

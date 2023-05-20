@@ -1545,7 +1545,7 @@ class ConfigModel(
             metadata = getattr(self, SUBST_METADATA, None)
             if metadata:
                 context = get_context(self)
-                context.loader.processor_class.export(state, metadata)
+                context.loader.processor_class.export(state, metadata=metadata)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
@@ -1623,6 +1623,12 @@ class ConfigModel(
         ):
             context.enter(name).bind_to(value)
         return value
+
+    def __deepcopy__(
+        self: ConfigModelT,
+        memodict: dict[Any, Any] | None = None
+    ) -> ConfigModelT:
+        return self.parse_obj(self.dict())
 
     def __getattribute__(self, attr: str) -> Any:
         value = super().__getattribute__(attr)
