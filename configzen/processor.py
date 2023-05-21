@@ -689,7 +689,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         state |= overrides
         extras: dict[str, Any] = {
             key: state.pop(key)
-            for key in state
+            for key in set(state)
             if key not in key_order
         }
 
