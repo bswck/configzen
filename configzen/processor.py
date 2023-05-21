@@ -26,7 +26,7 @@ __all__ = (
 
 DirectiveT = TypeVar("DirectiveT")
 
-SUBST_METADATA: str = "__configzen_substitute__"
+EXPORT: str = "__configzen_export__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
 
 
@@ -227,16 +227,17 @@ def parse_directive_call(
 
 if TYPE_CHECKING:
 
-    class SubstitutionMetadata(TypedDict, Generic[ConfigModelT]):
+    class ExportMetadata(TypedDict, Generic[ConfigModelT]):
         route: str | None
         context: AnyContext[ConfigModelT]
+        key_order: list[str]
         preprocess: bool
 
 else:
 
-    class SubstitutionMetadata(TypedDict):
+    class ExportMetadata(TypedDict):
         """
-        Metadata for the `extend` substitution directive call.
+        Metadata for exporting.
 
         Attributes
         ----------
@@ -248,6 +249,7 @@ else:
 
         route: str | None
         context: AnyContext[ConfigModelT]
+        key_order: list[str]
         preprocess: bool
 
 
@@ -280,7 +282,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         cls,
         state: Any,
         *,
-        metadata: SubstitutionMetadata[ConfigModelT] | None = None,
+        metadata: ExportMetadata[ConfigModelT] | None = None,
     ) -> None:
         """
         Export the state.
@@ -297,7 +299,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                 from configzen.config import CONTEXT
 
                 state.pop(CONTEXT, None)
-                metadata = state.pop(SUBST_METADATA, None)
+                metadata = state.pop(EXPORT, None)
             if metadata:
                 cls._export(state, metadata)
             else:
@@ -310,7 +312,7 @@ class BaseProcessor(Generic[ConfigModelT]):
     def _export(
         cls,
         state: Any,
-        metadata: SubstitutionMetadata[ConfigModelT],
+        metadata: ExportMetadata[ConfigModelT],
     ) -> None:
         raise NotImplementedError
 
@@ -600,10 +602,11 @@ class Processor(BaseProcessor[ConfigModelT]):
         if preserve:
             ctx.container |= {
                 CONTEXT: context,
-                SUBST_METADATA: SubstitutionMetadata(
+                EXPORT: ExportMetadata(
                     route=str(substitution_route),
                     context=context,
                     preprocess=preprocess,
+                    key_order=list(ctx.container)
                 ),
             }
 
@@ -611,7 +614,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     def _export(
         cls,
         state: dict[str, Any],
-        metadata: SubstitutionMetadata[ConfigModelT],
+        metadata: ExportMetadata[ConfigModelT],
     ) -> None:
         """
         Exports model state preserving substition directive calls in the model state.
@@ -627,6 +630,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         route = metadata["route"]
         context = metadata["context"]
+        key_order = metadata["key_order"]
         loader = context.loader
 
         with loader.processor_open_resource() as reader:
@@ -647,9 +651,9 @@ class Processor(BaseProcessor[ConfigModelT]):
             counterpart_value = pre_serialize(counterpart_value)
 
             if is_dict_like(value):
-                if SUBST_METADATA in value:
+                if EXPORT in value:
                     value.pop(CONTEXT, None)
-                    cls.export(value, metadata=value.pop(SUBST_METADATA))
+                    cls.export(value, metadata=value.pop(EXPORT))
                 overrides_for_key = {
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
@@ -683,3 +687,14 @@ class Processor(BaseProcessor[ConfigModelT]):
             }
 
         state |= overrides
+        extras: dict[str, Any] = {
+            key: state.pop(key)
+            for key in state
+            if key not in key_order
+        }
+
+        # Preserve the order of keys in the original configuration.
+        for key in filter(state.__contains__, key_order):
+            state[key] = state.pop(key)
+
+        state |= extras

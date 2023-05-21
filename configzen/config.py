@@ -83,7 +83,7 @@ from configzen.errors import (
     UnspecifiedParserError,
     format_syntax_error,
 )
-from configzen.processor import SUBST_METADATA, DirectiveContext, Processor
+from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.typedefs import (
     AsyncConfigIO,
     ConfigIO,
@@ -1593,7 +1593,7 @@ class ConfigModelMetaclass(ModelMetaclass):
         namespace: dict[str, Any],
         **kwargs: Any,
     ) -> type:
-        namespace[SUBST_METADATA] = pydantic.PrivateAttr()
+        namespace[EXPORT] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1634,7 +1634,7 @@ class ConfigModel(
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
-            metadata = getattr(self, SUBST_METADATA, None)
+            metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
                 context.loader.processor_class.export(state, metadata=metadata)
