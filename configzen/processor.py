@@ -652,10 +652,10 @@ class Processor(BaseProcessor[ConfigModelT]):
                     cls.export(value, metadata=value.pop(SUBST_METADATA))
                 overrides_for_key = {
                     sub_key: comp
-                    for sub_key, orig in value.items()
+                    for sub_key, comp in counterpart_value.items()
                     if (
-                        (comp := counterpart_value.get(sub_key, missing)) is not missing
-                        and orig != comp
+                        (orig := value.get(sub_key, missing)) is missing
+                        or orig != comp
                     )
                 }
                 if overrides_for_key:
