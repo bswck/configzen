@@ -1124,7 +1124,11 @@ class ConfigAt(Generic[ConfigModelT]):
         return reload(self, **kwargs)
 
 
-def save(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> int:
+def save(
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    write_kwargs: dict[str, Any] | None = None,
+    **kwargs: Any
+) -> int:
     """
     Save the configuration.
 
@@ -1132,8 +1136,10 @@ def save(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> int:
     ----------
     section
         The configuration model instance or the configuration item.
+    write_kwargs
+        Keyword arguments to pass to the writing function.
     **kwargs
-        Keyword arguments to pass to the saving function.
+        Keyword arguments to pass to the dumping function.
 
     Returns
     -------
@@ -1141,21 +1147,26 @@ def save(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> int:
     """
     if isinstance(section, ConfigModel):
         config = section
-        return config.save()
+        return config.save(write_kwargs=write_kwargs, **kwargs)
+
+    if write_kwargs is None:
+        write_kwargs = {}
 
     config = section.owner
     data = config.initial_state
-    at = ConfigAt(config, data, section.route)
-    data = at.update(section.get())
+    scope = ConfigAt(config, data, section.route)
+    data = scope.update(section.get())
     context = get_context(config)
-    blob = context.loader.dump_config(config.copy(update=data))
-    result = config.write(blob, **kwargs)
+    blob = context.loader.dump_config(config.copy(update=data), **kwargs)
+    result = config.write(blob, **write_kwargs)
     context.initial_state = data
     return result
 
 
 async def save_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    write_kwargs: dict[str, Any] | None = None,
+    **kwargs: Any
 ) -> int:
     """
     Save the configuration asynchronously.
@@ -1164,8 +1175,10 @@ async def save_async(
     ----------
     section
         The configuration model instance or the configuration item.
+    write_kwargs
+        Keyword arguments to pass to the writing function.
     **kwargs
-        Keyword arguments to pass to the saving function.
+        Keyword arguments to pass to the dumping function.
 
     Returns
     -------
@@ -1173,15 +1186,18 @@ async def save_async(
     """
     if isinstance(section, ConfigModel):
         config = section
-        return await config.save_async(**kwargs)
+        return await config.save_async(write_kwargs=write_kwargs, **kwargs)
+
+    if write_kwargs is None:
+        write_kwargs = {}
 
     config = section.owner
     data = config.initial_state
-    at = ConfigAt(config, data, section.route)
-    data = at.update(section.get())
+    scope = ConfigAt(config, data, section.route)
+    data = scope.update(section.get())
     context = get_context(config)
-    blob = context.loader.dump_config(config.copy(update=data))
-    result = await config.write_async(blob, **kwargs)
+    blob = context.loader.dump_config(config.copy(update=data), **kwargs)
+    result = await config.write_async(blob, **write_kwargs)
     context.initial_state = data
     return result
 
@@ -1493,7 +1509,7 @@ def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) 
     return converted_value
 
 
-class CMBMetaclass(ModelMetaclass):
+class ConfigModelMetaclass(ModelMetaclass):
     def __new__(
         cls,
         name: str,
@@ -1515,7 +1531,7 @@ class CMBMetaclass(ModelMetaclass):
 
 class ConfigModel(
     pydantic.BaseSettings,
-    metaclass=CMBMetaclass,
+    metaclass=ConfigModelMetaclass,
     root=True,
 ):
     """
@@ -1688,16 +1704,25 @@ class ConfigModel(
             context.initial_state = new_config.__dict__
             new_config.rollback()
             return new_config
-        return cast(ConfigModelT, reload(cast(ConfigAt[ConfigModelT], context.at)))
+        return cast(
+            ConfigModelT,
+            reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        )
 
-    def save(self: ConfigModelT, **kwargs: Any) -> int:
+    def save(
+        self: ConfigModelT,
+        write_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any
+    ) -> int:
         """
         Save the configuration to the configuration file.
 
         Parameters
         ----------
-        **kwargs
+        write_kwargs
             Keyword arguments to pass to the write method.
+        **kwargs
+            Keyword arguments to pass to the dumping method.
 
         Returns
         -------
@@ -1705,11 +1730,17 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            blob = context.loader.dump_config(self)
-            result = self.write(blob, **kwargs)
+            if write_kwargs is None:
+                write_kwargs = {}
+            blob = context.loader.dump_config(self, **kwargs)
+            result = self.write(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
-        return save(cast(ConfigAt[ConfigModelT], context.at))
+        return save(
+            cast(ConfigAt[ConfigModelT], context.at),
+            write_kwargs=write_kwargs,
+            **kwargs,
+        )
 
     def write(self, blob: str, **kwargs: Any) -> int:
         """
@@ -1784,17 +1815,24 @@ class ConfigModel(
             self.rollback()
             return new_async_config
         return cast(
-            ConfigModelT, await reload_async(cast(ConfigAt[ConfigModelT], context.at))
+            ConfigModelT,
+            await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
         )
 
-    async def save_async(self: ConfigModelT, **kwargs: Any) -> int:
+    async def save_async(
+        self: ConfigModelT,
+        write_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any
+    ) -> int:
         """
         Save the configuration to the configuration file asynchronously.
 
         Parameters
         ----------
-        **kwargs
+        write_kwargs
             Keyword arguments to pass to the write method.
+        **kwargs
+            Keyword arguments to pass to the dumping method.
 
         Returns
         -------
@@ -1802,11 +1840,17 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            blob = context.loader.dump_config(self)
-            result = await self.write_async(blob, **kwargs)
+            if write_kwargs is None:
+                write_kwargs = {}
+            blob = context.loader.dump_config(self, **kwargs)
+            result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
-        return await save_async(cast(ConfigAt[ConfigModelT], context.at))
+        return await save_async(
+            cast(ConfigAt[ConfigModelT], context.at),
+            write_kwargs=write_kwargs,
+            **kwargs
+        )
 
     async def write_async(self, blob: str, **kwargs: Any) -> int:
         """
