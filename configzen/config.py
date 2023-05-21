@@ -1693,7 +1693,7 @@ class ConfigModel(
     def __deepcopy__(
         self: ConfigModelT, memodict: dict[Any, Any] | None = None
     ) -> ConfigModelT:
-        return self.parse_obj(export(self))
+        return type(self)(**copy.deepcopy(dict(self._iter(to_dict=False))))
 
     def __getattribute__(self, attr: str) -> Any:
         value = super().__getattribute__(attr)
