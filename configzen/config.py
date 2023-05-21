@@ -925,22 +925,36 @@ class ConfigLoader(Generic[ConfigModelT]):
 
     @classmethod
     def from_directive_context(
-        cls, ctx: DirectiveContext, /
-    ) -> ConfigLoader[ConfigModelT]:
+        cls,
+        ctx: DirectiveContext,
+        /,
+        route_separator: str = ":",
+        route_class: type[Route] | None = None,
+    ) -> tuple[ConfigLoader[ConfigModelT], SupportsRoute | None]:
         """
         Create a configuration loader from a preprocessor directive context.
+        Return an optional scope that the context points to.
 
         Parameters
         ----------
+        route_class
+        route_separator
         ctx
 
         Returns
         -------
         The configuration loader.
         """
+        if route_class is None:
+            route_class = Route
+        route: SupportsRoute | None = None
         args: list[Any] = []
         kwargs: dict[str, Any] = {}
-        if isinstance(ctx.snippet, (str, int)):
+        if isinstance(ctx.snippet, str):
+            path, _, route = ctx.snippet.partition(route_separator)
+            route = Route(route.strip().replace(route_separator, route_class.TOK_DOT))
+            args.append(path)
+        elif isinstance(ctx.snippet, int):
             args.append(ctx.snippet)
         elif is_dict_like(ctx.snippet):
             kwargs |= ctx.snippet
@@ -951,13 +965,13 @@ class ConfigLoader(Generic[ConfigModelT]):
                 f"invalid snippet for the {ctx.directive!r} directive: {ctx.snippet!r}"
             )
             raise ValueError(msg)
-        return cls(*args, **kwargs)
+        return cls(*args, **kwargs), str(route)
 
 
 class Route:
-    _TOK_DOT = "."
-    _TOK_DOTLIST_ESCAPE_LEFT = "["
-    _TOK_DOTLIST_ESCAPE_RIGHT = "]"
+    TOK_DOT = "."
+    TOK_DOTLIST_ESCAPE_ENTER = "["
+    TOK_DOTLIST_ESCAPE_EXIT = "]"
 
     def __init__(self, route: SupportsRoute) -> None:
         self.list_route = self.parse(route)
@@ -969,35 +983,36 @@ class Route:
         if isinstance(route, list):
             return route
         if isinstance(route, str):
-            return cls._decompose(route)
+            with format_syntax_error(route):
+                return cls._decompose(route)
         raise TypeError(f"invalid route type {type(route)!r}")
 
     @classmethod
     def _decompose(cls, route: str) -> list[str]:
-        route = route.removesuffix(cls._TOK_DOT) + cls._TOK_DOT[0]
+        route = route.removesuffix(cls.TOK_DOT) + cls.TOK_DOT[0]
         argument = ""
         escape_ctx = False
         prev_char = None
         list_route = []
         for char_no, char in enumerate(route, start=1):
-            if char in cls._TOK_DOT:
+            if char in cls.TOK_DOT:
                 if escape_ctx:
                     argument += char
                 else:
                     list_route.append(argument)
                     argument = ""
-            elif char in cls._TOK_DOTLIST_ESCAPE_LEFT:
-                if prev_char and prev_char in cls._TOK_DOTLIST_ESCAPE_RIGHT:
+            elif char in cls.TOK_DOTLIST_ESCAPE_ENTER:
+                if prev_char and prev_char in cls.TOK_DOTLIST_ESCAPE_EXIT:
                     raise InternalConfigError(
                         "invalid escape sequence "
-                        f"(expected {cls._TOK_DOT[0]} between escape sequences)",
+                        f"(expected {cls.TOK_DOT[0]} between escape sequences)",
                         extra=char_no,
                     )
                 if escape_ctx:
                     msg = "invalid escape sequence"
                     raise InternalConfigError(msg, extra=char_no)
                 escape_ctx = True
-            elif char in cls._TOK_DOTLIST_ESCAPE_RIGHT:
+            elif char in cls.TOK_DOTLIST_ESCAPE_EXIT:
                 if not escape_ctx:
                     msg = "invalid escape sequence"
                     raise InternalConfigError(msg, extra=char_no)
@@ -1013,6 +1028,17 @@ class Route:
     def decompose(cls, route: str) -> list[str]:
         with format_syntax_error(route):
             return cls._decompose(route)
+
+    def compose(self) -> str:
+        escape = (self.TOK_DOTLIST_ESCAPE_ENTER, self.TOK_DOTLIST_ESCAPE_EXIT)
+        raw = ("", "")
+        return self.TOK_DOT.join(
+            fragment.join(escape) if self.TOK_DOT in fragment else fragment.join(raw)
+            for fragment in self.list_route
+        )
+
+    def __str__(self) -> str:
+        return self.compose()
 
     def __iter__(self) -> Generator[str, None, None]:
         yield from self.list_route

@@ -439,6 +439,7 @@ class Directives(str, enum.Enum):
 class Processor(BaseProcessor[ConfigModelT]):
     directive_prefix = "^"
     extension_prefix = "+"
+    route_separator: ClassVar[str] = ":"
 
     @directive(Directives.EXTEND)
     def extend(self, ctx: DirectiveContext) -> None:
@@ -562,8 +563,8 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         loader_class = type(self.loader)
 
-        if len(ctx.arguments) > 1:
-            msg = f"{ctx.directive!r} directive can select only one section"
+        if len(ctx.arguments):
+            msg = f"{ctx.directive!r} directive takes no () arguments"
             raise ConfigPreprocessingError(msg)
 
         if preserve and ctx.has_duplicates(require_same_arguments=False):
@@ -573,7 +574,9 @@ class Processor(BaseProcessor[ConfigModelT]):
             )
             raise ConfigPreprocessingError(msg)
 
-        loader = loader_class.from_directive_context(ctx)
+        loader, substitution_route = loader_class.from_directive_context(
+            ctx, route_separator=self.route_separator
+        )
 
         if loader.resource == self.loader.resource:
             raise ConfigPreprocessingError(
@@ -583,7 +586,6 @@ class Processor(BaseProcessor[ConfigModelT]):
         with loader.processor_open_resource() as reader:
             substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
 
-        substitution_route = ctx.arguments[0] if ctx.arguments else None
         if substitution_route:
             substituted = at(substituted, substitution_route, loader=loader)
             if not is_dict_like(substituted):
@@ -591,6 +593,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     f"imported item {substitution_route!r} "
                     f"from {loader.resource} is not a dictionary"
                 )
+
         context: Context[ConfigModelT] = Context(loader)
         ctx.container = substituted | ctx.container
 
@@ -598,7 +601,9 @@ class Processor(BaseProcessor[ConfigModelT]):
             ctx.container |= {
                 CONTEXT: context,
                 SUBST_METADATA: SubstitutionMetadata(
-                    route=substitution_route, context=context, preprocess=preprocess
+                    route=str(substitution_route),
+                    context=context,
+                    preprocess=preprocess,
                 ),
             }
 
