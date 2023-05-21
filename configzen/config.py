@@ -288,8 +288,8 @@ def export(obj: ConfigModelT) -> dict[str, Any]:
 
 
 def with_exporter(
-    func: Callable[[ConfigModelT],
-    dict[str, Any]], cls: type[ConfigModelT] | None = None
+    func: Callable[[ConfigModelT], dict[str, Any]],
+    cls: type[ConfigModelT] | None = None,
 ) -> type[ConfigModelT] | Any:
     """
     Register a custom exporter for a type.
@@ -306,7 +306,6 @@ def with_exporter(
 
     export.register(cls, func)
     return cls
-
 
 
 @pre_serialize.register(list)
@@ -450,19 +449,32 @@ class ConfigLoader(Generic[ConfigModelT]):
     predefined_default_kwargs: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}
     default_allowed_url_schemes: ClassVar[set[str]] = {"file", "http", "https"}
 
-    _OPEN_KWARGS: ClassVar[frozenset[str]] = frozenset(
-        ("mode", "buffering", "encoding", "errors", "newline")
-    )
-    _URLOPEN_KWARGS: ClassVar[frozenset[str]] = frozenset(
-        (
-            "data",
-            "timeout",
-            "cafile",
-            "capath",
-            "cadefault",
-            "context",
-        )
-    )
+    OPEN_KWARGS: ClassVar[set[str]] = {
+        "mode",
+        "buffering",
+        "encoding",
+        "errors",
+        "newline",
+    }
+    URLOPEN_KWARGS: ClassVar[set[str]] = {
+        "data",
+        "timeout",
+        "cafile",
+        "capath",
+        "cadefault",
+        "context",
+    }
+    JSON_KWARGS: ClassVar[set[str]] = {
+        "skipkeys",
+        "ensure_ascii",
+        "check_circular",
+        "allow_nan",
+        "cls",
+        "indent",
+        "separators",
+        "default",
+        "sort_keys",
+    }
 
     def __init__(
         self,
@@ -650,8 +662,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         if ac_parser is None:
             ac_parser = self.ac_parser
         if ac_parser == "json" and self.use_pydantic_json:
-            # xxx: Filter JSON kwargs to ensure safety?
-            kwargs = self.dump_options | kwargs
+            kwargs = filter_options(self.JSON_KWARGS, self.dump_options | kwargs)
             return config.json(**kwargs)
         return self.dump_data(export(config), ac_parser=ac_parser, **kwargs)
 
@@ -715,11 +726,11 @@ class ConfigLoader(Generic[ConfigModelT]):
                     f"must be one of {self.allowed_url_schemes!r}"
                 )
                 raise ValueError(msg)
-            kwds = filter_options(self._URLOPEN_KWARGS, kwds)
+            kwds = filter_options(self.URLOPEN_KWARGS, kwds)
             request = urllib.request.Request(url.geturl())
             return cast(ConfigIO, urllib.request.urlopen(request, **kwds))  # noqa: S310
         if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
-            kwds = filter_options(self._OPEN_KWARGS, kwds)
+            kwds = filter_options(self.OPEN_KWARGS, kwds)
             if isinstance(self.resource, int):
                 return cast(
                     ConfigIO,
@@ -773,7 +784,7 @@ class ConfigLoader(Generic[ConfigModelT]):
             )
             raise RuntimeError(msg)
         if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
-            kwds = filter_options(self._OPEN_KWARGS, kwds)
+            kwds = filter_options(self.OPEN_KWARGS, kwds)
             return aiofiles.open(self.resource, **kwds)
         raise RuntimeError("cannot open resource asynchronously")
 
@@ -1164,7 +1175,7 @@ class ConfigAt(Generic[ConfigModelT]):
 def save(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> int:
     """
     Save the configuration.
@@ -1203,7 +1214,7 @@ def save(
 async def save_async(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> int:
     """
     Save the configuration asynchronously.
@@ -1678,8 +1689,7 @@ class ConfigModel(
         return value
 
     def __deepcopy__(
-        self: ConfigModelT,
-        memodict: dict[Any, Any] | None = None
+        self: ConfigModelT, memodict: dict[Any, Any] | None = None
     ) -> ConfigModelT:
         return self.parse_obj(export(self))
 
@@ -1742,14 +1752,11 @@ class ConfigModel(
             new_config.rollback()
             return new_config
         return cast(
-            ConfigModelT,
-            reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+            ConfigModelT, reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
         )
 
     def save(
-        self: ConfigModelT,
-        write_kwargs: dict[str, Any] | None = None,
-        **kwargs: Any
+        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
         """
         Save the configuration to the configuration file.
@@ -1853,13 +1860,11 @@ class ConfigModel(
             return new_async_config
         return cast(
             ConfigModelT,
-            await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+            await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs),
         )
 
     async def save_async(
-        self: ConfigModelT,
-        write_kwargs: dict[str, Any] | None = None,
-        **kwargs: Any
+        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
         """
         Save the configuration to the configuration file asynchronously.
@@ -1886,7 +1891,7 @@ class ConfigModel(
         return await save_async(
             cast(ConfigAt[ConfigModelT], context.at),
             write_kwargs=write_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     async def write_async(self, blob: str, **kwargs: Any) -> int:

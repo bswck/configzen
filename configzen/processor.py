@@ -295,6 +295,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         if is_dict_like(state):
             if metadata is None:
                 from configzen.config import CONTEXT
+
                 state.pop(CONTEXT, None)
                 metadata = state.pop(SUBST_METADATA, None)
             if metadata:
