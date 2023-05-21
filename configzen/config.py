@@ -113,6 +113,8 @@ __all__ = (
     "with_pre_serialize",
     "post_deserialize",
     "with_post_deserialize",
+    "export",
+    "with_exporter",
 )
 
 _URL_SCHEMES: set[str] = set(
