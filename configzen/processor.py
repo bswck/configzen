@@ -676,6 +676,15 @@ class Processor(BaseProcessor[ConfigModelT]):
         for value in state.values():
             cls.export(value, metadata=None)
 
+        # TODO: Optimize. We iterate over the same about 3-4 times.
+
+        state |= overrides
+        extras: dict[str, Any] = {
+            key: state.pop(key)
+            for key in set(state)
+            if key not in key_order
+        }
+
         if substituted_values:
             substitution_directive = cls.directive(Directives.EXTEND)
             resource = context.loader.resource
@@ -685,13 +694,6 @@ class Processor(BaseProcessor[ConfigModelT]):
             state |= {substitution_directive: resource} | {
                 key: state.pop(key) for key in set(state)
             }
-
-        state |= overrides
-        extras: dict[str, Any] = {
-            key: state.pop(key)
-            for key in set(state)
-            if key not in key_order
-        }
 
         # Preserve the order of keys in the original configuration.
         for key in filter(state.__contains__, key_order):
