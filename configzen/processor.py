@@ -673,10 +673,12 @@ class Processor(BaseProcessor[ConfigModelT]):
             cls.export(value, metadata=None)
 
         if substituted_values:
-            arguments = [] if route is None else [route]
-            substitution_directive = cls.directive(Directives.EXTEND, arguments)
+            substitution_directive = cls.directive(Directives.EXTEND)
+            resource = context.loader.resource
+            if route:
+                resource = context.loader.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.
-            state |= {substitution_directive: context.loader.resource} | {
+            state |= {substitution_directive: resource} | {
                 key: state.pop(key) for key in set(state)
             }
 
