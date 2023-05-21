@@ -109,12 +109,10 @@ __all__ = (
     "save_async",
     "reload",
     "reload_async",
-    "convert",
-    "converter",
-    "convert_namedtuple",
-    "convert_mapping",
-    "generic_validate",
-    "generic_validator",
+    "pre_serialize",
+    "with_pre_serialize",
+    "post_deserialize",
+    "with_post_deserialize",
 )
 
 _URL_SCHEMES: set[str] = set(
@@ -152,7 +150,7 @@ def _is_namedtuple(
 
 
 @functools.singledispatch
-def convert(obj: Any) -> Any:
+def pre_serialize(obj: Any) -> Any:
     """
     Convert a value to a format that can be safely serialized.
 
@@ -171,19 +169,21 @@ def convert(obj: Any) -> Any:
     Any
     """
     if dataclasses.is_dataclass(obj):
-        return convert(dataclasses.asdict(obj))
+        return pre_serialize(dataclasses.asdict(obj))
     if _is_namedtuple(obj):
-        return convert_namedtuple(obj)
+        return _ps_namedtuple(obj)
     return obj
 
 
 for obj_type, encoder in ENCODERS_BY_TYPE.items():
-    convert.register(obj_type, encoder)
+    pre_serialize.register(obj_type, encoder)
 
 
-def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] | Any:
+def with_pre_serialize(
+    func: Callable[[T], Any], cls: type[T] | None = None
+) -> type[T] | Any:
     """
-    Register a converter function for a type.
+    Register a pre-serialization converter function for a type.
 
     Parameters
     ----------
@@ -202,20 +202,20 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
     -----
     .. code-block:: python
 
-        @converter(converter_func)
+        @with_pre_serialize(converter_func)
         class MyClass:
             ...
 
     """
     if cls is None:
-        return functools.partial(converter, func)
+        return functools.partial(with_pre_serialize, func)
 
-    convert.register(cls, func)
+    pre_serialize.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
 
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
-            yield lambda value: generic_validate.dispatch(cls)(cls, value)
+            yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
         cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
 
@@ -223,9 +223,9 @@ def converter(func: Callable[[T], Any], cls: type[T] | None = None) -> type[T] |
 
 
 @functools.singledispatch
-def generic_validate(cls: Any, value: Any) -> Any:
+def post_deserialize(cls: Any, value: Any) -> Any:
     """
-    Load a value into a type.
+    Load a value into a type after deserialization.
 
     This function is used to load values that are not supported by
     `anyconfig` to a format that can be used at runtime. It is used
@@ -248,7 +248,7 @@ def generic_validate(cls: Any, value: Any) -> Any:
     return cls(value)
 
 
-def generic_validator(
+def with_post_deserialize(
     func: Callable[[Any], T], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
@@ -267,14 +267,50 @@ def generic_validator(
     """
 
     if cls is None:
-        return functools.partial(generic_validator, func)
+        return functools.partial(with_post_deserialize, func)
 
-    generic_validate.register(cls, func)
+    post_deserialize.register(cls, func)
     return cls
 
 
-@convert.register(list)
-def convert_list(obj: list[Any]) -> list[Any]:
+@functools.singledispatch
+def export(obj: ConfigModelT) -> dict[str, Any]:
+    """
+    Export a ConfigModel to a safely-serializable format.
+    Register a custom exporter for a type using the `with_exporter` decorator,
+    which can help to exclude particular values from the export if needed.
+
+    Parameters
+    ----------
+    obj
+    """
+    return obj.dict()
+
+
+def with_exporter(
+    func: Callable[[ConfigModelT],
+    dict[str, Any]], cls: type[ConfigModelT] | None = None
+) -> type[ConfigModelT] | Any:
+    """
+    Register a custom exporter for a type.
+
+    Parameters
+    ----------
+    func
+        The exporter function.
+    cls
+        The type to register the exporter for.
+    """
+    if cls is None:
+        return functools.partial(with_exporter, func)
+
+    export.register(cls, func)
+    return cls
+
+
+
+@pre_serialize.register(list)
+def _ps_list(obj: list[Any]) -> list[Any]:
     """
     Convert a list to safely-serializable form.
 
@@ -287,11 +323,11 @@ def convert_list(obj: list[Any]) -> list[Any]:
     -------
     The converted list.
     """
-    return [convert(item) for item in obj]
+    return [pre_serialize(item) for item in obj]
 
 
-@convert.register(collections.abc.Mapping)
-def convert_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
+@pre_serialize.register(collections.abc.Mapping)
+def _ps_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
     """
     Convert a mapping to safely-serializable form.
 
@@ -304,11 +340,11 @@ def convert_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
     -------
     The converted mapping.
     """
-    return {k: convert(v) for k, v in obj.items()}
+    return {k: pre_serialize(v) for k, v in obj.items()}
 
 
 @functools.singledispatch
-def convert_namedtuple(obj: tuple[Any, ...]) -> Any:
+def _ps_namedtuple(obj: tuple[Any, ...]) -> Any:
     """
     Convert a namedtuple to safely-serializable form.
 
@@ -321,9 +357,9 @@ def convert_namedtuple(obj: tuple[Any, ...]) -> Any:
     -------
     The converted namedtuple (likely a list).
     """
-    # Initially I wanted it to be convert(obj._asdict()), but
-    # pydantic doesn't seem to be friends with custom NamedTuples.
-    return convert(list(obj))
+    # Initially I wanted it to be pre_serialize(obj._asdict()), but
+    # pydantic doesn't seem to be friends with custom NamedTuple-s.
+    return pre_serialize(list(obj))
 
 
 def _delegate_ac_options(
@@ -615,8 +651,9 @@ class ConfigLoader(Generic[ConfigModelT]):
             ac_parser = self.ac_parser
         if ac_parser == "json" and self.use_pydantic_json:
             # xxx: Filter JSON kwargs to ensure safety?
+            kwargs = self.dump_options | kwargs
             return config.json(**kwargs)
-        return self.dump_data(config.dict(), ac_parser=ac_parser, **kwargs)
+        return self.dump_data(export(config), ac_parser=ac_parser, **kwargs)
 
     def dump_data(
         self,
@@ -643,7 +680,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         if ac_parser is None:
             ac_parser = self.ac_parser
         kwargs = self.dump_options | kwargs
-        return anyconfig.dumps(convert(data), ac_parser=ac_parser, **kwargs)
+        return anyconfig.dumps(pre_serialize(data), ac_parser=ac_parser, **kwargs)
 
     @property
     def is_url(self) -> bool:
@@ -1503,7 +1540,7 @@ def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None
 
 def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
     initial_state_type = type(value)
-    converted_value = convert(value)
+    converted_value = pre_serialize(value)
     if isinstance(converted_value, initial_state_type):
         return model_encoder(value, **kwargs)
     return converted_value
@@ -1644,7 +1681,7 @@ class ConfigModel(
         self: ConfigModelT,
         memodict: dict[Any, Any] | None = None
     ) -> ConfigModelT:
-        return self.parse_obj(self.dict())
+        return self.parse_obj(export(self))
 
     def __getattribute__(self, attr: str) -> Any:
         value = super().__getattribute__(attr)

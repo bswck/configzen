@@ -615,7 +615,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import at, convert, CONTEXT
+        from configzen.config import at, pre_serialize, CONTEXT
 
         overrides = {}
 
@@ -638,7 +638,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             counterpart_value = state.pop(key, missing)
             if counterpart_value is missing:
                 continue
-            counterpart_value = convert(counterpart_value)
+            counterpart_value = pre_serialize(counterpart_value)
 
             if is_dict_like(value):
                 if SUBST_METADATA in value:
