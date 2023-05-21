@@ -676,7 +676,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             substitution_directive = cls.directive(Directives.EXTEND)
             resource = context.loader.resource
             if route:
-                resource = context.loader.route_separator.join((resource, route))
+                resource = cls.route_separator.join((str(resource), route))
             # Put the substitution directive at the beginning of the state in-place.
             state |= {substitution_directive: resource} | {
                 key: state.pop(key) for key in set(state)
