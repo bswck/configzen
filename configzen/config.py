@@ -989,7 +989,7 @@ class Route:
 
     @classmethod
     def _decompose(cls, route: str) -> list[str]:
-        route = route.removesuffix(cls.TOK_DOT) + cls.TOK_DOT[0]
+        route = route.removesuffix(cls.TOK_DOT) + cls.TOK_DOT
         argument = ""
         escape_ctx = False
         prev_char = None
@@ -1005,7 +1005,7 @@ class Route:
                 if prev_char and prev_char in cls.TOK_DOTLIST_ESCAPE_EXIT:
                     raise InternalConfigError(
                         "invalid escape sequence "
-                        f"(expected {cls.TOK_DOT[0]} between escape sequences)",
+                        f"(expected {cls.TOK_DOT} between escape sequences)",
                         extra=char_no,
                     )
                 if escape_ctx:
@@ -1036,6 +1036,18 @@ class Route:
             fragment.join(escape) if self.TOK_DOT in fragment else fragment.join(raw)
             for fragment in self.list_route
         )
+
+    def enter(self, *args: str) -> Route:
+        return type(self)(self.list_route + list(args))
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Route):
+            return self.list_route == other.list_route
+        if isinstance(other, str):
+            return self.list_route == self.decompose(other)
+        if isinstance(other, list):
+            return self.list_route == other
+        return NotImplemented
 
     def __str__(self) -> str:
         return self.compose()
@@ -1360,6 +1372,11 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
     def trace_route(self) -> collections.abc.Generator[str, None, None]:
         """Trace the route to where the configuration subcontext points to."""
 
+    @property
+    def route(self) -> Route:
+        """The route to where the configuration subcontext points to."""
+        return Route(list(self.trace_route()))
+
     @staticmethod
     def get(config: ConfigModelT) -> AnyContext[ConfigModelT]:
         """
@@ -1516,7 +1533,7 @@ class Subcontext(AnyContext[ConfigModelT], Generic[ConfigModelT]):
         if self.owner is None:
             msg = "Cannot get section pointed to by an unbound context"
             raise ValueError(msg)
-        return ConfigAt(self.owner, None, list(self.trace_route()))
+        return ConfigAt(self.owner, None, self.route)
 
     @property
     def owner(self) -> ConfigModelT | None:
@@ -1626,11 +1643,13 @@ class ConfigModel(
             value = kwargs.pop(private_attr, missing)
             if value is not missing:
                 setattr(self, private_attr, value)
+                if private_attr == CONTEXT:
+                    value.bind_to(self)
         super().__init__(**kwargs)
 
     @no_type_check
     def _iter(self, **kwargs: Any) -> Generator[tuple[str, Any], None, None]:
-        if kwargs.get("to_dict", False):
+        if kwargs.get("to_dict", False) and kwargs.get("preprocessing", True):
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
@@ -1692,6 +1711,25 @@ class ConfigModel(
         """
         return ConfigAt(self, None, route)
 
+    def update(self, **kwargs: Any) -> None:
+        """
+        Update the configuration with new values, in-place.
+
+        Parameters
+        ----------
+        kwargs
+            The new values to update the configuration with.
+
+        Returns
+        -------
+        None
+        """
+        # Crucial difference to self.__dict__.update():
+        # self.__dict__.update() would not trigger the validation
+        # of the new values.
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
     def rollback(self) -> None:
         """
         Rollback the configuration to its initial state.
@@ -1707,11 +1745,18 @@ class ConfigModel(
         self, name: str, value: ConfigModelT
     ) -> ConfigModelT:
         context = get_context_or_none(self)
+        value_context = get_context_or_none(value)
         if (
             context
             # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
             and ConfigModel in type(value).mro()
-            and not hasattr(value, CONTEXT)
+            # We do not check if value was already defined here
+            # because it may mess up models that rely on an extension relation.
+            # Removed: ``and not hasattr(value, CONTEXT)``
+            # Instead, we check if the optional current context points to here.
+            and (
+                value_context and context.route.enter(name) != value_context.route
+            )
         ):
             context.enter(name).bind_to(value)
         return value
