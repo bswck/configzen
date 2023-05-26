@@ -88,6 +88,7 @@ from configzen.typedefs import (
     AsyncConfigIO,
     ConfigIO,
     ConfigModelT,
+    NormalizedResourceT,
     RawResourceT,
     SupportsRoute,
     T,
@@ -431,7 +432,7 @@ class ConfigLoader(Generic[ConfigModelT]):
     ValueError
     """
 
-    _resource: RawResourceT
+    _resource: NormalizedResourceT
     processor_class: type[Processor[ConfigModelT]]
     ac_parser: str | None
     create_if_missing: bool
@@ -510,6 +511,16 @@ class ConfigLoader(Generic[ConfigModelT]):
 
         self.processor_class = processor_class
         self.ac_parser = ac_parser
+
+        if (
+            isinstance(resource, (str, os.PathLike))
+            and not (
+                isinstance(resource, str)
+                and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
+            )
+        ):
+            resource = pathlib.Path(resource)
+
         self.resource = resource
         self.create_if_missing = create_if_missing
         self.use_pydantic_json = kwargs.pop("use_pydantic_json", True)
@@ -526,7 +537,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         _delegate_ac_options(self.load_options, self.dump_options, kwargs)
 
     @property
-    def resource(self) -> RawResourceT:
+    def resource(self) -> NormalizedResourceT:
         """
         The resource of the configuration.
 
@@ -539,7 +550,7 @@ class ConfigLoader(Generic[ConfigModelT]):
         return self._resource
 
     @resource.setter
-    def resource(self, value: RawResourceT) -> None:
+    def resource(self, value: NormalizedResourceT) -> None:
         """
         The resource of the configuration.
 
@@ -558,8 +569,8 @@ class ConfigLoader(Generic[ConfigModelT]):
 
     def _guess_ac_parser(self) -> str | None:
         ac_parser = None
-        if isinstance(self.resource, str):
-            ac_parser = pathlib.Path(self.resource).suffix[1:].casefold()
+        if isinstance(self.resource, pathlib.Path):
+            ac_parser = self.resource.suffix[1:].casefold()
             if not ac_parser:
                 msg = f"Could not guess the engine to use for {self.resource!r}."
                 raise UnspecifiedParserError(msg)
@@ -698,10 +709,7 @@ class ConfigLoader(Generic[ConfigModelT]):
     @property
     def is_url(self) -> bool:
         """Whether the resource is a URL."""
-        return (
-            isinstance(self.resource, str)
-            and urllib.parse.urlparse(self.resource).scheme in _URL_SCHEMES
-        )
+        return isinstance(self.resource, str)
 
     def open_resource(self, **kwds: Any) -> ConfigIO:
         """
@@ -731,7 +739,7 @@ class ConfigLoader(Generic[ConfigModelT]):
             kwds = filter_options(self.URLOPEN_KWARGS, kwds)
             request = urllib.request.Request(url.geturl())
             return cast(ConfigIO, urllib.request.urlopen(request, **kwds))  # noqa: S310
-        if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
+        if isinstance(self.resource, (int, pathlib.Path)):
             kwds = filter_options(self.OPEN_KWARGS, kwds)
             if isinstance(self.resource, int):
                 return cast(
@@ -743,7 +751,7 @@ class ConfigLoader(Generic[ConfigModelT]):
                     open(self.resource, **kwds),  # noqa: PTH123, SIM115
                 )
             return cast(ConfigIO, pathlib.Path(self.resource).open(**kwds))
-        return self.resource
+        return cast(ConfigIO, self.resource)
 
     def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
         """
@@ -785,7 +793,7 @@ class ConfigLoader(Generic[ConfigModelT]):
                 "asynchronously (install with `pip install aiofiles`)"
             )
             raise RuntimeError(msg)
-        if isinstance(self.resource, (str, int, os.PathLike, pathlib.Path)):
+        if isinstance(self.resource, (int, pathlib.Path)):
             kwds = filter_options(self.OPEN_KWARGS, kwds)
             return aiofiles.open(self.resource, **kwds)
         raise RuntimeError("cannot open resource asynchronously")
@@ -1673,7 +1681,7 @@ class ConfigModel(
         if resource is None:
             raise ValueError("No resource specified")
         loader: ConfigLoader[ConfigModelT]
-        if isinstance(resource, (str, bytes)):
+        if isinstance(resource, str):
             loader = ConfigLoader(resource)
         elif isinstance(resource, ConfigLoader):
             loader = resource
@@ -1754,9 +1762,7 @@ class ConfigModel(
             # because it may mess up models that rely on an extension relation.
             # Removed: ``and not hasattr(value, CONTEXT)``
             # Instead, we check if the optional current context points to here.
-            and (
-                value_context and context.route.enter(name) != value_context.route
-            )
+            and (value_context and context.route.enter(name) != value_context.route)
         ):
             context.enter(name).bind_to(value)
         return value

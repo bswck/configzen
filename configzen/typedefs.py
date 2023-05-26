@@ -23,3 +23,4 @@ SupportsRoute: TypeAlias = Union[str, list[str], "Route"]
 ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
 AsyncConfigIO: TypeAlias = "AiofilesContextManager[None, None, AsyncTextIOWrapper]"
 RawResourceT: TypeAlias = Union[ConfigIO, str, int, os.PathLike, pathlib.Path]
+NormalizedResourceT: TypeAlias = Union[ConfigIO, str, int, pathlib.Path]

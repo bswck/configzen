@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import dataclasses
 import enum
+import pathlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
 from anyconfig.utils import is_dict_like, is_list_like
 
 from configzen.errors import (
+    ConfigPreprocessingError,
     InternalConfigError,
     format_syntax_error,
-    ConfigPreprocessingError,
 )
 from configzen.typedefs import ConfigModelT
 
@@ -106,7 +107,7 @@ class DirectiveContext:
 class Tokens(str, enum.Enum):
     LPAREN: str = "("
     RPAREN: str = ")"
-    COMMA: str = ",;"
+    COMMAS: str = ",;"
     STRING: str = "\"'"
     ESCAPE: str = "\\"
 
@@ -131,7 +132,7 @@ def _parse_argument_string_impl(
 
     tok_escape = tokens.ESCAPE
     tok_string = tokens.STRING
-    tok_comma = tokens.COMMA
+    tok_commas = tokens.COMMAS
 
     for char_no, char in enumerate(raw_argument_string, start=1):
         if escape_ctx:
@@ -153,7 +154,7 @@ def _parse_argument_string_impl(
             else:
                 # we are in a string
                 argument += char
-        elif char in tok_comma:
+        elif char in tok_commas:
             if string_ctx:
                 if not explicit_strings_ctx:
                     string_ctx = None
@@ -161,14 +162,14 @@ def _parse_argument_string_impl(
                     emit(argument)
                     argument = ""
             else:
-                if prev_char in {*tok_comma, None}:
+                if prev_char in {*tok_commas, None}:
                     msg = "Empty argument"
                     raise InternalConfigError(msg, extra=char_no)
                 emit(argument)
                 argument = ""
                 explicit_strings_ctx = False
         elif not string_ctx and not char.isspace():
-            if prev_char in {*tok_comma, None}:
+            if prev_char in {*tok_commas, None}:
                 string_ctx = char
                 argument += char
                 explicit_strings_ctx = False
@@ -187,11 +188,14 @@ def _parse_argument_string(
 ) -> list[str]:
     """Half for jokes, half for serious use"""
 
-    tok_comma = tokens.COMMA
+    tok_commas = tokens.COMMAS
 
-    if any(raw_argument_string.endswith(tok) for tok in tok_comma):
+    if any(raw_argument_string.endswith(tok) for tok in tok_commas):
         raw_argument_string = raw_argument_string[:-1]
-    raw_argument_string += tok_comma[0]
+    raw_argument_string += tok_commas[0]
+
+    if raw_argument_string in tok_commas:
+        return []
 
     with format_syntax_error(raw_argument_string):
         return _parse_argument_string_impl(raw_argument_string, tokens)
@@ -585,6 +589,14 @@ class Processor(BaseProcessor[ConfigModelT]):
                 f"{loader.resource} tried to {ctx.directive!r} on itself"
             )
 
+        if (
+            isinstance(loader.resource, pathlib.Path)
+            and not loader.resource.is_absolute()
+        ):
+            orig_resource = self.loader.resource
+            if isinstance(orig_resource, pathlib.Path) and orig_resource.is_absolute():
+                loader.resource = loader.resource.relative_to(orig_resource.parent)
+
         with loader.processor_open_resource() as reader:
             substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
 
@@ -606,7 +618,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     route=str(substitution_route),
                     context=context,
                     preprocess=preprocess,
-                    key_order=list(ctx.container)
+                    key_order=list(ctx.container),
                 ),
             }
 
@@ -624,7 +636,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import at, pre_serialize, CONTEXT
+        from configzen.config import CONTEXT, at, pre_serialize
 
         overrides = {}
 
@@ -658,8 +670,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
                     if (
-                        (orig := value.get(sub_key, missing)) is missing
-                        or orig != comp
+                        (orig := value.get(sub_key, missing)) is missing or orig != comp
                     )
                 }
                 if overrides_for_key:
@@ -680,16 +691,14 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         state |= overrides
         extras: dict[str, Any] = {
-            key: state.pop(key)
-            for key in set(state)
-            if key not in key_order
+            key: state.pop(key) for key in set(state) if key not in key_order
         }
 
         if substituted_values:
             substitution_directive = cls.directive(Directives.EXTEND)
-            resource = context.loader.resource
+            resource = str(context.loader.resource)
             if route:
-                resource = cls.route_separator.join((str(resource), route))
+                resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.
             state |= {substitution_directive: resource} | {
                 key: state.pop(key) for key in set(state)
