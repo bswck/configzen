@@ -436,6 +436,7 @@ class ConfigLoader(Generic[ConfigModelT]):
     processor_class: type[Processor[ConfigModelT]]
     ac_parser: str | None
     create_if_missing: bool
+    relative: bool = False
     allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
     global_load_options: dict[str, Any] = {}
@@ -519,6 +520,8 @@ class ConfigLoader(Generic[ConfigModelT]):
                 and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
             )
         ):
+            if resource.startwsith("."):
+                self.relative = True
             resource = pathlib.Path(resource)
 
         self.resource = resource

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import enum
 from collections.abc import Callable
@@ -588,7 +589,12 @@ class Processor(BaseProcessor[ConfigModelT]):
                 f"{loader.resource} tried to {ctx.directive!r} on itself"
             )
 
-        with loader.processor_open_resource() as reader:
+        actual_loader = loader
+        if loader.relative:
+            actual_loader = copy.copy(loader)
+            actual_loader.resource = self.loader.resource.parent / loader.resource
+
+        with actual_loader.processor_open_resource() as reader:
             substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
 
         if substitution_route:
