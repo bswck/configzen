@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import enum
-import pathlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
@@ -588,14 +587,6 @@ class Processor(BaseProcessor[ConfigModelT]):
             raise ConfigPreprocessingError(
                 f"{loader.resource} tried to {ctx.directive!r} on itself"
             )
-
-        if (
-            isinstance(loader.resource, pathlib.Path)
-            and not loader.resource.is_absolute()
-        ):
-            orig_resource = self.loader.resource
-            if isinstance(orig_resource, pathlib.Path) and orig_resource.is_absolute():
-                loader.resource = loader.resource.relative_to(orig_resource.parent)
 
         with loader.processor_open_resource() as reader:
             substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
