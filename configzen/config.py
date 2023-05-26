@@ -520,9 +520,10 @@ class ConfigLoader(Generic[ConfigModelT]):
                 and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
             )
         ):
-            if resource.startwsith("."):
+            raw_path = os.fspath(resource)
+            if raw_path.startswith("."):
                 self.relative = True
-            resource = pathlib.Path(resource)
+            resource = pathlib.Path(raw_path)
 
         self.resource = resource
         self.create_if_missing = create_if_missing
