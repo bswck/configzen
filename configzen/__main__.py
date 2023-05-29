@@ -23,11 +23,11 @@ if __name__ == "__main__":
         store = asyncio.run(Store.load_async(opt.source))
         print(store)
         context = get_context(store)
-        context.loader.resource = opt.dest
+        context.manager.resource = opt.dest
         asyncio.run(store.save_async())
     else:
         store = Store.load(opt.source)
         print(store)
         context = get_context(store)
-        context.loader.resource = opt.dest
+        context.manager.resource = opt.dest
         store.save()

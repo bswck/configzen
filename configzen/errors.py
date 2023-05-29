@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import anyconfig
 
 if TYPE_CHECKING:
-    from configzen.config import ConfigLoader
+    from configzen.config import ConfigManager
     from configzen.typedefs import ConfigModelT
 
 
@@ -34,7 +34,7 @@ class ArgumentSyntaxError(ConfigError):
 
 
 @contextlib.contextmanager
-def format_syntax_error(source: str) -> Generator[None, None, None]:
+def pretty_syntax_error(source: str) -> Generator[None, None, None]:
     """Raise a SyntaxError with a message and a source."""
     try:
         yield
@@ -71,7 +71,7 @@ class ResourceLookupError(ConfigError, LookupError):
     """An error occurred while looking up a resource."""
 
     def __init__(
-        self, resource: ConfigLoader[ConfigModelT] | None, route: list[str]
+        self, resource: ConfigManager[ConfigModelT] | None, route: list[str]
     ) -> None:
         resource_name = resource.resource if resource else "the provided resource"
         super().__init__(f"{route} not found in {resource_name}")

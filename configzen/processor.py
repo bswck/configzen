@@ -11,12 +11,12 @@ from anyconfig.utils import is_dict_like, is_list_like
 from configzen.errors import (
     ConfigPreprocessingError,
     InternalConfigError,
-    format_syntax_error,
+    pretty_syntax_error,
 )
 from configzen.typedefs import ConfigModelT
 
 if TYPE_CHECKING:
-    from configzen.config import AnyContext, ConfigLoader
+    from configzen.config import BaseContext, ConfigManager
 
 __all__ = (
     "DirectiveContext",
@@ -197,7 +197,7 @@ def _parse_argument_string(
     if raw_argument_string in tok_commas:
         return []
 
-    with format_syntax_error(raw_argument_string):
+    with pretty_syntax_error(raw_argument_string):
         return _parse_argument_string_impl(raw_argument_string, tokens)
 
 
@@ -233,7 +233,7 @@ if TYPE_CHECKING:
 
     class ExportMetadata(TypedDict, Generic[ConfigModelT]):
         route: str | None
-        context: AnyContext[ConfigModelT]
+        context: BaseContext[ConfigModelT]
         key_order: list[str]
         preprocess: bool
 
@@ -252,7 +252,7 @@ else:
         """
 
         route: str | None
-        context: AnyContext[ConfigModelT]
+        context: BaseContext[ConfigModelT]
         key_order: list[str]
         preprocess: bool
 
@@ -275,10 +275,10 @@ class BaseProcessor(Generic[ConfigModelT]):
 
     def __init__(
         self,
-        resource: ConfigLoader[ConfigModelT],
+        resource: ConfigManager[ConfigModelT],
         dict_config: dict[str, Any],
     ) -> None:
-        self.loader = resource
+        self.manager = resource
         self.dict_config = dict_config
 
     @classmethod
@@ -567,7 +567,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     ) -> None:
         from configzen.config import CONTEXT, Context, at
 
-        loader_class = type(self.loader)
+        manager_class = type(self.manager)
 
         if len(ctx.arguments):
             msg = f"{ctx.directive!r} directive takes no () arguments"
@@ -580,32 +580,32 @@ class Processor(BaseProcessor[ConfigModelT]):
             )
             raise ConfigPreprocessingError(msg)
 
-        loader, substitution_route = loader_class.from_directive_context(
+        manager, substitution_route = manager_class.from_directive_context(
             ctx, route_separator=self.route_separator
         )
 
-        if loader.resource == self.loader.resource:
+        if manager.resource == self.manager.resource:
             raise ConfigPreprocessingError(
-                f"{loader.resource} tried to {ctx.directive!r} on itself"
+                f"{manager.resource} tried to {ctx.directive!r} on itself"
             )
 
-        actual_loader = loader
-        if loader.relative:
-            actual_loader = copy.copy(loader)
-            actual_loader.resource = self.loader.resource.parent / loader.resource
+        actual_manager = manager
+        if manager.relative:
+            actual_manager = copy.copy(manager)
+            actual_manager.resource = self.manager.resource.parent / manager.resource
 
-        with actual_loader.processor_open_resource() as reader:
-            substituted = loader.load_into_dict(reader.read(), preprocess=preprocess)
+        with actual_manager.processor_open_resource() as reader:
+            substituted = manager.load_into_dict(reader.read(), preprocess=preprocess)
 
         if substitution_route:
-            substituted = at(substituted, substitution_route, loader=loader)
+            substituted = at(substituted, substitution_route, manager=manager)
             if not is_dict_like(substituted):
                 raise ConfigPreprocessingError(
                     f"imported item {substitution_route!r} "
-                    f"from {loader.resource} is not a dictionary"
+                    f"from {manager.resource} is not a dictionary"
                 )
 
-        context: Context[ConfigModelT] = Context(loader)
+        context: Context[ConfigModelT] = Context(manager)
         ctx.container = substituted | ctx.container
 
         if preserve:
@@ -640,14 +640,14 @@ class Processor(BaseProcessor[ConfigModelT]):
         route = metadata["route"]
         context = metadata["context"]
         key_order = metadata["key_order"]
-        loader = context.loader
+        manager = context.manager
 
-        with loader.processor_open_resource() as reader:
+        with manager.processor_open_resource() as reader:
             # Here we intentionally always preprocess the loaded configuration.
-            loaded = loader.load_into_dict(reader.read())
+            loaded = manager.load_into_dict(reader.read())
 
             if route:
-                loaded = at(loaded, route, loader=loader)
+                loaded = at(loaded, route, manager=manager)
 
         substituted_values = loaded.copy()
 
@@ -671,7 +671,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     )
                 }
                 if overrides_for_key:
-                    export_key = loader.processor_class.extension_prefix + key
+                    export_key = manager.processor_class.extension_prefix + key
                     overrides[export_key] = overrides_for_key
 
             elif is_list_like(value):
@@ -693,7 +693,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         if substituted_values:
             substitution_directive = cls.directive(Directives.EXTEND)
-            resource = str(context.loader.resource)
+            resource = str(context.manager.resource)
             if route:
                 resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.

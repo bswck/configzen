@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import abc
 import collections.abc
+import contextvars
 import copy
 import dataclasses
 import functools
@@ -68,7 +69,7 @@ import pathlib
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
-from typing import Any, ClassVar, Generic, Literal, cast, no_type_check
+from typing import Any, ClassVar, Generic, Literal, cast, no_type_check, overload
 
 import anyconfig
 import pydantic
@@ -81,7 +82,7 @@ from configzen.errors import (
     InternalConfigError,
     ResourceLookupError,
     UnspecifiedParserError,
-    format_syntax_error,
+    pretty_syntax_error,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.typedefs import (
@@ -94,6 +95,7 @@ from configzen.typedefs import (
     T,
 )
 
+
 try:
     import aiofiles
 
@@ -103,7 +105,7 @@ except ImportError:
     AIOFILES_AVAILABLE = False
 
 __all__ = (
-    "ConfigLoader",
+    "ConfigManager",
     "ConfigModel",
     "ConfigMeta",
     "save",
@@ -119,9 +121,16 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params,
+    urllib.parse.uses_relative
+    + urllib.parse.uses_netloc
+    + urllib.parse.uses_params
 ) - {""}
 CONTEXT: str = "__configzen_context__"
+LOCAL: str = "__local__"
+
+current_context: contextvars.ContextVar[BaseContext | None] = contextvars.ContextVar(
+    "current_context", default=None
+)
 
 
 def _get_defaults_from_model_class(
@@ -216,7 +225,6 @@ def with_pre_serialize(
     pre_serialize.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
-
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
@@ -365,7 +373,9 @@ def _ps_namedtuple(obj: tuple[Any, ...]) -> Any:
 
 
 def _delegate_ac_options(
-    load_options: dict[str, Any], dump_options: dict[str, Any], options: dict[str, Any]
+    load_options: dict[str, Any],
+    dump_options: dict[str, Any],
+    options: dict[str, Any]
 ) -> None:
     for key, value in options.items():
         if key.startswith("dump_"):
@@ -387,9 +397,9 @@ def _delegate_ac_options(
             target[actual_key] = value
 
 
-class ConfigLoader(Generic[ConfigModelT]):
+class ConfigManager(Generic[ConfigModelT]):
     """
-    A configuration resource loader.
+    A configuration resource loader and saver.
 
     This class is used to represent a configuration resource, which
     can be a file, a URL, or a file-like object. It is used internally
@@ -439,8 +449,8 @@ class ConfigLoader(Generic[ConfigModelT]):
     relative: bool = False
     allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
-    global_load_options: dict[str, Any] = {}
-    global_dump_options: dict[str, Any] = {
+    default_load_options: dict[str, Any] = {}
+    default_dump_options: dict[str, Any] = {
         # These are usually desirable for configuration files.
         # If you want to change them, you can do so by monkey-patching
         # these variables. You can also change `load_options` and
@@ -517,7 +527,7 @@ class ConfigLoader(Generic[ConfigModelT]):
             isinstance(resource, (str, os.PathLike))
             and not (
                 isinstance(resource, str)
-                and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
+                and urllib.parse.urlparse( str(resource)).scheme in _URL_SCHEMES
             )
         ):
             raw_path = os.fspath(resource)
@@ -535,8 +545,8 @@ class ConfigLoader(Generic[ConfigModelT]):
             "allowed_url_schemes", self.default_allowed_url_schemes.copy()
         )
 
-        self.load_options = self.global_load_options.copy()
-        self.dump_options = self.global_dump_options.copy()
+        self.load_options = self.default_load_options.copy()
+        self.dump_options = self.default_dump_options.copy()
 
         _delegate_ac_options(self.load_options, self.dump_options, kwargs)
 
@@ -579,6 +589,7 @@ class ConfigLoader(Generic[ConfigModelT]):
                 msg = f"Could not guess the engine to use for {self.resource!r}."
                 raise UnspecifiedParserError(msg)
         return ac_parser
+
 
     def load_into(
         self,
@@ -942,9 +953,9 @@ class ConfigLoader(Generic[ConfigModelT]):
         /,
         route_separator: str = ":",
         route_class: type[Route] | None = None,
-    ) -> tuple[ConfigLoader[ConfigModelT], SupportsRoute | None]:
+    ) -> tuple[ConfigManager[ConfigModelT], SupportsRoute | None]:
         """
-        Create a configuration loader from a preprocessor directive context.
+        Create a configuration manager from a preprocessor directive context.
         Return an optional scope that the context points to.
 
         Parameters
@@ -955,7 +966,7 @@ class ConfigLoader(Generic[ConfigModelT]):
 
         Returns
         -------
-        The configuration loader.
+        The configuration manager.
         """
         if route_class is None:
             route_class = Route
@@ -979,6 +990,10 @@ class ConfigLoader(Generic[ConfigModelT]):
             raise ValueError(msg)
         return cls(*args, **kwargs), str(route)
 
+    def __repr__(self) -> str:
+        resource = self.resource
+        return f"{type(self).__name__}({resource=!r})"
+
 
 class Route:
     TOK_DOT = "."
@@ -995,7 +1010,7 @@ class Route:
         if isinstance(route, list):
             return route
         if isinstance(route, str):
-            with format_syntax_error(route):
+            with pretty_syntax_error(route):
                 return cls._decompose(route)
         raise TypeError(f"invalid route type {type(route)!r}")
 
@@ -1038,7 +1053,7 @@ class Route:
 
     @classmethod
     def decompose(cls, route: str) -> list[str]:
-        with format_syntax_error(route):
+        with pretty_syntax_error(route):
             return cls._decompose(route)
 
     def compose(self) -> str:
@@ -1072,7 +1087,7 @@ def at(
     mapping: Any,
     route: SupportsRoute,
     converter_func: Callable[[Any], dict[str, Any]] = _vars,
-    loader: ConfigLoader[ConfigModelT] | None = None,
+    manager: ConfigManager[ConfigModelT] | None = None,
 ) -> Any:
     """
     Get an item at a route.
@@ -1084,7 +1099,7 @@ def at(
     route
         The route to the item.
     converter_func
-    loader
+    manager
 
     Returns
     -------
@@ -1098,7 +1113,7 @@ def at(
             route_here.append(part)
             scope = converter_func(scope)[part]
     except KeyError:
-        raise ResourceLookupError(loader, route_here) from None
+        raise ResourceLookupError(manager, route_here) from None
     return scope
 
 
@@ -1257,7 +1272,7 @@ def save(
     scope = ConfigAt(config, data, section.route)
     data = scope.update(section.get())
     context = get_context(config)
-    blob = context.loader.dump_config(config.copy(update=data), **kwargs)
+    blob = context.manager.dump_config(config.copy(update=data), **kwargs)
     result = config.write(blob, **write_kwargs)
     context.initial_state = data
     return result
@@ -1296,13 +1311,16 @@ async def save_async(
     scope = ConfigAt(config, data, section.route)
     data = scope.update(section.get())
     context = get_context(config)
-    blob = context.loader.dump_config(config.copy(update=data), **kwargs)
+    blob = context.manager.dump_config(config.copy(update=data), **kwargs)
     result = await config.write_async(blob, **write_kwargs)
     context.initial_state = data
     return result
 
 
-def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any:
+def reload(
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    **kwargs: Any
+) -> Any:
     """
     Reload the configuration.
 
@@ -1324,14 +1342,15 @@ def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any
     config = section.owner
     context = get_context(config)
     state = config.__dict__
-    newest = context.loader.read(config_class=type(config), **kwargs)
+    newest = context.manager.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     ConfigAt(config, state, section.route).update(section_data)
     return section_data
 
 
 async def reload_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    **kwargs: Any
 ) -> Any:
     """
     Reload the configuration asynchronously.
@@ -1354,13 +1373,13 @@ async def reload_async(
     config = section.owner
     context = get_context(config)
     state = config.__dict__
-    newest = await context.loader.read_async(config_class=type(config), **kwargs)
+    newest = await context.manager.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     ConfigAt(config, state, section.route).update(section_data)
     return section_data
 
 
-class AnyContext(abc.ABC, Generic[ConfigModelT]):
+class BaseContext(abc.ABC, Generic[ConfigModelT]):
     """
     The base class for configuration context.
     Contexts are used to
@@ -1387,40 +1406,15 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
         """The route to where the configuration subcontext points to."""
         return Route(list(self.trace_route()))
 
-    @staticmethod
-    def get(config: ConfigModelT) -> AnyContext[ConfigModelT]:
-        """
-        Get the context of the configuration model.
+    @overload
+    def enter(self: T, part: None) -> T:
+        ...
 
-        Parameters
-        ----------
-        config
-            The configuration model instance.
-
-        Returns
-        -------
-        The context of the configuration model.
-        """
-        return cast(AnyContext[ConfigModelT], object.__getattribute__(config, CONTEXT))
-
-    def bind_to(self, config: ConfigModelT) -> None:
-        """
-        Bind the context to the configuration model.
-
-        Parameters
-        ----------
-        config
-            The configuration model instance.
-
-        Returns
-        -------
-        None
-        """
-        if config is None:
-            return
-        object.__setattr__(config, CONTEXT, self)
-
+    @overload
     def enter(self, part: str) -> Subcontext[ConfigModelT]:
+        ...
+
+    def enter(self, part):
         """
         Enter a subcontext.
 
@@ -1433,12 +1427,14 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
         -------
         The new subcontext.
         """
+        if part is None:
+            return self
         return Subcontext(self, part)
 
     @property
     @abc.abstractmethod
-    def loader(self) -> ConfigLoader[ConfigModelT]:
-        """The configuration resource loader."""
+    def manager(self) -> ConfigManager[ConfigModelT]:
+        """The configuration resource manager."""
 
     @property
     @abc.abstractmethod
@@ -1457,13 +1453,16 @@ class AnyContext(abc.ABC, Generic[ConfigModelT]):
         """
 
 
-class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
+class Context(
+    BaseContext[ConfigModelT],
+    Generic[ConfigModelT]
+):
     """
     The context of a configuration model.
 
     Parameters
     ----------
-    loader
+    manager
         The configuration resource.
     owner
         The top-level configuration model instance,
@@ -1474,10 +1473,10 @@ class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
 
     def __init__(
         self,
-        loader: ConfigLoader[ConfigModelT],
+        manager: ConfigManager[ConfigModelT],
         owner: ConfigModelT | None = None,
     ) -> None:
-        self._loader = loader
+        self._manager = manager
         self._owner = None
         self._initial_state = {}
 
@@ -1487,8 +1486,8 @@ class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
         yield from ()
 
     @property
-    def loader(self) -> ConfigLoader[ConfigModelT]:
-        return self._loader
+    def manager(self) -> ConfigManager[ConfigModelT]:
+        return self._manager
 
     @property
     def at(self) -> ConfigModelT | None:
@@ -1502,7 +1501,6 @@ class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
     def owner(self, config: ConfigModelT | None) -> None:
         if config is None:
             return
-        self.bind_to(config)
         self._owner = config
 
     @property
@@ -1513,8 +1511,19 @@ class Context(AnyContext[ConfigModelT], Generic[ConfigModelT]):
     def initial_state(self, initial_state: dict[str, Any]) -> None:
         self._initial_state = copy.deepcopy(initial_state)
 
+    def __repr__(self) -> str:
+        manager = self.manager
+        return (
+            f"<{type(self).__name__} "
+            f"of {type(self.owner).__name__!r} configuration "
+            f"({manager=})>"
+        )
 
-class Subcontext(AnyContext[ConfigModelT], Generic[ConfigModelT]):
+
+class Subcontext(
+    BaseContext[ConfigModelT],
+    Generic[ConfigModelT]
+):
     """
     The subcontext of a configuration model.
 
@@ -1526,13 +1535,13 @@ class Subcontext(AnyContext[ConfigModelT], Generic[ConfigModelT]):
         The name of the item nested in the item the parent context points to.
     """
 
-    def __init__(self, parent: AnyContext[ConfigModelT], part: str) -> None:
+    def __init__(self, parent: BaseContext[ConfigModelT], part: str) -> None:
         self._parent = parent
         self._part = part
 
     @property
-    def loader(self) -> ConfigLoader[ConfigModelT]:
-        return self._parent.loader
+    def manager(self) -> ConfigManager[ConfigModelT]:
+        return self._parent.manager
 
     def trace_route(self) -> collections.abc.Generator[str, None, None]:
         yield from self._parent.trace_route()
@@ -1559,8 +1568,17 @@ class Subcontext(AnyContext[ConfigModelT], Generic[ConfigModelT]):
         data[self._part] = copy.deepcopy(value)
         self._parent.initial_state = data
 
+    def __repr__(self) -> str:
+        manager = self.manager
+        route = self.route
+        return (
+            f"<{type(self).__name__} "
+            f"of {type(self.owner).__name__ + '.' + str(route)!r} configuration "
+            f"({manager=})>"
+        )
 
-def get_context(config: ConfigModelT) -> AnyContext[ConfigModelT]:
+
+def get_context(config: ConfigModelT) -> BaseContext[ConfigModelT]:
     """
     Get the context of the configuration model.
 
@@ -1573,18 +1591,13 @@ def get_context(config: ConfigModelT) -> AnyContext[ConfigModelT]:
     -------
     The context of the configuration model.
     """
-    try:
-        context = AnyContext.get(config)
-    except AttributeError:
-        msg = (
-            "Cannot get context for configuration. "
-            "It was likely not loaded from a resource, but instantiated directly"
-        )
-        raise RuntimeError(msg) from None
+    context = get_context_or_none(config)
+    if context is None:
+        raise RuntimeError("Cannot get context of unbound configuration model")
     return context
 
 
-def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None:
+def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | None:
     """
     Get the context of the configuration model safely.
 
@@ -1597,11 +1610,7 @@ def get_context_or_none(config: ConfigModelT) -> AnyContext[ConfigModelT] | None
     -------
     The context of the configuration model.
     """
-    try:
-        context = get_context(config)
-    except RuntimeError:
-        context = None
-    return context
+    return getattr(config, LOCAL).get(current_context)
 
 
 def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
@@ -1622,8 +1631,11 @@ class ConfigModelMetaclass(ModelMetaclass):
     ) -> type:
         namespace[EXPORT] = pydantic.PrivateAttr()
         namespace[CONTEXT] = pydantic.PrivateAttr()
+        namespace[LOCAL] = pydantic.PrivateAttr()
+
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
+
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         new_class.__json_encoder__ = functools.partial(
             _json_encoder,
@@ -1645,53 +1657,57 @@ class ConfigModel(
     """
 
     def __init__(self, **kwargs: Any) -> None:
-        # Allow to set private attributes
-        # (e.g. for the context) via the constructor
-        # for convenience
+        # Set private attributes via the constructor
+        # to allow preprocessor-related instances to exist.
         missing = object()
         for private_attr in self.__private_attributes__:
             value = kwargs.pop(private_attr, missing)
             if value is not missing:
                 setattr(self, private_attr, value)
                 if private_attr == CONTEXT:
-                    value.bind_to(self)
+                    current_context.set(value)
         super().__init__(**kwargs)
+
+    def _init_private_attributes(self) -> None:
+        super()._init_private_attributes()
+        local = contextvars.copy_context()
+        setattr(self, LOCAL, local)
 
     @no_type_check
     def _iter(self, **kwargs: Any) -> Generator[tuple[str, Any], None, None]:
-        if kwargs.get("to_dict", False) and kwargs.get("preprocessing", True):
+        if kwargs.get("to_dict", False):  # and kwargs.get("preprocessing", True):
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
-                context.loader.processor_class.export(state, metadata=metadata)
+                context.manager.processor_class.export(state, metadata=metadata)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
 
     @classmethod
-    def _resolve_loader(
+    def _resolve_manager(
         cls,
-        resource: ConfigLoader[ConfigModelT] | RawResourceT | None = None,
+        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
-    ) -> ConfigLoader[ConfigModelT]:
+    ) -> ConfigManager[ConfigModelT]:
         if resource is None:
             resource = getattr(cls.__config__, "resource", None)
         if resource is None:
             raise ValueError("No resource specified")
-        loader: ConfigLoader[ConfigModelT]
+        manager: ConfigManager[ConfigModelT]
         if isinstance(resource, str):
-            loader = ConfigLoader(resource)
-        elif isinstance(resource, ConfigLoader):
-            loader = resource
+            manager = ConfigManager(resource)
+        elif isinstance(resource, ConfigManager):
+            manager = resource
         else:
             raise TypeError(f"Invalid resource type: {type(resource).__name__}")
         if create_if_missing is not None:
-            loader.create_if_missing = create_if_missing
-        return loader
+            manager.create_if_missing = create_if_missing
+        return manager
 
     @property
     def initial_state(self) -> dict[str, Any]:
@@ -1751,39 +1767,15 @@ class ConfigModel(
         context = get_context(self)
         self.__dict__.update(context.initial_state)
 
-    def _ensure_settings_with_context(
-        self, name: str, value: ConfigModelT
-    ) -> ConfigModelT:
-        context = get_context_or_none(self)
-        value_context = get_context_or_none(value)
-        if (
-            context
-            # pydantic.BaseModel.__instancecheck__() and __subclasscheck__()...
-            and ConfigModel in type(value).mro()
-            # We do not check if value was already defined here
-            # because it may mess up models that rely on an extension relation.
-            # Removed: ``and not hasattr(value, CONTEXT)``
-            # Instead, we check if the optional current context points to here.
-            and (value_context and context.route.enter(name) != value_context.route)
-        ):
-            context.enter(name).bind_to(value)
-        return value
-
     def __deepcopy__(
         self: ConfigModelT, memodict: dict[Any, Any] | None = None
     ) -> ConfigModelT:
         return type(self)(**copy.deepcopy(dict(self._iter(to_dict=False))))
 
-    def __getattribute__(self, attr: str) -> Any:
-        value = super().__getattribute__(attr)
-        if isinstance(value, ConfigModel):
-            return self._ensure_settings_with_context(attr, value)
-        return value
-
     @classmethod
     def load(
         cls: type[ConfigModelT],
-        resource: ConfigLoader[ConfigModelT] | RawResourceT | None = None,
+        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -1805,9 +1797,12 @@ class ConfigModel(
         self
         """
         cls.update_forward_refs()
-        loader = cls._resolve_loader(resource, create_if_missing=create_if_missing)
-        context = Context(loader)  # type: Context[ConfigModelT]
-        config = loader.read(config_class=cls, **kwargs)
+        manager = cls._resolve_manager(resource, create_if_missing=create_if_missing)
+        context = Context(manager)  # type: Context[ConfigModelT]
+        current_context.set(context)
+        local = contextvars.copy_context()
+        config = manager.read(config_class=cls, **kwargs)
+        setattr(config, LOCAL, local)
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -1827,12 +1822,12 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            new_config = context.loader.read(config_class=type(self), **kwargs)
-            context.bind_to(new_config)
+            current_context.set(context)
+            new_config = context.manager.read(config_class=type(self), **kwargs)
             context.initial_state = new_config.__dict__
-            new_config.rollback()
-            return new_config
-        state = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+            state = context.initial_state
+        else:
+            state = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
         self.update(**state)
         return self
 
@@ -1857,7 +1852,7 @@ class ConfigModel(
         if context.owner is self:
             if write_kwargs is None:
                 write_kwargs = {}
-            blob = context.loader.dump_config(self, **kwargs)
+            blob = context.manager.dump_config(self, **kwargs)
             result = self.write(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
@@ -1883,15 +1878,15 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.loader.is_url:
+        if context.manager.is_url:
             msg = "Writing to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return context.loader.write(blob, **kwargs)
+        return context.manager.write(blob, **kwargs)
 
     @classmethod
     async def load_async(
         cls: type[ConfigModelT],
-        resource: ConfigLoader[ConfigModelT] | RawResourceT | None,
+        resource: ConfigManager[ConfigModelT] | RawResourceT | None,
         *,
         create_if_missing: bool = False,
         **kwargs: Any,
@@ -1913,9 +1908,12 @@ class ConfigModel(
         -------
         self
         """
-        loader = cls._resolve_loader(resource, create_if_missing=create_if_missing)
-        context = Context(loader)  # type: Context[ConfigModelT]
-        config = loader.read(config_class=cls, **kwargs)
+        manager = cls._resolve_manager(resource, create_if_missing=create_if_missing)
+        context = Context(manager)  # type: Context[ConfigModelT]
+        current_context.set(context)
+        local = contextvars.copy_context()
+        config = manager.read(config_class=cls, **kwargs)
+        setattr(config, LOCAL, local)
         context.owner = config
         return config
 
@@ -1934,12 +1932,18 @@ class ConfigModel(
         """
         context = get_context(self)
         if context.owner is self:
-            new_async_config = await context.loader.read_async(**kwargs)
-            context.bind_to(new_async_config)
+            current_context.set(context)
+            new_async_config = await context.manager.read_async(
+                config_class=type(self),
+                **kwargs
+            )
             context.initial_state = new_async_config.__dict__
-            self.rollback()
-            return new_async_config
-        state = await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+            state = context.initial_state
+        else:
+            state = await reload_async(
+                cast(ConfigAt[ConfigModelT], context.at),
+                **kwargs
+            )
         self.update(**state)
         return self
 
@@ -1964,7 +1968,7 @@ class ConfigModel(
         if context.owner is self:
             if write_kwargs is None:
                 write_kwargs = {}
-            blob = context.loader.dump_config(self, **kwargs)
+            blob = context.manager.dump_config(self, **kwargs)
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
@@ -1990,10 +1994,24 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.loader.is_url:
+        if context.manager.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return await context.loader.write_async(blob, **kwargs)
+        return await context.manager.write_async(blob, **kwargs)
+
+    @classmethod
+    def __get_validators__(cls) -> Generator[Callable[..., Any], None, None]:
+        yield from super().__get_validators__()
+        yield cls._validate_as_field
+
+    @classmethod
+    def _validate_as_field(cls, value: Any, **kwargs: Any) -> None:
+        field = kwargs.get("field")
+        context = current_context.get()
+        subcontext = context.enter(field.name)
+        current_context.set(subcontext)
+        setattr(value, LOCAL, contextvars.copy_context())
+        return value
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
@@ -2010,7 +2028,25 @@ class ConfigMeta(pydantic.BaseSettings.Config):
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
 
-    resource: ConfigLoader[ConfigModel] | RawResourceT | None = None
+    resource: ConfigManager[ConfigModel] | RawResourceT | None = None
     validate_assignment: bool = True
 
     Extra = pydantic.Extra
+
+
+if __name__ == "__main__":
+    class Inner(ConfigModel):
+        foo: int
+
+    class Nested(ConfigModel):
+        a: int
+        b: int
+        inner: Inner
+
+    class Base(ConfigModel):
+        nested: Nested
+
+    b = Base.load("testconf.yaml")
+    print(b, get_context(b))
+    print(b.nested, get_context(b.nested))
+    print(b.nested.inner, get_context(b.nested.inner))
