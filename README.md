@@ -49,7 +49,6 @@ class DatabaseConfig(ConfigModel):
     
     class Config(ConfigMeta):
         resource = "database.yaml"
-        validate_assignment = True
         env_prefix = "DB_"
 
 
