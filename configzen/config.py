@@ -1323,11 +1323,10 @@ def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any
 
     config = section.owner
     context = get_context(config)
-    data = config.__dict__
+    state = config.__dict__
     newest = context.loader.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
-    new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
+    ConfigAt(config, state, section.route).update(section_data)
     return section_data
 
 
@@ -1354,12 +1353,11 @@ async def reload_async(
 
     config = section.owner
     context = get_context(config)
-    data = config.__dict__
+    state = config.__dict__
     newest = await context.loader.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
-    new_mapping = ConfigAt(config, data, section.route).update(section_data)
-    config.__dict__.update(new_mapping)
-    return new_mapping
+    ConfigAt(config, state, section.route).update(section_data)
+    return section_data
 
 
 class AnyContext(abc.ABC, Generic[ConfigModelT]):
@@ -1834,9 +1832,9 @@ class ConfigModel(
             context.initial_state = new_config.__dict__
             new_config.rollback()
             return new_config
-        return cast(
-            ConfigModelT, reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
-        )
+        state = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        self.update(**state)
+        return self
 
     def save(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
@@ -1941,10 +1939,9 @@ class ConfigModel(
             context.initial_state = new_async_config.__dict__
             self.rollback()
             return new_async_config
-        return cast(
-            ConfigModelT,
-            await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs),
-        )
+        state = await reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        self.update(**state)
+        return self
 
     async def save_async(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
