@@ -1638,7 +1638,7 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         for field in new_class.__fields__.values():
-            if type(field.type_) is ModelMetaclass:
+            if type(field.type_) is ConfigModelMetaclass:
                 if field.pre_validators is None:
                     field.pre_validators = []
                 validator = make_generic_validator(field.type_.__field_setup__)
