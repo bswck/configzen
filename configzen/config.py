@@ -1833,11 +1833,12 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        current_context.set(context)
+        tok = current_context.set(context)
         if context.owner is self:
             changed = context.manager.read(config_class=type(self), **kwargs)
         else:
             changed = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        current_context.reset(tok)
         state = changed.__dict__
         context.initial_state = state
         self.update(**state)
@@ -1943,7 +1944,7 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        current_context.set(context)
+        tok = current_context.set(context)
         if context.owner is self:
             changed = await context.manager.read_async(
                 config_class=type(self), **kwargs
@@ -1952,6 +1953,7 @@ class ConfigModel(
             changed = await reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
+        current_context.reset(tok)
         state = changed.__dict__
         context.initial_state = state
         self.update(**state)
