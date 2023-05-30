@@ -1002,9 +1002,9 @@ class ConfigManager(Generic[ConfigModelT]):
 
 
 class Route:
-    TOK_DOT = "."
-    TOK_DOTLIST_ESCAPE_ENTER = "["
-    TOK_DOTLIST_ESCAPE_EXIT = "]"
+    TOK_DOT: ClassVar[str] = "."
+    TOK_DOTLIST_ESCAPE_ENTER: ClassVar[str] = "["
+    TOK_DOTLIST_ESCAPE_EXIT: ClassVar[str] = "]"
 
     def __init__(self, route: SupportsRoute) -> None:
         self.list_route = self.parse(route)
@@ -1025,7 +1025,7 @@ class Route:
         route = route.removesuffix(cls.TOK_DOT) + cls.TOK_DOT
         argument = ""
         escape_ctx = False
-        prev_char = None
+        prev_char: str | None = None
         list_route = []
         for char_no, char in enumerate(route, start=1):
             if char in cls.TOK_DOT:
@@ -1638,7 +1638,7 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         for field in new_class.__fields__.values():
-            if issubclass(field.type_, ConfigModel):
+            if type(field.type_) is ModelMetaclass:
                 if field.pre_validators is None:
                     field.pre_validators = []
                 validator = make_generic_validator(field.type_.__field_setup__)
