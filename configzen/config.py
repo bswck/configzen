@@ -1641,7 +1641,9 @@ class ConfigModelMetaclass(ModelMetaclass):
             if type(field.outer_type_) is ConfigModelMetaclass:
                 if field.pre_validators is None:
                     field.pre_validators = []
-                validator = make_generic_validator(field.outer_type_.__field_setup__)
+                validator = make_generic_validator(
+                    field.outer_type_.__field_setup__  # type: ignore[attr-defined]
+                )
                 field.pre_validators.insert(0, validator)
         new_class.__json_encoder__ = functools.partial(
             _json_encoder,
