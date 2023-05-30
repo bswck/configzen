@@ -1779,7 +1779,10 @@ class ConfigModel(
     def __deepcopy__(
         self: ConfigModelT, memodict: dict[Any, Any] | None = None
     ) -> ConfigModelT:
-        return type(self)(**copy.deepcopy(dict(self._iter(to_dict=False))))
+        state = dict(self._iter(to_dict=False))
+        state.pop(LOCAL, None)
+        state.pop(TOKEN, None)
+        return type(self)(**copy.deepcopy(state))
 
     @classmethod
     def load(
@@ -1832,11 +1835,11 @@ class ConfigModel(
         context = get_context(self)
         if context.owner is self:
             current_context.set(context)
-            new_config = context.manager.read(config_class=type(self), **kwargs)
-            context.initial_state = new_config.__dict__
-            state = context.initial_state
+            changed = context.manager.read(config_class=type(self), **kwargs)
         else:
-            state = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+            changed = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        state = changed.__dict__
+        context.initial_state = state
         self.update(**state)
         return self
 
@@ -1942,15 +1945,15 @@ class ConfigModel(
         context = get_context(self)
         if context.owner is self:
             current_context.set(context)
-            new_async_config = await context.manager.read_async(
+            changed = await context.manager.read_async(
                 config_class=type(self), **kwargs
             )
-            context.initial_state = new_async_config.__dict__
-            state = context.initial_state
         else:
-            state = await reload_async(
+            changed = await reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
+        state = changed.__dict__
+        context.initial_state = state
         self.update(**state)
         return self
 
@@ -2012,8 +2015,9 @@ class ConfigModel(
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            _vars(value)[TOKEN] = tok
-            _vars(value)[LOCAL] = contextvars.copy_context()
+            vs = _vars(value)
+            vs[TOKEN] = tok
+            vs[LOCAL] = contextvars.copy_context()
         return value
 
 
