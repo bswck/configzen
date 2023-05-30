@@ -68,7 +68,6 @@ import os
 import pathlib
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Generator
 from typing import (
     Any,
     ClassVar,
@@ -208,7 +207,7 @@ for obj_type, encoder in ENCODERS_BY_TYPE.items():
 
 
 def with_pre_serialize(
-    func: Callable[[T], Any], cls: type[T] | None = None
+    func: collections.abc.Callable[[T], Any], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
     Register a pre-serialization converter function for a type.
@@ -242,7 +241,9 @@ def with_pre_serialize(
 
     if not hasattr(cls, "__get_validators__"):
 
-        def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
+        def validator_gen() -> (
+            collections.abc.Generator[collections.abc.Callable[[Any], Any], None, None]
+        ):
             yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
         cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
@@ -277,7 +278,7 @@ def post_deserialize(cls: Any, value: Any) -> Any:
 
 
 def with_post_deserialize(
-    func: Callable[[Any], T], cls: type[T] | None = None
+    func: collections.abc.Callable[[Any], T], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
     Register a loader function for a type.
@@ -318,7 +319,7 @@ def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
 
 
 def with_exporter(
-    func: Callable[[ConfigModelT], dict[str, Any]],
+    func: collections.abc.Callable[[ConfigModelT], dict[str, Any]],
     cls: type[ConfigModelT] | None = None,
 ) -> type[ConfigModelT] | Any:
     """
@@ -1092,14 +1093,14 @@ class Route:
     def __str__(self) -> str:
         return self.compose()
 
-    def __iter__(self) -> Generator[str, None, None]:
+    def __iter__(self) -> collections.abc.Generator[str, None, None]:
         yield from self.list_route
 
 
 def at(
     mapping: Any,
     route: SupportsRoute,
-    converter_func: Callable[[Any], dict[str, Any]] = _vars,
+    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _vars,
     manager: ConfigManager[ConfigModelT] | None = None,
 ) -> Any:
     """
@@ -1620,7 +1621,9 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     )
 
 
-def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
+def _json_encoder(
+    model_encoder: collections.abc.Callable[..., Any], value: Any, **kwargs: Any
+) -> Any:
     initial_state_type = type(value)
     converted_value = pre_serialize(value)
     if isinstance(converted_value, initial_state_type):
@@ -1704,9 +1707,10 @@ class ConfigModel(
         _exporting.reset(tok)
         return ctx.run(self.dict, **kwargs)
 
-
     @no_type_check
-    def _iter(self, **kwargs: Any) -> Generator[tuple[str, Any], None, None]:
+    def _iter(
+        self, **kwargs: Any
+    ) -> collections.abc.Generator[tuple[str, Any], None, None]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state = {}
             for key, value in super()._iter(**kwargs):
@@ -1721,18 +1725,11 @@ class ConfigModel(
 
     @classmethod
     @no_type_check
-    def _get_value(
-        cls,
-        value: Any,
-        *,
-        to_dict: bool,
-        **kwds: Any
-    ) -> Any:
+    def _get_value(cls, value: Any, *, to_dict: bool, **kwds: Any) -> Any:
         if _exporting.get():
             exporter = export.dispatch(type(value))
             if (
-                isinstance(value, BaseModel)
-                or exporter != export.dispatch(object)
+                isinstance(value, BaseModel) or exporter != export.dispatch(object)
             ) and to_dict:
                 value_dict = export(value, **kwds)
                 if ROOT_KEY in value_dict:
