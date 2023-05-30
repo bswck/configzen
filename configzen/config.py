@@ -69,11 +69,24 @@ import pathlib
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Generator
-from typing import Any, ClassVar, Generic, Literal, cast, no_type_check, overload
+from typing import (
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    Optional,
+    cast,
+    no_type_check,
+    overload,
+)
 
 import anyconfig
 import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
+from pydantic.fields import (  # type: ignore[attr-defined]
+    ModelField,
+    make_generic_validator,
+)
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import ModelMetaclass
 
@@ -94,7 +107,6 @@ from configzen.typedefs import (
     SupportsRoute,
     T,
 )
-
 
 try:
     import aiofiles
@@ -121,26 +133,25 @@ __all__ = (
 )
 
 _URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative
-    + urllib.parse.uses_netloc
-    + urllib.parse.uses_params
+    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params
 ) - {""}
-CONTEXT: str = "__configzen_context__"
+CONTEXT: str = "__context__"
+TOKEN: str = "__context_token__"
 LOCAL: str = "__local__"
 
-current_context: contextvars.ContextVar[BaseContext | None] = contextvars.ContextVar(
-    "current_context", default=None
-)
+current_context: contextvars.ContextVar[
+    BaseContext[Any] | None
+] = contextvars.ContextVar("current_context", default=None)
 
 
 def _get_defaults_from_model_class(
-    model: type[pydantic.BaseSettings],
+    model: type[pydantic.BaseModel],
 ) -> dict[str, Any]:
     defaults = {}
     for field in model.__fields__.values():
         default = field.default
         if not field.field_info.exclude and not field.required:
-            if isinstance(default, pydantic.BaseSettings):
+            if isinstance(default, pydantic.BaseModel):
                 default = default.dict()
             defaults[field.name] = default
     return defaults
@@ -225,6 +236,7 @@ def with_pre_serialize(
     pre_serialize.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
+
         def validator_gen() -> Generator[Callable[[Any], Any], None, None]:
             yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
@@ -373,9 +385,7 @@ def _ps_namedtuple(obj: tuple[Any, ...]) -> Any:
 
 
 def _delegate_ac_options(
-    load_options: dict[str, Any],
-    dump_options: dict[str, Any],
-    options: dict[str, Any]
+    load_options: dict[str, Any], dump_options: dict[str, Any], options: dict[str, Any]
 ) -> None:
     for key, value in options.items():
         if key.startswith("dump_"):
@@ -523,12 +533,9 @@ class ConfigManager(Generic[ConfigModelT]):
         self.processor_class = processor_class
         self.ac_parser = ac_parser
 
-        if (
-            isinstance(resource, (str, os.PathLike))
-            and not (
-                isinstance(resource, str)
-                and urllib.parse.urlparse( str(resource)).scheme in _URL_SCHEMES
-            )
+        if isinstance(resource, (str, os.PathLike)) and not (
+            isinstance(resource, str)
+            and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
         ):
             raw_path = os.fspath(resource)
             if raw_path.startswith("."):
@@ -589,7 +596,6 @@ class ConfigManager(Generic[ConfigModelT]):
                 msg = f"Could not guess the engine to use for {self.resource!r}."
                 raise UnspecifiedParserError(msg)
         return ac_parser
-
 
     def load_into(
         self,
@@ -1317,10 +1323,7 @@ async def save_async(
     return result
 
 
-def reload(
-    section: ConfigModelT | ConfigAt[ConfigModelT],
-    **kwargs: Any
-) -> Any:
+def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any:
     """
     Reload the configuration.
 
@@ -1349,8 +1352,7 @@ def reload(
 
 
 async def reload_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT],
-    **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
 ) -> Any:
     """
     Reload the configuration asynchronously.
@@ -1407,14 +1409,16 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
         return Route(list(self.trace_route()))
 
     @overload
-    def enter(self: T, part: None) -> T:
+    def enter(self: BaseContext[ConfigModelT], part: None) -> BaseContext[ConfigModelT]:
         ...
 
     @overload
     def enter(self, part: str) -> Subcontext[ConfigModelT]:
         ...
 
-    def enter(self, part):
+    def enter(
+        self, part: str | None
+    ) -> Subcontext[ConfigModelT] | BaseContext[ConfigModelT]:
         """
         Enter a subcontext.
 
@@ -1453,10 +1457,7 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
         """
 
 
-class Context(
-    BaseContext[ConfigModelT],
-    Generic[ConfigModelT]
-):
+class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     """
     The context of a configuration model.
 
@@ -1520,10 +1521,7 @@ class Context(
         )
 
 
-class Subcontext(
-    BaseContext[ConfigModelT],
-    Generic[ConfigModelT]
-):
+class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     """
     The subcontext of a configuration model.
 
@@ -1610,7 +1608,9 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     -------
     The context of the configuration model.
     """
-    return getattr(config, LOCAL).get(current_context)
+    return cast(
+        Optional[BaseContext[ConfigModelT]], getattr(config, LOCAL).get(current_context)
+    )
 
 
 def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
@@ -1629,14 +1629,20 @@ class ConfigModelMetaclass(ModelMetaclass):
         namespace: dict[str, Any],
         **kwargs: Any,
     ) -> type:
-        namespace[EXPORT] = pydantic.PrivateAttr()
-        namespace[CONTEXT] = pydantic.PrivateAttr()
-        namespace[LOCAL] = pydantic.PrivateAttr()
+        namespace |= dict.fromkeys(
+            (EXPORT, CONTEXT, LOCAL, TOKEN), pydantic.PrivateAttr()
+        )
 
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
 
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
+        for field in new_class.__fields__.values():
+            if issubclass(field.type_, ConfigModel):
+                if field.pre_validators is None:
+                    field.pre_validators = []
+                validator = make_generic_validator(field.type_.__field_setup__)
+                field.pre_validators.insert(0, validator)
         new_class.__json_encoder__ = functools.partial(
             _json_encoder,
             new_class.__json_encoder__,
@@ -1672,6 +1678,9 @@ class ConfigModel(
         super()._init_private_attributes()
         local = contextvars.copy_context()
         setattr(self, LOCAL, local)
+        tok = getattr(self, TOKEN, None)
+        if tok:
+            current_context.reset(tok)
 
     @no_type_check
     def _iter(self, **kwargs: Any) -> Generator[tuple[str, Any], None, None]:
@@ -1934,15 +1943,13 @@ class ConfigModel(
         if context.owner is self:
             current_context.set(context)
             new_async_config = await context.manager.read_async(
-                config_class=type(self),
-                **kwargs
+                config_class=type(self), **kwargs
             )
             context.initial_state = new_async_config.__dict__
             state = context.initial_state
         else:
             state = await reload_async(
-                cast(ConfigAt[ConfigModelT], context.at),
-                **kwargs
+                cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
         self.update(**state)
         return self
@@ -2000,17 +2007,13 @@ class ConfigModel(
         return await context.manager.write_async(blob, **kwargs)
 
     @classmethod
-    def __get_validators__(cls) -> Generator[Callable[..., Any], None, None]:
-        yield from super().__get_validators__()
-        yield cls._validate_as_field
-
-    @classmethod
-    def _validate_as_field(cls, value: Any, **kwargs: Any) -> None:
-        field = kwargs.get("field")
+    def __field_setup__(cls, value: Any, field: ModelField) -> Any:
         context = current_context.get()
-        subcontext = context.enter(field.name)
-        current_context.set(subcontext)
-        setattr(value, LOCAL, contextvars.copy_context())
+        if context is not None:
+            subcontext = context.enter(field.name)
+            tok = current_context.set(subcontext)
+            _vars(value)[TOKEN] = tok
+            _vars(value)[LOCAL] = contextvars.copy_context()
         return value
 
 
@@ -2032,21 +2035,3 @@ class ConfigMeta(pydantic.BaseSettings.Config):
     validate_assignment: bool = True
 
     Extra = pydantic.Extra
-
-
-if __name__ == "__main__":
-    class Inner(ConfigModel):
-        foo: int
-
-    class Nested(ConfigModel):
-        a: int
-        b: int
-        inner: Inner
-
-    class Base(ConfigModel):
-        nested: Nested
-
-    b = Base.load("testconf.yaml")
-    print(b, get_context(b))
-    print(b.nested, get_context(b.nested))
-    print(b.nested.inner, get_context(b.nested.inner))

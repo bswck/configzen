@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import enum
+import pathlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
@@ -591,8 +592,11 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         actual_manager = manager
         if manager.relative:
+            parent = cast(pathlib.Path, self.manager.resource).parent
+            child = cast(pathlib.Path, manager.resource)
+
             actual_manager = copy.copy(manager)
-            actual_manager.resource = self.manager.resource.parent / manager.resource
+            actual_manager.resource = parent / child
 
         with actual_manager.processor_open_resource() as reader:
             substituted = manager.load_into_dict(reader.read(), preprocess=preprocess)
