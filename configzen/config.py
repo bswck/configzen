@@ -1638,10 +1638,10 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         for field in new_class.__fields__.values():
-            if type(field.type_) is ConfigModelMetaclass:
+            if type(field.outer_type_) is ConfigModelMetaclass:
                 if field.pre_validators is None:
                     field.pre_validators = []
-                validator = make_generic_validator(field.type_.__field_setup__)
+                validator = make_generic_validator(field.outer_type_.__field_setup__)
                 field.pre_validators.insert(0, validator)
         new_class.__json_encoder__ = functools.partial(
             _json_encoder,
