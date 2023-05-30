@@ -1833,8 +1833,8 @@ class ConfigModel(
         self
         """
         context = get_context(self)
+        current_context.set(context)
         if context.owner is self:
-            current_context.set(context)
             changed = context.manager.read(config_class=type(self), **kwargs)
         else:
             changed = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
@@ -1943,8 +1943,8 @@ class ConfigModel(
         self
         """
         context = get_context(self)
+        current_context.set(context)
         if context.owner is self:
-            current_context.set(context)
             changed = await context.manager.read_async(
                 config_class=type(self), **kwargs
             )
