@@ -88,7 +88,8 @@ from pydantic.fields import (  # type: ignore[attr-defined]
     make_generic_validator,
 )
 from pydantic.json import ENCODERS_BY_TYPE
-from pydantic.main import ModelMetaclass
+from pydantic.main import ModelMetaclass, BaseModel
+from pydantic.utils import ROOT_KEY
 
 from configzen.errors import (
     ConfigAccessError,
@@ -142,6 +143,10 @@ LOCAL: str = "__local__"
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
 ] = contextvars.ContextVar("current_context", default=None)
+
+_exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_exporting", default=False
+)
 
 
 def _get_defaults_from_model_class(
@@ -297,7 +302,7 @@ def with_post_deserialize(
 
 
 @functools.singledispatch
-def export(obj: ConfigModelT) -> dict[str, Any]:
+def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -307,7 +312,9 @@ def export(obj: ConfigModelT) -> dict[str, Any]:
     ----------
     obj
     """
-    return obj.dict()
+    if isinstance(obj, ConfigModel) and not _exporting.get():
+        return obj.export(**kwargs)
+    return cast(dict[str, Any], obj.dict(**kwargs))
 
 
 def with_exporter(
@@ -1684,9 +1691,23 @@ class ConfigModel(
         if tok:
             current_context.reset(tok)
 
+    def export(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Export the configuration model.
+
+        Returns
+        -------
+        The exported configuration model.
+        """
+        tok = _exporting.set(True)  # noqa: FBT003
+        ctx = contextvars.copy_context()
+        _exporting.reset(tok)
+        return ctx.run(self.dict, **kwargs)
+
+
     @no_type_check
     def _iter(self, **kwargs: Any) -> Generator[tuple[str, Any], None, None]:
-        if kwargs.get("to_dict", False):  # and kwargs.get("preprocessing", True):
+        if kwargs.get("to_dict", False) and _exporting.get():
             state = {}
             for key, value in super()._iter(**kwargs):
                 state[key] = value
@@ -1697,6 +1718,27 @@ class ConfigModel(
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
+
+    @classmethod
+    @no_type_check
+    def _get_value(
+        cls,
+        value: Any,
+        *,
+        to_dict: bool,
+        **kwds: Any
+    ) -> Any:
+        if _exporting.get():
+            exporter = export.dispatch(type(value))
+            if (
+                isinstance(value, BaseModel)
+                or exporter != export.dispatch(object)
+            ) and to_dict:
+                value_dict = export(value, **kwds)
+                if ROOT_KEY in value_dict:
+                    return value_dict[ROOT_KEY]
+                return value_dict
+        return super()._get_value(value, to_dict=to_dict, **kwds)
 
     @classmethod
     def _resolve_manager(
@@ -1982,7 +2024,10 @@ class ConfigModel(
         if context.owner is self:
             if write_kwargs is None:
                 write_kwargs = {}
-            blob = context.manager.dump_config(self, **kwargs)
+            tok = _exporting.set(True)  # noqa: FBT003
+            ctx = contextvars.copy_context()
+            _exporting.reset(tok)
+            blob = ctx.run(context.manager.dump_config, self, **kwargs)
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
