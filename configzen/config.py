@@ -1835,7 +1835,7 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        tok = current_context.set(context)
+        tok = current_context.set(get_context(context.owner))
         if context.owner is self:
             changed = context.manager.read(config_class=type(self), **kwargs)
         else:
@@ -1946,7 +1946,7 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        tok = current_context.set(context)
+        tok = current_context.set(get_context(context.owner))
         if context.owner is self:
             changed = await context.manager.read_async(
                 config_class=type(self), **kwargs
