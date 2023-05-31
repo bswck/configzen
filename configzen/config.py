@@ -242,7 +242,7 @@ def with_pre_serialize(
     if not hasattr(cls, "__get_validators__"):
 
         def validator_gen() -> (
-            collections.abc.Generator[collections.abc.Callable[[Any], Any], None, None]
+            collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
         ):
             yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
@@ -546,9 +546,9 @@ class ConfigManager(Generic[ConfigModelT]):
             and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
         ):
             raw_path = os.fspath(resource)
-            if raw_path.startswith("."):
-                self.relative = True
             resource = pathlib.Path(raw_path)
+            if raw_path.startswith(".") and len(resource.parts) > 1:
+                self.relative = True
 
         self.resource = resource
         self.create_if_missing = create_if_missing
@@ -1093,7 +1093,7 @@ class Route:
     def __str__(self) -> str:
         return self.compose()
 
-    def __iter__(self) -> collections.abc.Generator[str, None, None]:
+    def __iter__(self) -> collections.abc.Iterator[str]:
         yield from self.list_route
 
 
@@ -1408,7 +1408,7 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
     initial_state: dict[str, Any]
 
     @abc.abstractmethod
-    def trace_route(self) -> collections.abc.Generator[str, None, None]:
+    def trace_route(self) -> collections.abc.Iterator[str]:
         """Trace the route to where the configuration subcontext points to."""
 
     @property
@@ -1491,7 +1491,7 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
 
         self.owner = owner
 
-    def trace_route(self) -> collections.abc.Generator[str, None, None]:
+    def trace_route(self) -> collections.abc.Iterator[str]:
         yield from ()
 
     @property
@@ -1549,7 +1549,7 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     def manager(self) -> ConfigManager[ConfigModelT]:
         return self._parent.manager
 
-    def trace_route(self) -> collections.abc.Generator[str, None, None]:
+    def trace_route(self) -> collections.abc.Iterator[str]:
         yield from self._parent.trace_route()
         yield self._part
 
@@ -1710,7 +1710,7 @@ class ConfigModel(
     @no_type_check
     def _iter(
         self, **kwargs: Any
-    ) -> collections.abc.Generator[tuple[str, Any], None, None]:
+    ) -> collections.abc.Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state = {}
             for key, value in super()._iter(**kwargs):
@@ -1829,6 +1829,7 @@ class ConfigModel(
     def load(
         cls: type[ConfigModelT],
         resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
+        *,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -1942,7 +1943,7 @@ class ConfigModel(
         cls: type[ConfigModelT],
         resource: ConfigManager[ConfigModelT] | RawResourceT | None,
         *,
-        create_if_missing: bool = False,
+        create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Generator
+import collections.abc
 from typing import TYPE_CHECKING, Any
 
 import anyconfig
@@ -34,7 +34,7 @@ class ArgumentSyntaxError(ConfigError):
 
 
 @contextlib.contextmanager
-def pretty_syntax_error(source: str) -> Generator[None, None, None]:
+def pretty_syntax_error(source: str) -> collections.abc.Iterator[None]:
     """Raise a SyntaxError with a message and a source."""
     try:
         yield
