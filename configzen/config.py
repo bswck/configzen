@@ -683,6 +683,40 @@ class ConfigManager(Generic[ConfigModelT]):
             dict_config = {}
         return config_class.parse_obj(dict_config)
 
+    async def async_load_into(
+        self,
+        config_class: type[ConfigModelT],
+        blob: str,
+        ac_parser: str | None = None,
+        **kwargs: Any,
+    ) -> ConfigModelT:
+        """
+        Load the configuration into a `ConfigModel` subclass asynchronously.
+
+        Parameters
+        ----------
+        config_class
+            The `ConfigModel` subclass to load the configuration into.
+        blob
+            The configuration to load.
+        ac_parser
+            The name of the engines to use for loading the configuration.
+        **kwargs
+            Additional keyword arguments to pass to `anyconfig.loads()`.
+
+        Returns
+        -------
+        The loaded configuration.
+        """
+        dict_config = await self.load_into_dict_async(
+            blob,
+            ac_parser=ac_parser,
+            **kwargs
+        )
+        if dict_config is None:
+            dict_config = {}
+        return config_class.parse_obj(dict_config)
+
     def _preload_into_dict(
         self,
         blob: str,
@@ -1070,7 +1104,7 @@ class ConfigManager(Generic[ConfigModelT]):
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
                 await self.write_async(blob, **(create_kwargs or {}))
-        return self.load_into(config_class, blob, **self.load_options)
+        return await self.async_load_into(config_class, blob, **self.load_options)
 
     async def write_async(
         self,
