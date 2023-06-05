@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import contextlib
 import collections.abc
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 import anyconfig

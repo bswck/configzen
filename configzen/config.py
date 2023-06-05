@@ -2171,7 +2171,7 @@ class ConfigModel(
         context = Context(manager)  # type: Context[ConfigModelT]
         current_context.set(context)
         local = contextvars.copy_context()
-        config = manager.read(config_class=cls, **kwargs)
+        config = await manager.read_async(config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
         context.owner = config
         return config
