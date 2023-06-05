@@ -717,7 +717,7 @@ class ConfigManager(Generic[ConfigModelT]):
             dict_config = {}
         return config_class.parse_obj(dict_config)
 
-    def _preload_into_dict(
+    def _load_into_dict_impl(
         self,
         blob: str,
         ac_parser: str | None = None,
@@ -764,7 +764,7 @@ class ConfigManager(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._preload_into_dict(blob, ac_parser, **kwargs)
+        loaded = self._load_into_dict_impl(blob, ac_parser, **kwargs)
         if preprocess:
             loaded = self.processor_class(self, loaded).preprocess()
         return loaded
@@ -794,7 +794,7 @@ class ConfigManager(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._preload_into_dict(blob, ac_parser, **kwargs)
+        loaded = self._load_into_dict_impl(blob, ac_parser, **kwargs)
         if preprocess:
             loaded = await self.processor_class(self, loaded).preprocess_async()
         return loaded
