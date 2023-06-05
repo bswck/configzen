@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import dataclasses
 import enum
@@ -14,7 +15,7 @@ from configzen.errors import (
     InternalConfigError,
     pretty_syntax_error,
 )
-from configzen.typedefs import ConfigModelT
+from configzen.typedefs import ConfigModelT, SupportsRoute
 
 if TYPE_CHECKING:
     from configzen.config import BaseContext, ConfigManager
@@ -30,10 +31,13 @@ DirectiveT = TypeVar("DirectiveT")
 
 EXPORT: str = "__configzen_export__"
 EXECUTES_DIRECTIVES: str = "__configzen_executes_directives__"
+EXECUTES_DIRECTIVES_ASYNC: str = "__configzen_executes_directives_async__"
 
 
 def directive(
     name: str | enum.Enum,
+    *,
+    asynchronous: bool | None = None,
 ) -> Callable[..., Any]:
     """
     Decorator for creating processor directives.
@@ -42,6 +46,8 @@ def directive(
     ----------
     name
         The name of the directive.
+    asynchronous
+        Whether the decorated directive function is asynchronous.
 
     Returns
     -------
@@ -51,9 +57,13 @@ def directive(
         name = name.value.casefold()
 
     def decorator(func: Any) -> Any:
-        if not hasattr(func, EXECUTES_DIRECTIVES):
-            setattr(func, EXECUTES_DIRECTIVES, set())
-        getattr(func, EXECUTES_DIRECTIVES).add(name)
+        nonlocal asynchronous
+        if asynchronous is None:
+            asynchronous = asyncio.iscoroutinefunction(func)
+        attr = EXECUTES_DIRECTIVES_ASYNC if asynchronous else EXECUTES_DIRECTIVES
+        if not hasattr(func, attr):
+            setattr(func, attr, set())
+        getattr(func, attr).add(name)
         return func
 
     return decorator
@@ -119,7 +129,7 @@ class ArgumentSyntaxError(ValueError):
     """
 
 
-def _parse_argument_string_impl(
+def _parse_argument_string_impl(  # noqa: C901, PLR0912, PLR0915
     raw_argument_string: str,
     tokens: type[Tokens] = Tokens,
 ) -> list[str]:
@@ -271,15 +281,16 @@ class BaseProcessor(Generic[ConfigModelT]):
     """
 
     _directive_handlers: dict[str, Any] = None  # type: ignore[assignment]
+    _async_directive_handlers: dict[str, Any] = None  # type: ignore[assignment]
     directive_prefix: ClassVar[str]
     extension_prefix: ClassVar[str]
 
     def __init__(
         self,
-        resource: ConfigManager[ConfigModelT],
+        manager: ConfigManager[ConfigModelT],
         dict_config: dict[str, Any],
     ) -> None:
-        self.manager = resource
+        self.manager = manager
         self.dict_config = dict_config
 
     @classmethod
@@ -314,12 +325,62 @@ class BaseProcessor(Generic[ConfigModelT]):
                 cls.export(item, metadata=None)
 
     @classmethod
+    async def export_async(
+        cls,
+        state: Any,
+        *,
+        metadata: ExportMetadata[ConfigModelT] | None = None,
+    ) -> None:
+        """
+        Export the state asynchronously.
+
+        Parameters
+        ----------
+        state
+            The state to export.
+        metadata
+            The metadata of the substitution.
+        """
+        if is_dict_like(state):
+            if metadata is None:
+                from configzen.config import CONTEXT
+
+                state.pop(CONTEXT, None)
+                metadata = state.pop(EXPORT, None)
+            if metadata:
+                await cls._export_async(state, metadata)
+            else:
+                await cls.export_async(list(state.values()), metadata=None)
+        elif is_list_like(state):
+            for item in state:
+                await cls.export_async(item, metadata=None)
+
+    @classmethod
     def _export(
         cls,
         state: Any,
         metadata: ExportMetadata[ConfigModelT],
     ) -> None:
         raise NotImplementedError
+
+    @classmethod
+    async def _export_async(
+        cls,
+        state: Any,
+        metadata: ExportMetadata[ConfigModelT],
+    ) -> None:
+        raise NotImplementedError
+
+    async def preprocess_async(self) -> dict[str, Any]:
+        """
+        Parse the dictionary config and return the parsed config,
+        ready for instantiating the model.
+
+        Returns
+        -------
+        The parsed config.
+        """
+        return cast(dict[str, Any], await self._preprocess_async(self.dict_config))
 
     def preprocess(self) -> dict[str, Any]:
         """
@@ -376,6 +437,50 @@ class BaseProcessor(Generic[ConfigModelT]):
                 result[key] = self._preprocess(value)
         return result
 
+    async def _preprocess_async(self, container: Any) -> Any:
+        if not is_dict_like(container):
+            if is_list_like(container):
+                return [await self._preprocess_async(v) for v in container]
+            return container
+
+        result: dict[str, Any] = {}
+
+        for key, value in sorted(
+            cast(dict[str, Any], container).items(),
+            key=lambda item: item[0] == self.directive_prefix,
+        ):
+            if key.startswith(self.extension_prefix):
+                actual_key = key.lstrip(self.extension_prefix)
+                overridden = result.get(actual_key, {})
+                if not is_dict_like(overridden):
+                    raise ConfigPreprocessingError(
+                        f"{self.extension_prefix} can be used only for overriding "
+                        f"dictionary sections but item at {actual_key!r} "
+                        f"is not a dictionary"
+                    )
+                replacement = overridden | value
+                result[actual_key] = await self._preprocess_async(replacement)
+            elif key.startswith(self.directive_prefix):
+                directive_name, arguments = parse_directive_call(
+                    self.directive_prefix, key
+                )
+                context_container = container.copy()
+                del context_container[key]
+                context = DirectiveContext(
+                    directive=directive_name,
+                    key=key,
+                    prefix=self.directive_prefix,
+                    arguments=arguments,
+                    snippet=value,
+                    container=context_container,
+                )
+                await self._call_directive_async(context)
+                new_container = await self._preprocess_async(context.container)
+                result |= new_container
+            else:
+                result[key] = await self._preprocess_async(value)
+        return result
+
     def _call_directive(self, context: DirectiveContext) -> None:
         handler = self._directive_handlers.get(context.directive)
         if handler is None:
@@ -384,16 +489,31 @@ class BaseProcessor(Generic[ConfigModelT]):
             )
         handler(self, context)
 
+    async def _call_directive_async(self, context: DirectiveContext) -> None:
+        handler = self._async_directive_handlers.get(context.directive)
+        if handler is None:
+            raise ConfigPreprocessingError(
+                f"unknown preprocessing directive: {context.directive!r}"
+            )
+        await handler(self, context)
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         if cls._directive_handlers is None:
             cls._directive_handlers = {}
         else:
             cls._directive_handlers = cls._directive_handlers.copy()
+        if cls._async_directive_handlers is None:
+            cls._async_directive_handlers = {}
+        else:
+            cls._async_directive_handlers = cls._async_directive_handlers.copy()
         for _name, func in cls.__dict__.items():
             if hasattr(func, EXECUTES_DIRECTIVES):
                 for directive_name in getattr(func, EXECUTES_DIRECTIVES):
                     cls._directive_handlers[directive_name] = func
+            elif hasattr(func, EXECUTES_DIRECTIVES_ASYNC):
+                for directive_name in getattr(func, EXECUTES_DIRECTIVES_ASYNC):
+                    cls._async_directive_handlers[directive_name] = func
 
     @classmethod
     def register_directive(cls, name: str, func: Any) -> None:
@@ -451,7 +571,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     @directive(Directives.EXTEND)
     def extend(self, ctx: DirectiveContext) -> None:
         """
-        extend a configuration with another configuration.
+        Extend a configuration with another configuration.
         Recursively preprocess the referenced configuration.
         Preserve information about the referenced configuration.
 
@@ -481,7 +601,7 @@ class Processor(BaseProcessor[ConfigModelT]):
           foo: 3
         ```
         """
-        return self._substitute(ctx, preprocess=True, preserve=True)
+        self._substitute(ctx, preprocess=True, preserve=True)
 
     @directive(Directives.INCLUDE)
     def include(self, ctx: DirectiveContext) -> None:
@@ -525,7 +645,7 @@ class Processor(BaseProcessor[ConfigModelT]):
           foo: 3
         ```
         """
-        return self._substitute(ctx, preprocess=True, preserve=False)
+        self._substitute(ctx, preprocess=True, preserve=False)
 
     @directive(Directives.COPY)
     def copy(self, ctx: DirectiveContext) -> None:
@@ -561,13 +681,37 @@ class Processor(BaseProcessor[ConfigModelT]):
           bar: 2
         ```
         """
-        return self._substitute(ctx, preprocess=False, preserve=False)
+        self._substitute(ctx, preprocess=False, preserve=False)
 
-    def _substitute(
-        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
-    ) -> None:
-        from configzen.config import CONTEXT, Context, at
+    @directive(Directives.EXTEND)
+    async def extend_async(self, ctx: DirectiveContext) -> None:
+        """
+        Extend a configuration with another configuration asynchronously.
+        For more information see `extend`.
+        """
+        await self._substitute_async(ctx, preprocess=True, preserve=True)
 
+    @directive(Directives.EXTEND)
+    async def include_async(self, ctx: DirectiveContext) -> None:
+        """
+        Include a configuration in another configuration asynchronously.
+        For more information see `include`.
+        """
+        await self._substitute_async(ctx, preprocess=True, preserve=False)
+
+    @directive(Directives.COPY)
+    async def copy_async(self, ctx: DirectiveContext) -> None:
+        """
+        Copy a configuration and paste into another configuration asynchronously.
+        For more information see `copy`.
+        """
+        await self._substitute_async(ctx, preprocess=False, preserve=False)
+
+    def _get_substitution_info(
+        self, ctx: DirectiveContext, *, preserve: bool
+    ) -> tuple[
+        ConfigManager[ConfigModelT], ConfigManager[ConfigModelT], SupportsRoute | None
+    ]:
         manager_class = type(self.manager)
 
         if len(ctx.arguments):
@@ -581,7 +725,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             )
             raise ConfigPreprocessingError(msg)
 
-        manager, substitution_route = manager_class.from_directive_context(
+        manager, route = manager_class.from_directive_context(
             ctx, route_separator=self.route_separator
         )
 
@@ -598,25 +742,70 @@ class Processor(BaseProcessor[ConfigModelT]):
             actual_manager = copy.copy(manager)
             actual_manager.resource = parent / child
 
-        with actual_manager.processor_open_resource() as reader:
-            substituted = manager.load_into_dict(reader.read(), preprocess=preprocess)
+        return actual_manager, manager, route
 
-        if substitution_route:
-            substituted = at(substituted, substitution_route, manager=manager)
-            if not is_dict_like(substituted):
+    def _substitute(
+        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
+    ) -> None:
+        actual_mgr, mgr, route = self._get_substitution_info(ctx, preserve=preserve)
+
+        with actual_mgr.processor_open_resource() as reader:
+            source = mgr.load_into_dict(reader.read(), preprocess=preprocess)
+
+        self._substitute_impl(
+            ctx,
+            route,
+            source=source,
+            manager=mgr,
+            preprocess=preprocess,
+            preserve=preserve,
+        )
+
+    async def _substitute_async(
+        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
+    ) -> None:
+        actual_mgr, mgr, route = self._get_substitution_info(ctx, preserve=preserve)
+
+        async with actual_mgr.processor_open_resource_async() as reader:
+            source = mgr.load_into_dict(await reader.read(), preprocess=preprocess)
+
+        self._substitute_impl(
+            ctx,
+            route,
+            source=source,
+            manager=mgr,
+            preprocess=preprocess,
+            preserve=preserve,
+        )
+
+    @staticmethod
+    def _substitute_impl(  # noqa: PLR0913
+        ctx: DirectiveContext,
+        route: SupportsRoute | None,
+        *,
+        source: dict[str, Any],
+        manager: ConfigManager[ConfigModelT],
+        preprocess: bool,
+        preserve: bool,
+    ) -> None:
+        from configzen.config import CONTEXT, Context, at
+
+        if route:
+            source = at(source, route, manager=manager)
+            if not is_dict_like(source):
                 raise ConfigPreprocessingError(
-                    f"imported item {substitution_route!r} "
+                    f"imported item {route!r} "
                     f"from {manager.resource} is not a dictionary"
                 )
 
         context: Context[ConfigModelT] = Context(manager)
-        ctx.container = substituted | ctx.container
+        ctx.container = source | ctx.container
 
         if preserve:
             ctx.container |= {
                 CONTEXT: context,
                 EXPORT: ExportMetadata(
-                    route=str(substitution_route),
+                    route=str(route),
                     context=context,
                     preprocess=preprocess,
                     key_order=list(ctx.container),
@@ -688,14 +877,108 @@ class Processor(BaseProcessor[ConfigModelT]):
         for value in state.values():
             cls.export(value, metadata=None)
 
-        # TODO: Optimize. We iterate over the same about 3-4 times.
+        cls._export_finalize(
+            context=context,
+            state=state,
+            overrides=overrides,
+            values=substituted_values,
+            route=route,
+            key_order=key_order,
+        )
+
+    @classmethod
+    async def _export_async(
+        cls,
+        state: dict[str, Any],
+        metadata: ExportMetadata[ConfigModelT],
+    ) -> None:
+        """
+        Exports model state preserving substition directive calls in the model state.
+
+        Parameters
+        ----------
+        metadata
+        state
+        """
+        from configzen.config import CONTEXT, at, pre_serialize
+
+        overrides = {}
+
+        route = metadata["route"]
+        context = metadata["context"]
+        key_order = metadata["key_order"]
+        manager = context.manager
+
+        async with manager.processor_open_resource_async() as reader:
+            # Here we intentionally always preprocess the loaded configuration.
+            loaded = await manager.load_into_dict_async(await reader.read())
+
+            if route:
+                loaded = at(loaded, route, manager=manager)
+
+        substituted_values = loaded.copy()
+
+        missing = object()
+
+        for key, value in loaded.items():
+            counterpart_value = state.pop(key, missing)
+            if counterpart_value is missing:
+                continue
+            counterpart_value = pre_serialize(counterpart_value)
+
+            if is_dict_like(value):
+                if EXPORT in value:
+                    value.pop(CONTEXT, None)
+                    await cls.export_async(value, metadata=value.pop(EXPORT))
+                overrides_for_key = {
+                    sub_key: comp
+                    for sub_key, comp in counterpart_value.items()
+                    if (
+                        (orig := value.get(sub_key, missing)) is missing or orig != comp
+                    )
+                }
+                if overrides_for_key:
+                    export_key = manager.processor_class.extension_prefix + key
+                    overrides[export_key] = overrides_for_key
+
+            elif is_list_like(value):
+                await cls.export_async(value, metadata=None)
+
+            elif counterpart_value != value:
+                overrides[key] = counterpart_value
+                del substituted_values[key]
+
+        for value in state.values():
+            await cls.export_async(value, metadata=None)
+
+        cls._export_finalize(
+            context=context,
+            state=state,
+            overrides=overrides,
+            values=substituted_values,
+            route=route,
+            key_order=key_order,
+        )
+
+    @classmethod
+    def _export_finalize(  # noqa: PLR0913
+        cls,
+        context: BaseContext[ConfigModelT],
+        *,
+        state: dict[str, Any],
+        overrides: dict[str, Any],
+        values: dict[str, Any],
+        route: str | None,
+        key_order: list[str],
+    ) -> None:
+        # TODO: Optimize. We iterate over the same too many times.
 
         state |= overrides
         extras: dict[str, Any] = {
             key: state.pop(key) for key in set(state) if key not in key_order
         }
 
-        if substituted_values:
+        if values:
             substitution_directive = cls.directive(Directives.EXTEND)
             resource = str(context.manager.resource)
             if route:

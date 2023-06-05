@@ -1,8 +1,9 @@
+import collections.abc
 import contextlib
 import os
 import pathlib
 import sys
-from typing import TYPE_CHECKING, TextIO, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Optional, TextIO, TypeVar, Union
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -24,3 +25,9 @@ ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
 AsyncConfigIO: TypeAlias = "AiofilesContextManager[None, None, AsyncTextIOWrapper]"
 RawResourceT: TypeAlias = Union[ConfigIO, str, int, os.PathLike, pathlib.Path]
 NormalizedResourceT: TypeAlias = Union[ConfigIO, str, int, pathlib.Path]
+IncludeExcludeT: TypeAlias = Optional[
+    Union[
+        collections.abc.Set[Union[int, str]],
+        collections.abc.Mapping[Union[int, str], Any],
+    ]
+]

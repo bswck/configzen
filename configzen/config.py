@@ -87,7 +87,7 @@ from pydantic.fields import (  # type: ignore[attr-defined]
     make_generic_validator,
 )
 from pydantic.json import ENCODERS_BY_TYPE
-from pydantic.main import ModelMetaclass, BaseModel
+from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
 from configzen.errors import (
@@ -102,6 +102,7 @@ from configzen.typedefs import (
     AsyncConfigIO,
     ConfigIO,
     ConfigModelT,
+    IncludeExcludeT,
     NormalizedResourceT,
     RawResourceT,
     SupportsRoute,
@@ -129,7 +130,9 @@ __all__ = (
     "post_deserialize",
     "with_post_deserialize",
     "export",
+    "export_async",
     "with_exporter",
+    "with_async_exporter",
 )
 
 _URL_SCHEMES: set[str] = set(
@@ -202,8 +205,8 @@ def pre_serialize(obj: Any) -> Any:
     return obj
 
 
-for obj_type, encoder in ENCODERS_BY_TYPE.items():
-    pre_serialize.register(obj_type, encoder)
+for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
+    pre_serialize.register(obj_type, obj_encoder)
 
 
 def with_pre_serialize(
@@ -318,6 +321,22 @@ def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
     return cast(dict[str, Any], obj.dict(**kwargs))
 
 
+@functools.singledispatch
+async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
+    """
+    Export a ConfigModel to a safely-serializable format.
+    Register a custom exporter for a type using the `with_exporter` decorator,
+    which can help to exclude particular values from the export if needed.
+
+    Parameters
+    ----------
+    obj
+    """
+    if isinstance(obj, ConfigModel) and not _exporting.get():
+        return await obj.export_async(**kwargs)
+    return cast(dict[str, Any], await obj.dict_async(**kwargs))
+
+
 def with_exporter(
     func: collections.abc.Callable[[ConfigModelT], dict[str, Any]],
     cls: type[ConfigModelT] | None = None,
@@ -336,6 +355,35 @@ def with_exporter(
         return functools.partial(with_exporter, func)
 
     export.register(cls, func)
+    if export_async.dispatch(cls) is export_async:
+
+        async def default_async_func(obj: Any) -> Any:
+            return func(obj)
+
+        export_async.register(cls, default_async_func)
+    return cls
+
+
+def with_async_exporter(
+    func: collections.abc.Callable[
+        [ConfigModelT], collections.abc.Coroutine[Any, Any, dict[str, Any]]
+    ],
+    cls: type[ConfigModelT] | None = None,
+) -> type[ConfigModelT] | Any:
+    """
+    Register a custom exporter for a type.
+
+    Parameters
+    ----------
+    func
+        The exporter function.
+    cls
+        The type to register the exporter for.
+    """
+    if cls is None:
+        return functools.partial(with_exporter, func)
+
+    export_async.register(cls, func)
     return cls
 
 
@@ -635,6 +683,26 @@ class ConfigManager(Generic[ConfigModelT]):
             dict_config = {}
         return config_class.parse_obj(dict_config)
 
+    def _preload_into_dict(
+        self,
+        blob: str,
+        ac_parser: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        if ac_parser is None:
+            ac_parser = self.ac_parser
+        kwargs = self.load_options | kwargs
+        loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
+            blob, ac_parser=ac_parser, **kwargs
+        )
+        if not isinstance(loaded, collections.abc.Mapping):
+            msg = (
+                f"Expected a mapping as a result of loading {self.resource}, "
+                f"got {type(loaded).__name__}."
+            )
+            raise TypeError(msg)
+        return dict(loaded)
+
     def load_into_dict(
         self,
         blob: str,
@@ -662,22 +730,40 @@ class ConfigManager(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        if ac_parser is None:
-            ac_parser = self.ac_parser
-        kwargs = self.load_options | kwargs
-        loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
-            blob, ac_parser=ac_parser, **kwargs
-        )
-        if not isinstance(loaded, collections.abc.Mapping):
-            msg = (
-                f"Expected a mapping as a result of loading {self.resource}, "
-                f"got {type(loaded).__name__}."
-            )
-            raise TypeError(msg)
-        loaded = dict(loaded)
+        loaded = self._preload_into_dict(blob, ac_parser, **kwargs)
         if preprocess:
             loaded = self.processor_class(self, loaded).preprocess()
-        return cast(dict[str, Any], loaded)
+        return loaded
+
+    async def load_into_dict_async(
+        self,
+        blob: str,
+        ac_parser: str | None = None,
+        *,
+        preprocess: bool = True,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Load the configuration into a dictionary asynchronously.
+
+        Parameters
+        ----------
+        blob
+            The configuration to load.
+        ac_parser
+            The name of the anyconfig parser to use for loading the configuration.
+        preprocess
+        **kwargs
+            Additional keyword arguments to pass to `anyconfig.loads()`.
+
+        Returns
+        -------
+        The loaded configuration dictionary.
+        """
+        loaded = self._preload_into_dict(blob, ac_parser, **kwargs)
+        if preprocess:
+            loaded = await self.processor_class(self, loaded).preprocess_async()
+        return loaded
 
     def dump_config(
         self,
@@ -707,6 +793,35 @@ class ConfigManager(Generic[ConfigModelT]):
             kwargs = filter_options(self.JSON_KWARGS, self.dump_options | kwargs)
             return config.json(**kwargs)
         return self.dump_data(export(config), ac_parser=ac_parser, **kwargs)
+
+    async def dump_config_async(
+        self,
+        config: ConfigModelT,
+        ac_parser: str | None = None,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Dump the configuration to a string.
+
+        Parameters
+        ----------
+        config
+            The configuration to dump.
+        ac_parser
+            The name of the anyconfig parser to use for saving the configuration.
+        **kwargs
+            Additional keyword arguments to pass to `anyconfig.dumps()`.
+
+        Returns
+        -------
+        The dumped configuration.
+        """
+        if ac_parser is None:
+            ac_parser = self.ac_parser
+        if ac_parser == "json" and self.use_pydantic_json:
+            kwargs = filter_options(self.JSON_KWARGS, self.dump_options | kwargs)
+            return await config.json_async(**kwargs)
+        return self.dump_data(await export_async(config), ac_parser=ac_parser, **kwargs)
 
     def dump_data(
         self,
@@ -782,24 +897,6 @@ class ConfigManager(Generic[ConfigModelT]):
             return cast(ConfigIO, pathlib.Path(self.resource).open(**kwds))
         return cast(ConfigIO, self.resource)
 
-    def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
-        """
-        Called by the processor to open a configuration resource with reading intention.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments to pass to the opening routine.
-            For URLs, these are passed to ``urllib.request.urlopen()``.
-            For local files, these are passed to ``builtins.open()``.
-
-        Returns
-        -------
-        The opened resource.
-        """
-        kwargs = self._get_default_kwargs("read", kwargs)
-        return self.open_resource(**kwargs)
-
     def open_resource_async(self, **kwds: Any) -> AsyncConfigIO:
         """
         Open the configuration file asynchronously.
@@ -826,6 +923,44 @@ class ConfigManager(Generic[ConfigModelT]):
             kwds = filter_options(self.OPEN_KWARGS, kwds)
             return aiofiles.open(self.resource, **kwds)
         raise RuntimeError("cannot open resource asynchronously")
+
+    def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
+        """
+        Called by the processor to open a configuration resource
+        with the reading intention.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the opening routine.
+            For URLs, these are passed to ``urllib.request.urlopen()``.
+            For local files, these are passed to ``builtins.open()``.
+
+        Returns
+        -------
+        The opened resource.
+        """
+        kwargs = self._get_default_kwargs("read", kwargs)
+        return self.open_resource(**kwargs)
+
+    def processor_open_resource_async(self, **kwargs: Any) -> AsyncConfigIO:
+        """
+        Called by the processor to open a configuration resource asynchronously
+        with the reading intention.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the opening routine.
+            For URLs, these are passed to ``urllib.request.urlopen()``.
+            For local files, these are passed to ``builtins.open()``.
+
+        Returns
+        -------
+        The opened resource.
+        """
+        kwargs = self._get_default_kwargs("read", kwargs)
+        return self.open_resource_async(**kwargs)
 
     def _get_default_kwargs(
         self,
@@ -1707,8 +1842,61 @@ class ConfigModel(
         _exporting.reset(tok)
         return ctx.run(self.dict, **kwargs)
 
-    @no_type_check
-    def _iter(
+    async def export_async(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Export the configuration model.
+
+        Returns
+        -------
+        The exported configuration model.
+        """
+        tok = _exporting.set(True)  # noqa: FBT003
+        ctx = contextvars.copy_context()
+        _exporting.reset(tok)
+        return await ctx.run(self.dict_async, **kwargs)
+
+    async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Get the dictionary representation of the configuration model.
+
+        Returns
+        -------
+        The dictionary representation of the configuration model.
+        """
+        return dict(await self._iter_async(to_dict=True, **kwargs))
+
+    async def json_async(  # noqa: PLR0913
+        self,
+        include: IncludeExcludeT = None,
+        exclude: IncludeExcludeT = None,
+        *,
+        by_alias: bool = False,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        encoder: collections.abc.Callable[[Any], Any] | None = None,
+        models_as_dict: bool = True,
+        **dumps_kwargs: Any,
+    ) -> str:
+        encoder = cast(
+            collections.abc.Callable[[Any], Any], encoder or self.__json_encoder__
+        )
+        data = dict(
+            await self._iter_async(
+                to_dict=models_as_dict,
+                by_alias=by_alias,
+                include=include,
+                exclude=exclude,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+            )
+        )
+        if self.__custom_root_type__:
+            data = data[ROOT_KEY]
+        return self.__config__.json_dumps(data, default=encoder, **dumps_kwargs)
+
+    def _iter(  # type: ignore[override]
         self, **kwargs: Any
     ) -> collections.abc.Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
@@ -1722,6 +1910,22 @@ class ConfigModel(
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
+
+    async def _iter_async(
+        self, **kwargs: Any
+    ) -> collections.abc.Iterator[tuple[str, Any]]:
+        if kwargs.get("to_dict", False) and _exporting.get():
+            state = {}
+            for key, value in super()._iter(**kwargs):
+                state[key] = value
+            metadata = getattr(self, EXPORT, None)
+            if metadata:
+                context = get_context(self)
+                await context.manager.processor_class.export_async(
+                    state, metadata=metadata
+                )
+            return ((key, value) for key, value in state.items())
+        return super()._iter(**kwargs)
 
     @classmethod
     @no_type_check
@@ -2025,7 +2229,7 @@ class ConfigModel(
             tok = _exporting.set(True)  # noqa: FBT003
             ctx = contextvars.copy_context()
             _exporting.reset(tok)
-            blob = ctx.run(context.manager.dump_config, self, **kwargs)
+            blob = await ctx.run(context.manager.dump_config_async, self, **kwargs)
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
