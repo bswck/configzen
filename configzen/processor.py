@@ -691,7 +691,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         """
         await self._substitute_async(ctx, preprocess=True, preserve=True)
 
-    @directive(Directives.EXTEND)
+    @directive(Directives.INCLUDE)
     async def include_async(self, ctx: DirectiveContext) -> None:
         """
         Include a configuration in another configuration asynchronously.
