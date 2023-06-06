@@ -1987,12 +1987,10 @@ class ConfigModel(
         if resource is None:
             raise ValueError("No resource specified")
         manager: ConfigManager[ConfigModelT]
-        if isinstance(resource, str):
-            manager = ConfigManager(resource)
-        elif isinstance(resource, ConfigManager):
+        if isinstance(resource, ConfigManager):
             manager = resource
         else:
-            raise TypeError(f"Invalid resource type: {type(resource).__name__}")
+            manager = ConfigManager(resource)
         if create_if_missing is not None:
             manager.create_if_missing = create_if_missing
         return manager
