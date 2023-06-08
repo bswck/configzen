@@ -308,7 +308,7 @@ def with_post_deserialize(
 
 
 @functools.singledispatch
-def export(obj: Any, *, json: bool = False, **kwargs: Any) -> dict[str, Any]:
+def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -317,18 +317,14 @@ def export(obj: Any, *, json: bool = False, **kwargs: Any) -> dict[str, Any]:
     Parameters
     ----------
     obj
-    json
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return obj.export(**kwargs)
-    exporter = obj.json if json else obj.dict
-    return cast(dict[str, Any], exporter(**kwargs))
+    return cast(dict[str, Any], obj.dict(**kwargs))
 
 
 @functools.singledispatch
-async def export_async(
-    obj: Any, *, json: bool = False, **kwargs: Any
-) -> dict[str, Any]:
+async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -337,12 +333,10 @@ async def export_async(
     Parameters
     ----------
     obj
-    json
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return await obj.export_async(**kwargs)
-    exporter = obj.json_async if json else obj.dict_async
-    return cast(dict[str, Any], await exporter(**kwargs))
+    return cast(dict[str, Any], await obj.dict_async(**kwargs))
 
 
 def with_exporter(
@@ -851,7 +845,11 @@ class ConfigAgent(Generic[ConfigModelT]):
         if ac_parser == "json" and self.use_pydantic_json:
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
-            ) | {"json": True}
+            )
+            tok = _exporting.set(True)  # noqa: FBT003
+            ctx = contextvars.copy_context()
+            _exporting.reset(tok)
+            return ctx.run(config.json, **export_kwargs)
         data = export(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
@@ -883,7 +881,11 @@ class ConfigAgent(Generic[ConfigModelT]):
         if ac_parser == "json" and self.use_pydantic_json:
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
-            ) | {"json": True}
+            )
+            tok = _exporting.set(True)  # noqa: FBT003
+            task = asyncio.create_task(config.json_async(**export_kwargs))
+            _exporting.reset(tok)
+            return await task
         data = await export_async(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
