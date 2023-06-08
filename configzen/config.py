@@ -160,7 +160,7 @@ def _get_defaults_from_model_class(
         if not field.field_info.exclude and not field.required:
             if isinstance(default, pydantic.BaseModel):
                 default = default.dict()
-            defaults[field.name] = default
+            defaults[field.alias] = default
     return defaults
 
 
