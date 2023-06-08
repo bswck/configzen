@@ -58,6 +58,7 @@ files in various formats and within a number of advanced methods.
 from __future__ import annotations
 
 import abc
+import asyncio
 import collections.abc
 import contextvars
 import copy
@@ -1885,9 +1886,9 @@ class ConfigModel(
         The exported configuration model.
         """
         tok = _exporting.set(True)  # noqa: FBT003
-        ctx = contextvars.copy_context()
+        task = asyncio.create_task(self.dict_async(**kwargs))
         _exporting.reset(tok)
-        return await ctx.run(self.dict_async, **kwargs)
+        return await task
 
     async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -2177,14 +2178,14 @@ class ConfigModel(
     @classmethod
     async def load_async(
         cls: type[ConfigModelT],
-        resource: ConfigManager[ConfigModelT] | RawResourceT | None,
+        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """
         Load the configuration file asynchronously.
-        To reload the configuration, use the `reload()` method.
+        To reload the configuration, use the `reload_async()` method.
 
         Parameters
         ----------
@@ -2259,9 +2260,11 @@ class ConfigModel(
             if write_kwargs is None:
                 write_kwargs = {}
             tok = _exporting.set(True)  # noqa: FBT003
-            ctx = contextvars.copy_context()
+            task = asyncio.create_task(
+                context.manager.dump_config_async(self, **kwargs)
+            )
             _exporting.reset(tok)
-            blob = await ctx.run(context.manager.dump_config_async, self, **kwargs)
+            blob = await task
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result

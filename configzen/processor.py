@@ -559,8 +559,6 @@ class Directives(str, enum.Enum):
     EXTEND = "extend"
     INCLUDE = "include"
     COPY = "copy"
-    PROCESSOR = "processor"
-    DEFINE = "define"
 
 
 class Processor(BaseProcessor[ConfigModelT]):
