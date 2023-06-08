@@ -12,13 +12,11 @@ from anyconfig.utils import is_dict_like, is_list_like
 
 from configzen.errors import (
     ConfigPreprocessingError,
-    InternalConfigError,
-    pretty_syntax_error,
 )
 from configzen.typedefs import ConfigModelT, SupportsRoute
 
 if TYPE_CHECKING:
-    from configzen.config import BaseContext, ConfigManager
+    from configzen.config import BaseContext, ConfigAgent
 
 __all__ = (
     "DirectiveContext",
@@ -94,150 +92,22 @@ class DirectiveContext:
     directive: str
     key: str
     prefix: str
-    arguments: list[str]
     snippet: dict[str, Any]
     container: dict[str, Any]
-
-    def has_duplicates(self, *, require_same_arguments: bool = True) -> bool:
-        """
-        Return whether the directive has duplicates.
-
-        Returns
-        -------
-        Whether the directive has duplicates.
-        """
-        for key in self.container:
-            directive_name, arguments = parse_directive_call(self.prefix, key)
-            if directive_name == self.directive:
-                if require_same_arguments and arguments != self.arguments:
-                    continue
-                return True
-        return False
-
-
-class Tokens(str, enum.Enum):
-    LPAREN: str = "("
-    RPAREN: str = ")"
-    COMMAS: str = ",;"
-    STRING: str = "\"'"
-    ESCAPE: str = "\\"
-
-
-class ArgumentSyntaxError(ValueError):
-    """
-    Raised when there is a syntax error in an argument.
-    """
-
-
-def _parse_argument_string_impl(  # noqa: C901, PLR0912, PLR0915
-    raw_argument_string: str,
-    tokens: type[Tokens] = Tokens,
-) -> list[str]:
-    prev_char = None
-    string_ctx = None
-    escape_ctx = False
-    arguments: list[str] = []
-    argument = ""
-    emit = arguments.append
-    explicit_strings_ctx = True
-
-    tok_escape = tokens.ESCAPE
-    tok_string = tokens.STRING
-    tok_commas = tokens.COMMAS
-
-    for char_no, char in enumerate(raw_argument_string, start=1):
-        if escape_ctx:
-            escape_ctx = False
-            argument += char
-        elif char in tok_escape:
-            escape_ctx = True
-        elif char in tok_string:
-            if string_ctx and not explicit_strings_ctx:
-                msg = f"Implicit string closed with explicit string character {char}"
-                raise InternalConfigError(msg, extra=char_no)
-            explicit_strings_ctx = True
-            if string_ctx is None:
-                # we enter a string
-                string_ctx = char
-            elif string_ctx == char:
-                # we exit a string
-                string_ctx = None
-            else:
-                # we are in a string
-                argument += char
-        elif char in tok_commas:
-            if string_ctx:
-                if not explicit_strings_ctx:
-                    string_ctx = None
-                    explicit_strings_ctx = True
-                    emit(argument)
-                    argument = ""
-            else:
-                if prev_char in {*tok_commas, None}:
-                    msg = "Empty argument"
-                    raise InternalConfigError(msg, extra=char_no)
-                emit(argument)
-                argument = ""
-                explicit_strings_ctx = False
-        elif not string_ctx and not char.isspace():
-            if prev_char in {*tok_commas, None}:
-                string_ctx = char
-                argument += char
-                explicit_strings_ctx = False
-            if explicit_strings_ctx:
-                msg = "Unexpected character after explicit string"
-                raise InternalConfigError(msg, extra=char_no)
-        else:
-            argument += char
-        prev_char = char
-    return arguments
-
-
-def _parse_argument_string(
-    raw_argument_string: str,
-    tokens: type[Tokens] = Tokens,
-) -> list[str]:
-    """Half for jokes, half for serious use"""
-
-    tok_commas = tokens.COMMAS
-
-    if any(raw_argument_string.endswith(tok) for tok in tok_commas):
-        raw_argument_string = raw_argument_string[:-1]
-    raw_argument_string += tok_commas[0]
-
-    if raw_argument_string in tok_commas:
-        return []
-
-    with pretty_syntax_error(raw_argument_string):
-        return _parse_argument_string_impl(raw_argument_string, tokens)
 
 
 def parse_directive_call(
     prefix: str,
     directive_name: str,
-    tokens: type[Tokens] = Tokens,
-) -> tuple[str, list[str]]:
-    arguments = []
+) -> str:
     if directive_name.startswith(prefix):
         directive_name = directive_name[len(prefix) :].casefold()
 
-        if directive_name.endswith(tokens.RPAREN):
-            try:
-                lpar = directive_name.index(tokens.LPAREN)
-            except ValueError:
-                msg = f"invalid directive call: {directive_name}"
-                raise ConfigPreprocessingError(msg) from None
-            (directive_name, raw_argument_string) = (
-                directive_name[:lpar],
-                directive_name[lpar + 1 : -1],
-            )
-            arguments = _parse_argument_string(raw_argument_string, tokens)
-
         if not directive_name.isidentifier():
-            msg = f"invalid directive name: {directive_name}"
+            msg = f"Invalid directive name: {directive_name}"
             raise ConfigPreprocessingError(msg)
 
-    return directive_name, arguments
+    return directive_name
 
 
 if TYPE_CHECKING:
@@ -287,10 +157,10 @@ class BaseProcessor(Generic[ConfigModelT]):
 
     def __init__(
         self,
-        manager: ConfigManager[ConfigModelT],
+        agent: ConfigAgent[ConfigModelT],
         dict_config: dict[str, Any],
     ) -> None:
-        self.manager = manager
+        self.agent = agent
         self.dict_config = dict_config
 
     @classmethod
@@ -417,16 +287,13 @@ class BaseProcessor(Generic[ConfigModelT]):
                 replacement = overridden | value
                 result[actual_key] = self._preprocess(replacement)
             elif key.startswith(self.directive_prefix):
-                directive_name, arguments = parse_directive_call(
-                    self.directive_prefix, key
-                )
+                directive_name = parse_directive_call(self.directive_prefix, key)
                 context_container = container.copy()
                 del context_container[key]
                 context = DirectiveContext(
                     directive=directive_name,
                     key=key,
                     prefix=self.directive_prefix,
-                    arguments=arguments,
                     snippet=value,
                     container=context_container,
                 )
@@ -461,16 +328,13 @@ class BaseProcessor(Generic[ConfigModelT]):
                 replacement = overridden | value
                 result[actual_key] = await self._preprocess_async(replacement)
             elif key.startswith(self.directive_prefix):
-                directive_name, arguments = parse_directive_call(
-                    self.directive_prefix, key
-                )
+                directive_name = parse_directive_call(self.directive_prefix, key)
                 context_container = container.copy()
                 del context_container[key]
                 context = DirectiveContext(
                     directive=directive_name,
                     key=key,
                     prefix=self.directive_prefix,
-                    arguments=arguments,
                     snippet=value,
                     container=context_container,
                 )
@@ -522,7 +386,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         cls._directive_handlers[name] = func
 
     @classmethod
-    def directive(cls, directive_name: str, arguments: list[str] | None = None) -> str:
+    def directive(cls, directive_name: str) -> str:
         """
         Create a directive call.
 
@@ -530,29 +394,15 @@ class BaseProcessor(Generic[ConfigModelT]):
         ----------
         directive_name
             The name of the directive.
-        arguments
-            The arguments to pass to the directive.
 
         Returns
         -------
         The directive call.
         """
-        if arguments is None:
-            arguments = []
-
-        def _fmt_argument(argument: str) -> str:
-            if '"' in argument:
-                argument = argument.replace("\\", "\\\\")
-                return f'"{argument}"'
-            return argument
-
         if isinstance(directive_name, enum.Enum):
             directive_name = directive_name.value
 
-        fmt_arguments = (
-            ",".join(map(_fmt_argument, arguments)).join("()") if arguments else ""
-        )
-        return cls.directive_prefix + directive_name + fmt_arguments
+        return cls.directive_prefix + directive_name
 
 
 class Directives(str, enum.Enum):
@@ -705,56 +555,53 @@ class Processor(BaseProcessor[ConfigModelT]):
         """
         await self._substitute_async(ctx, preprocess=False, preserve=False)
 
-    def _get_substitution_info(
-        self, ctx: DirectiveContext, *, preserve: bool
+    def _get_substitution_means(
+        self, ctx: DirectiveContext  # , *, preserve: bool
     ) -> tuple[
-        ConfigManager[ConfigModelT], ConfigManager[ConfigModelT], SupportsRoute | None
+        ConfigAgent[ConfigModelT], ConfigAgent[ConfigModelT], SupportsRoute | None
     ]:
-        manager_class = type(self.manager)
+        agent_class = type(self.agent)
 
-        if len(ctx.arguments):
-            msg = f"{ctx.directive!r} directive takes no () arguments"
-            raise ConfigPreprocessingError(msg)
+        # todo(bswck): raise on include and extend combined
+        # if preserve and ???:
+        #     msg = (
+        #         "Using more than one ??? directive "
+        #         "in the same scope is not allowed"
+        #     )
+        #     raise ConfigPreprocessingError(msg)
 
-        if preserve and ctx.has_duplicates(require_same_arguments=False):
-            msg = (
-                f"using more than one {ctx.directive!r} directive "
-                "in the same section is not allowed"
-            )
-            raise ConfigPreprocessingError(msg)
-
-        manager, route = manager_class.from_directive_context(
+        agent, route = agent_class.from_directive_context(
             ctx, route_separator=self.route_separator
         )
 
-        if manager.resource == self.manager.resource:
+        if agent.resource == self.agent.resource:
             raise ConfigPreprocessingError(
-                f"{manager.resource} tried to {ctx.directive!r} on itself"
+                f"{agent.resource} tried to {ctx.directive!r} on itself"
             )
 
-        actual_manager = manager
-        if manager.relative:
-            parent = cast(pathlib.Path, self.manager.resource).parent
-            child = cast(pathlib.Path, manager.resource)
+        actual_agent = agent
+        if agent.relative:
+            parent = cast(pathlib.Path, self.agent.resource).parent
+            child = cast(pathlib.Path, agent.resource)
 
-            actual_manager = copy.copy(manager)
-            actual_manager.resource = parent / child
+            actual_agent = copy.copy(agent)
+            actual_agent.resource = parent / child
 
-        return actual_manager, manager, route
+        return actual_agent, agent, route
 
     def _substitute(
         self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
     ) -> None:
-        actual_mgr, mgr, route = self._get_substitution_info(ctx, preserve=preserve)
+        agent, orig_agent, route = self._get_substitution_means(ctx)
 
-        with actual_mgr.processor_open_resource() as reader:
-            source = mgr.load_into_dict(reader.read(), preprocess=preprocess)
+        with agent.processor_open_resource() as reader:
+            source = orig_agent.load_into_dict(reader.read(), preprocess=preprocess)
 
         self._substitute_impl(
             ctx,
             route,
             source=source,
-            manager=mgr,
+            agent=orig_agent,
             preprocess=preprocess,
             preserve=preserve,
         )
@@ -762,16 +609,18 @@ class Processor(BaseProcessor[ConfigModelT]):
     async def _substitute_async(
         self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
     ) -> None:
-        actual_mgr, mgr, route = self._get_substitution_info(ctx, preserve=preserve)
+        agent, orig_agent, route = self._get_substitution_means(ctx)
 
-        async with actual_mgr.processor_open_resource_async() as reader:
-            source = mgr.load_into_dict(await reader.read(), preprocess=preprocess)
+        async with agent.processor_open_resource_async() as reader:
+            source = orig_agent.load_into_dict(
+                await reader.read(), preprocess=preprocess
+            )
 
         self._substitute_impl(
             ctx,
             route,
             source=source,
-            manager=mgr,
+            agent=orig_agent,
             preprocess=preprocess,
             preserve=preserve,
         )
@@ -782,21 +631,21 @@ class Processor(BaseProcessor[ConfigModelT]):
         route: SupportsRoute | None,
         *,
         source: dict[str, Any],
-        manager: ConfigManager[ConfigModelT],
+        agent: ConfigAgent[ConfigModelT],
         preprocess: bool,
         preserve: bool,
     ) -> None:
         from configzen.config import CONTEXT, Context, at
 
         if route:
-            source = at(source, route, manager=manager)
+            source = at(source, route, agent=agent)
             if not is_dict_like(source):
                 raise ConfigPreprocessingError(
                     f"imported item {route!r} "
-                    f"from {manager.resource} is not a dictionary"
+                    f"from {agent.resource} is not a dictionary"
                 )
 
-        context: Context[ConfigModelT] = Context(manager)
+        context: Context[ConfigModelT] = Context(agent)
         ctx.container = source | ctx.container
 
         if preserve:
@@ -831,14 +680,14 @@ class Processor(BaseProcessor[ConfigModelT]):
         route = metadata["route"]
         context = metadata["context"]
         key_order = metadata["key_order"]
-        manager = context.manager
+        agent = context.agent
 
-        with manager.processor_open_resource() as reader:
+        with agent.processor_open_resource() as reader:
             # Here we intentionally always preprocess the loaded configuration.
-            loaded = manager.load_into_dict(reader.read())
+            loaded = agent.load_into_dict(reader.read())
 
             if route:
-                loaded = at(loaded, route, manager=manager)
+                loaded = at(loaded, route, agent=agent)
 
         substituted_values = loaded.copy()
 
@@ -862,7 +711,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     )
                 }
                 if overrides_for_key:
-                    export_key = manager.processor_class.extension_prefix + key
+                    export_key = agent.processor_class.extension_prefix + key
                     overrides[export_key] = overrides_for_key
 
             elif is_list_like(value):
@@ -905,14 +754,14 @@ class Processor(BaseProcessor[ConfigModelT]):
         route = metadata["route"]
         context = metadata["context"]
         key_order = metadata["key_order"]
-        manager = context.manager
+        agent = context.agent
 
-        async with manager.processor_open_resource_async() as reader:
+        async with agent.processor_open_resource_async() as reader:
             # Here we intentionally always preprocess the loaded configuration.
-            loaded = await manager.load_into_dict_async(await reader.read())
+            loaded = await agent.load_into_dict_async(await reader.read())
 
             if route:
-                loaded = at(loaded, route, manager=manager)
+                loaded = at(loaded, route, agent=agent)
 
         substituted_values = loaded.copy()
 
@@ -936,7 +785,7 @@ class Processor(BaseProcessor[ConfigModelT]):
                     )
                 }
                 if overrides_for_key:
-                    export_key = manager.processor_class.extension_prefix + key
+                    export_key = agent.processor_class.extension_prefix + key
                     overrides[export_key] = overrides_for_key
 
             elif is_list_like(value):
@@ -969,7 +818,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         route: str | None,
         key_order: list[str],
     ) -> None:
-        # TODO: Optimize. We iterate over the same too many times.
+        # TODO: Optimize. We iterate over the same way too many times.
 
         state |= overrides
         extras: dict[str, Any] = {
@@ -978,7 +827,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         if values:
             substitution_directive = cls.directive(Directives.EXTEND)
-            resource = str(context.manager.resource)
+            resource = str(context.agent.resource)
             if route:
                 resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.

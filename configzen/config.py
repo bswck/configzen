@@ -93,10 +93,11 @@ from pydantic.utils import ROOT_KEY
 
 from configzen.errors import (
     ConfigAccessError,
-    InternalConfigError,
+    InternalSyntaxError,
     ResourceLookupError,
     UnspecifiedParserError,
-    pretty_syntax_error,
+    UnavailableParserError,
+    formatted_syntax_error,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.typedefs import (
@@ -119,7 +120,7 @@ except ImportError:
     AIOFILES_AVAILABLE = False
 
 __all__ = (
-    "ConfigManager",
+    "ConfigAgent",
     "ConfigModel",
     "ConfigMeta",
     "save",
@@ -165,7 +166,7 @@ def _get_defaults_from_model_class(
     return defaults
 
 
-def _vars(obj: Any) -> dict[str, Any]:
+def _vars_or_dict(obj: Any) -> dict[str, Any]:
     obj_dict = obj
     if not isinstance(obj, dict):
         obj_dict = obj.__dict__
@@ -307,7 +308,7 @@ def with_post_deserialize(
 
 
 @functools.singledispatch
-def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
+def export(obj: Any, *, json: bool = False, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -316,14 +317,18 @@ def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
     Parameters
     ----------
     obj
+    json
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return obj.export(**kwargs)
-    return cast(dict[str, Any], obj.dict(**kwargs))
+    exporter = obj.json if json else obj.dict
+    return cast(dict[str, Any], exporter(**kwargs))
 
 
 @functools.singledispatch
-async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
+async def export_async(
+    obj: Any, *, json: bool = False, **kwargs: Any
+) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -332,10 +337,12 @@ async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     Parameters
     ----------
     obj
+    json
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return await obj.export_async(**kwargs)
-    return cast(dict[str, Any], await obj.dict_async(**kwargs))
+    exporter = obj.json_async if json else obj.dict_async
+    return cast(dict[str, Any], await exporter(**kwargs))
 
 
 def with_exporter(
@@ -457,18 +464,18 @@ def _delegate_ac_options(
         for target in targets:
             if actual_key in target:
                 msg = (
-                    f"option {key}={value!r} overlaps with "
+                    f"Option {key}={value!r} overlaps with "
                     f"defined {actual_key}={target[actual_key]!r}"
                 )
                 raise ValueError(msg)
             target[actual_key] = value
 
 
-class ConfigManager(Generic[ConfigModelT]):
+class ConfigAgent(Generic[ConfigModelT]):
     """
-    A configuration resource loader and saver.
+    Configuration resource agent: loader and saver.
 
-    This class is used to represent a configuration resource, which
+    This class is used to broke between the model and the home resource, which
     can be a file, a URL, or a file-like object. It is used internally
     by `ConfigModel` and `AsyncConfigModel` to load and save
     configuration files.
@@ -555,6 +562,14 @@ class ConfigManager(Generic[ConfigModelT]):
         "separators",
         "default",
         "sort_keys",
+    }
+    EXPORT_KWARGS: ClassVar[set[str]] = {
+        "by_alias",
+        "include",
+        "exclude",
+        "exclude_unset",
+        "exclude_defaults",
+        "exclude_none",
     }
 
     def __init__(
@@ -643,14 +658,19 @@ class ConfigManager(Generic[ConfigModelT]):
         The resource of the configuration.
         """
         self._resource = value
-        self.ac_parser = self.ac_parser or self._guess_ac_parser()
+        if self.ac_parser is None:
+            self.ac_parser = self._guess_ac_parser()
 
     def _guess_ac_parser(self) -> str | None:
         ac_parser = None
         if isinstance(self.resource, pathlib.Path):
             ac_parser = self.resource.suffix[1:].casefold()
             if not ac_parser:
-                msg = f"Could not guess the engine to use for {self.resource!r}."
+                msg = (
+                    "Could not guess the anyconfig parser to use for "
+                    f"{self.resource!r}.\n"
+                    f"Available parsers: {', '.join(anyconfig.list_types())}"
+                )
                 raise UnspecifiedParserError(msg)
         return ac_parser
 
@@ -710,9 +730,7 @@ class ConfigManager(Generic[ConfigModelT]):
         The loaded configuration.
         """
         dict_config = await self.load_into_dict_async(
-            blob,
-            ac_parser=ac_parser,
-            **kwargs
+            blob, ac_parser=ac_parser, **kwargs
         )
         if dict_config is None:
             dict_config = {}
@@ -724,12 +742,17 @@ class ConfigManager(Generic[ConfigModelT]):
         ac_parser: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
+        ac_parser = ac_parser or self.ac_parser or self._guess_ac_parser()
         if ac_parser is None:
-            ac_parser = self.ac_parser
+            msg = "Cannot read configuration because `ac_parser` was not specified"
+            raise UnspecifiedParserError(msg)
         kwargs = self.load_options | kwargs
-        loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
-            blob, ac_parser=ac_parser, **kwargs
-        )
+        try:
+            loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
+                blob, ac_parser=ac_parser, **kwargs
+            )
+        except anyconfig.UnknownParserTypeError as exc:
+            raise UnavailableParserError(str(exc).split()[-1], self) from exc
         if not isinstance(loaded, collections.abc.Mapping):
             msg = (
                 f"Expected a mapping as a result of loading {self.resource}, "
@@ -765,7 +788,7 @@ class ConfigManager(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._load_into_dict_impl(blob, ac_parser, **kwargs)
+        loaded = self._load_into_dict_impl(blob, ac_parser=ac_parser, **kwargs)
         if preprocess:
             loaded = self.processor_class(self, loaded).preprocess()
         return loaded
@@ -824,10 +847,13 @@ class ConfigManager(Generic[ConfigModelT]):
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
+        export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
         if ac_parser == "json" and self.use_pydantic_json:
-            kwargs = filter_options(self.JSON_KWARGS, self.dump_options | kwargs)
-            return config.json(**kwargs)
-        return self.dump_data(export(config), ac_parser=ac_parser, **kwargs)
+            export_kwargs |= filter_options(
+                self.JSON_KWARGS, self.dump_options | kwargs
+            ) | {"json": True}
+        data = export(config, **export_kwargs)
+        return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
     async def dump_config_async(
         self,
@@ -853,10 +879,13 @@ class ConfigManager(Generic[ConfigModelT]):
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
+        export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
         if ac_parser == "json" and self.use_pydantic_json:
-            kwargs = filter_options(self.JSON_KWARGS, self.dump_options | kwargs)
-            return await config.json_async(**kwargs)
-        return self.dump_data(await export_async(config), ac_parser=ac_parser, **kwargs)
+            export_kwargs |= filter_options(
+                self.JSON_KWARGS, self.dump_options | kwargs
+            ) | {"json": True}
+        data = await export_async(config, **export_kwargs)
+        return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
     def dump_data(
         self,
@@ -882,8 +911,16 @@ class ConfigManager(Generic[ConfigModelT]):
         """
         if ac_parser is None:
             ac_parser = self.ac_parser
+        if ac_parser is None:
+            msg = (
+                "Cannot write configuration because `ac_parser` was not specified"
+                f"for agent {self}"
+            )
+            raise UnspecifiedParserError(msg)
         kwargs = self.dump_options | kwargs
-        return anyconfig.dumps(pre_serialize(data), ac_parser=ac_parser, **kwargs)
+        return anyconfig.dumps(
+            pre_serialize(data), ac_parser=ac_parser.casefold(), **kwargs
+        )
 
     @property
     def is_url(self) -> bool:
@@ -946,11 +983,11 @@ class ConfigManager(Generic[ConfigModelT]):
         The opened resource.
         """
         if self.is_url:
-            msg = "asynchronous URL opening is not supported"
+            msg = "Asynchronous URL opening is not supported"
             raise NotImplementedError(msg)
         if not AIOFILES_AVAILABLE:
             msg = (
-                "aiofiles is not available, cannot open file "
+                "Aiofiles is not available, cannot open file "
                 "asynchronously (install with `pip install aiofiles`)"
             )
             raise RuntimeError(msg)
@@ -1011,7 +1048,7 @@ class ConfigManager(Generic[ConfigModelT]):
             elif method == "write":
                 new_kwargs.setdefault("mode", "w")
             else:
-                msg = f"invalid resource access method: {method!r}"
+                msg = f"Invalid resource access method: {method!r}"
                 raise ValueError(msg)
         return new_kwargs
 
@@ -1137,9 +1174,9 @@ class ConfigManager(Generic[ConfigModelT]):
         /,
         route_separator: str = ":",
         route_class: type[Route] | None = None,
-    ) -> tuple[ConfigManager[ConfigModelT], SupportsRoute | None]:
+    ) -> tuple[ConfigAgent[ConfigModelT], SupportsRoute | None]:
         """
-        Create a configuration manager from a preprocessor directive context.
+        Create a configuration agent from a preprocessor directive context.
         Return an optional scope that the context points to.
 
         Parameters
@@ -1150,7 +1187,7 @@ class ConfigManager(Generic[ConfigModelT]):
 
         Returns
         -------
-        The configuration manager.
+        The configuration agent.
         """
         if route_class is None:
             route_class = Route
@@ -1169,7 +1206,7 @@ class ConfigManager(Generic[ConfigModelT]):
             args += list(ctx.snippet)
         else:
             msg = (
-                f"invalid snippet for the {ctx.directive!r} directive: {ctx.snippet!r}"
+                f"Invalid snippet for the {ctx.directive!r} directive: {ctx.snippet!r}"
             )
             raise ValueError(msg)
         return cls(*args, **kwargs), str(route)
@@ -1181,8 +1218,9 @@ class ConfigManager(Generic[ConfigModelT]):
 
 class Route:
     TOK_DOT: ClassVar[str] = "."
-    TOK_DOTLIST_ESCAPE_ENTER: ClassVar[str] = "["
-    TOK_DOTLIST_ESCAPE_EXIT: ClassVar[str] = "]"
+    TOK_ESCAPE: ClassVar[str] = "\\"
+    TOK_DOTLISTESC_ENTER: ClassVar[str] = "["
+    TOK_DOTLISTESC_EXIT: ClassVar[str] = "]"
 
     def __init__(self, route: SupportsRoute) -> None:
         self.list_route = self.parse(route)
@@ -1194,62 +1232,91 @@ class Route:
         if isinstance(route, list):
             return route
         if isinstance(route, str):
-            with pretty_syntax_error(route):
+            with formatted_syntax_error(route):
                 return cls._decompose(route)
         raise TypeError(f"invalid route type {type(route)!r}")
 
     @classmethod
-    def _decompose(cls, route: str) -> list[str]:
-        route = route.removesuffix(cls.TOK_DOT) + cls.TOK_DOT
-        argument = ""
-        escape_ctx = False
-        prev_char: str | None = None
-        list_route = []
-        for char_no, char in enumerate(route, start=1):
-            if char in cls.TOK_DOT:
-                if escape_ctx:
-                    argument += char
+    def _decompose(cls, route: str) -> list[str]:  # noqa: C901, PLR0912
+        tok_dot = cls.TOK_DOT
+        tok_escape = cls.TOK_ESCAPE
+        tok_dle_enter = cls.TOK_DOTLISTESC_ENTER
+        tok_dle_exit = cls.TOK_DOTLISTESC_EXIT
+
+        route = route.removesuffix(tok_dot) + tok_dot
+
+        part = ""
+        dle_ctx = None
+        list_route: list[str] = []
+        enter = list_route.append
+        error = functools.partial(InternalSyntaxError, prefix="Route(", suffix=")")
+        escape = False
+
+        for index, char in enumerate(route):
+            if escape:
+                part += char
+                escape = False
+                continue
+            is_last = index == len(route) - 1
+            if char == tok_dot:
+                if dle_ctx is not None:
+                    part += char
                 else:
-                    list_route.append(argument)
-                    argument = ""
-            elif char in cls.TOK_DOTLIST_ESCAPE_ENTER:
-                if prev_char and prev_char in cls.TOK_DOTLIST_ESCAPE_EXIT:
-                    raise InternalConfigError(
-                        "invalid escape sequence "
-                        f"(expected {cls.TOK_DOT} between escape sequences)",
-                        extra=char_no,
-                    )
-                if escape_ctx:
-                    msg = "invalid escape sequence"
-                    raise InternalConfigError(msg, extra=char_no)
-                escape_ctx = True
-            elif char in cls.TOK_DOTLIST_ESCAPE_EXIT:
-                if not escape_ctx:
-                    msg = "invalid escape sequence"
-                    raise InternalConfigError(msg, extra=char_no)
-                escape_ctx = False
-                list_route.append(argument)
-                argument = ""
+                    enter(part)
+                    part = ""
+            elif char == tok_escape:
+                if is_last:
+                    part += char
+                else:
+                    escape = True
+            elif char == tok_dle_enter:
+                if dle_ctx is not None:
+                    # a special character at its place
+                    part += char
+                else:
+                    dle_ctx = index
+            elif char == tok_dle_exit:
+                if is_last or route[index + 1] == tok_dot:
+                    if dle_ctx is None:
+                        msg = (
+                            "Dotlist escape sequence "
+                            f"was not opened with {tok_dle_enter!r}"
+                        )
+                        raise error(msg, index=index)
+                    dle_ctx = None
+                else:
+                    # a special character at its place
+                    part += char
             else:
-                argument += char
-            prev_char = char
+                part += char
+            if is_last and dle_ctx is not None:
+                msg = (
+                    "Unclosed dotlist escape sequence "
+                    f"(expected {tok_dle_exit!r} token)"
+                )
+                raise error(msg, index=dle_ctx)
         return list_route
 
     @classmethod
     def decompose(cls, route: str) -> list[str]:
-        with pretty_syntax_error(route):
+        with formatted_syntax_error(route):
             return cls._decompose(route)
 
     def compose(self) -> str:
-        escape = (self.TOK_DOTLIST_ESCAPE_ENTER, self.TOK_DOTLIST_ESCAPE_EXIT)
+        escape = (self.TOK_DOTLISTESC_ENTER, self.TOK_DOTLISTESC_EXIT)
         raw = ("", "")
         return self.TOK_DOT.join(
-            fragment.join(escape) if self.TOK_DOT in fragment else fragment.join(raw)
+            fragment.join(escape).replace(
+                self.TOK_DOTLISTESC_EXIT + self.TOK_DOT,
+                self.TOK_DOTLISTESC_EXIT + self.TOK_ESCAPE + self.TOK_DOT,
+            )
+            if self.TOK_DOT in fragment
+            else fragment.join(raw)
             for fragment in self.list_route
         )
 
-    def enter(self, *args: str) -> Route:
-        return type(self)(self.list_route + list(args))
+    def enter(self, subroute: SupportsRoute) -> Route:
+        return type(self)(self.list_route + self.parse(subroute))
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Route):
@@ -1266,12 +1333,15 @@ class Route:
     def __iter__(self) -> collections.abc.Iterator[str]:
         yield from self.list_route
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.list_route})"
+
 
 def at(
     mapping: Any,
     route: SupportsRoute,
-    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _vars,
-    manager: ConfigManager[ConfigModelT] | None = None,
+    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _vars_or_dict,
+    agent: ConfigAgent[ConfigModelT] | None = None,
 ) -> Any:
     """
     Get an item at a route.
@@ -1283,7 +1353,7 @@ def at(
     route
         The route to the item.
     converter_func
-    manager
+    agent
 
     Returns
     -------
@@ -1291,13 +1361,13 @@ def at(
     """
     route = Route(route)
     route_here = []
-    scope = _vars(mapping)
+    scope = _vars_or_dict(mapping)
     try:
         for part in route:
             route_here.append(part)
             scope = converter_func(scope)[part]
     except KeyError:
-        raise ResourceLookupError(manager, route_here) from None
+        raise ResourceLookupError(agent, route_here) from None
     return scope
 
 
@@ -1351,13 +1421,13 @@ class ConfigAt(Generic[ConfigModelT]):
         route = list(Route(self.route))
         mapping = self.mapping or self.owner
         key = route.pop()
-        submapping = _vars(mapping)
+        scope = _vars_or_dict(mapping)
         route_here = []
         try:
             for part in route:
                 route_here.append(part)
-                submapping = _vars(submapping[part])
-            submapping[key] = value
+                scope = _vars_or_dict(scope[part])
+            scope[key] = value
         except KeyError:
             raise ConfigAccessError(self.owner, route_here) from None
         return mapping
@@ -1456,7 +1526,7 @@ def save(
     scope = ConfigAt(config, data, section.route)
     data = scope.update(section.get())
     context = get_context(config)
-    blob = context.manager.dump_config(config.copy(update=data), **kwargs)
+    blob = context.agent.dump_config(config.copy(update=data), **kwargs)
     result = config.write(blob, **write_kwargs)
     context.initial_state = data
     return result
@@ -1495,7 +1565,7 @@ async def save_async(
     scope = ConfigAt(config, data, section.route)
     data = scope.update(section.get())
     context = get_context(config)
-    blob = context.manager.dump_config(config.copy(update=data), **kwargs)
+    blob = context.agent.dump_config(config.copy(update=data), **kwargs)
     result = await config.write_async(blob, **write_kwargs)
     context.initial_state = data
     return result
@@ -1523,7 +1593,7 @@ def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any
     config = section.owner
     context = get_context(config)
     state = config.__dict__
-    newest = context.manager.read(config_class=type(config), **kwargs)
+    newest = context.agent.read(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     ConfigAt(config, state, section.route).update(section_data)
     return section_data
@@ -1553,7 +1623,7 @@ async def reload_async(
     config = section.owner
     context = get_context(config)
     state = config.__dict__
-    newest = await context.manager.read_async(config_class=type(config), **kwargs)
+    newest = await context.agent.read_async(config_class=type(config), **kwargs)
     section_data = ConfigAt(newest, newest.__dict__, section.route).get()
     ConfigAt(config, state, section.route).update(section_data)
     return section_data
@@ -1615,8 +1685,8 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
 
     @property
     @abc.abstractmethod
-    def manager(self) -> ConfigManager[ConfigModelT]:
-        """The configuration resource manager."""
+    def agent(self) -> ConfigAgent[ConfigModelT]:
+        """The configuration agent responsible for loading and saving."""
 
     @property
     @abc.abstractmethod
@@ -1641,8 +1711,8 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
 
     Parameters
     ----------
-    manager
-        The configuration resource.
+    agent
+        The configuration resource agent.
     owner
         The top-level configuration model instance,
         holding all belonging subcontexts.
@@ -1652,10 +1722,10 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
 
     def __init__(
         self,
-        manager: ConfigManager[ConfigModelT],
+        agent: ConfigAgent[ConfigModelT],
         owner: ConfigModelT | None = None,
     ) -> None:
-        self._manager = manager
+        self._agent = agent
         self._owner = None
         self._initial_state = {}
 
@@ -1665,8 +1735,8 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         yield from ()
 
     @property
-    def manager(self) -> ConfigManager[ConfigModelT]:
-        return self._manager
+    def agent(self) -> ConfigAgent[ConfigModelT]:
+        return self._agent
 
     @property
     def at(self) -> ConfigModelT | None:
@@ -1691,11 +1761,11 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         self._initial_state = copy.deepcopy(initial_state)
 
     def __repr__(self) -> str:
-        manager = self.manager
+        agent = self.agent
         return (
             f"<{type(self).__name__} "
             f"of {type(self.owner).__name__!r} configuration "
-            f"({manager=})>"
+            f"({agent=})>"
         )
 
 
@@ -1716,8 +1786,8 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         self._part = part
 
     @property
-    def manager(self) -> ConfigManager[ConfigModelT]:
-        return self._parent.manager
+    def agent(self) -> ConfigAgent[ConfigModelT]:
+        return self._parent.agent
 
     def trace_route(self) -> collections.abc.Iterator[str]:
         yield from self._parent.trace_route()
@@ -1745,12 +1815,12 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         self._parent.initial_state = data
 
     def __repr__(self) -> str:
-        manager = self.manager
+        agent = self.agent
         route = self.route
         return (
             f"<{type(self).__name__} "
             f"of {type(self.owner).__name__ + '.' + str(route)!r} configuration "
-            f"({manager=})>"
+            f"({agent=})>"
         )
 
 
@@ -1941,7 +2011,7 @@ class ConfigModel(
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
-                context.manager.processor_class.export(state, metadata=metadata)
+                context.agent.processor_class.export(state, metadata=metadata)
             yield from state.items()
         else:
             yield from super()._iter(**kwargs)
@@ -1956,7 +2026,7 @@ class ConfigModel(
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
-                await context.manager.processor_class.export_async(
+                await context.agent.processor_class.export_async(
                     state, metadata=metadata
                 )
             return ((key, value) for key, value in state.items())
@@ -1977,24 +2047,32 @@ class ConfigModel(
         return super()._get_value(value, to_dict=to_dict, **kwds)
 
     @classmethod
-    def _resolve_manager(
+    def _resolve_agent(
         cls,
-        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
+        resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
-    ) -> ConfigManager[ConfigModelT]:
+        ac_parser: str | None = None,
+    ) -> ConfigAgent[ConfigModelT]:
         if resource is None:
             resource = getattr(cls.__config__, "resource", None)
         if resource is None:
             raise ValueError("No resource specified")
-        manager: ConfigManager[ConfigModelT]
-        if isinstance(resource, ConfigManager):
-            manager = resource
+        if ac_parser is None:
+            ac_parser = getattr(cls.__config__, "ac_parser", None)
+        agent: ConfigAgent[ConfigModelT]
+        if isinstance(resource, ConfigAgent):
+            agent = resource
         else:
-            manager = ConfigManager(resource)
+            agent = ConfigAgent(
+                resource,
+                ac_parser=ac_parser,
+            )
         if create_if_missing is not None:
-            manager.create_if_missing = create_if_missing
-        return manager
+            agent.create_if_missing = create_if_missing
+        if ac_parser is not None:
+            agent.ac_parser = cast(str, ac_parser)
+        return agent
 
     @property
     def initial_state(self) -> dict[str, Any]:
@@ -2065,9 +2143,10 @@ class ConfigModel(
     @classmethod
     def load(
         cls: type[ConfigModelT],
-        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
+        resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
+        ac_parser: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """
@@ -2078,6 +2157,8 @@ class ConfigModel(
         ----------
         resource
             The configuration resource to read from/write to.
+        ac_parser
+            The anyconfig parser to use.
         create_if_missing
             Whether to create the configuration file if it does not exist.
         **kwargs
@@ -2087,12 +2168,21 @@ class ConfigModel(
         -------
         self
         """
-        cls.update_forward_refs()
-        manager = cls._resolve_manager(resource, create_if_missing=create_if_missing)
-        context = Context(manager)  # type: Context[ConfigModelT]
+        agent = cls._resolve_agent(
+            resource,
+            ac_parser=ac_parser,
+            create_if_missing=create_if_missing,
+        )
+        context = Context(agent)  # type: Context[ConfigModelT]
         current_context.set(context)
         local = contextvars.copy_context()
-        config = manager.read(config_class=cls, **kwargs)
+        if getattr(
+            cls.__config__,
+            "autoupdate_forward_refs",
+            ConfigMeta.autoupdate_forward_refs,
+        ):
+            cls.update_forward_refs()
+        config = agent.read(config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
         context.owner = config
         context.initial_state = config.__dict__
@@ -2114,7 +2204,7 @@ class ConfigModel(
         context = get_context(self)
         tok = current_context.set(get_context(context.owner))
         if context.owner is self:
-            changed = context.manager.read(config_class=type(self), **kwargs)
+            changed = context.agent.read(config_class=type(self), **kwargs)
         else:
             changed = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
         current_context.reset(tok)
@@ -2144,7 +2234,7 @@ class ConfigModel(
         if context.owner is self:
             if write_kwargs is None:
                 write_kwargs = {}
-            blob = context.manager.dump_config(self, **kwargs)
+            blob = context.agent.dump_config(self, **kwargs)
             result = self.write(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
@@ -2170,16 +2260,17 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.manager.is_url:
+        if context.agent.is_url:
             msg = "Writing to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return context.manager.write(blob, **kwargs)
+        return context.agent.write(blob, **kwargs)
 
     @classmethod
     async def load_async(
         cls: type[ConfigModelT],
-        resource: ConfigManager[ConfigModelT] | RawResourceT | None = None,
+        resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
+        ac_parser: str | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -2191,6 +2282,8 @@ class ConfigModel(
         ----------
         resource
             The configuration resource.
+        ac_parser
+            The anyconfig parser to use.
         create_if_missing
             Whether to create the configuration file if it does not exist.
         **kwargs
@@ -2200,11 +2293,19 @@ class ConfigModel(
         -------
         self
         """
-        manager = cls._resolve_manager(resource, create_if_missing=create_if_missing)
-        context = Context(manager)  # type: Context[ConfigModelT]
+        agent = cls._resolve_agent(
+            resource, create_if_missing=create_if_missing, ac_parser=ac_parser
+        )
+        context = Context(agent)  # type: Context[ConfigModelT]
         current_context.set(context)
         local = contextvars.copy_context()
-        config = await manager.read_async(config_class=cls, **kwargs)
+        if getattr(
+            cls.__config__,
+            "autoupdate_forward_refs",
+            ConfigMeta.autoupdate_forward_refs,
+        ):
+            cls.update_forward_refs()
+        config = await agent.read_async(config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
         context.owner = config
         return config
@@ -2225,9 +2326,7 @@ class ConfigModel(
         context = get_context(self)
         tok = current_context.set(get_context(context.owner))
         if context.owner is self:
-            changed = await context.manager.read_async(
-                config_class=type(self), **kwargs
-            )
+            changed = await context.agent.read_async(config_class=type(self), **kwargs)
         else:
             changed = await reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
@@ -2260,9 +2359,7 @@ class ConfigModel(
             if write_kwargs is None:
                 write_kwargs = {}
             tok = _exporting.set(True)  # noqa: FBT003
-            task = asyncio.create_task(
-                context.manager.dump_config_async(self, **kwargs)
-            )
+            task = asyncio.create_task(context.agent.dump_config_async(self, **kwargs))
             _exporting.reset(tok)
             blob = await task
             result = await self.write_async(blob, **write_kwargs)
@@ -2290,10 +2387,10 @@ class ConfigModel(
         The number of bytes written.
         """
         context = get_context(self)
-        if context.manager.is_url:
+        if context.agent.is_url:
             msg = "Saving to URLs is not yet supported"
             raise NotImplementedError(msg)
-        return await context.manager.write_async(blob, **kwargs)
+        return await context.agent.write_async(blob, **kwargs)
 
     @classmethod
     def __field_setup__(cls, value: Any, field: ModelField) -> Any:
@@ -2301,7 +2398,7 @@ class ConfigModel(
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            vs = _vars(value)
+            vs = _vars_or_dict(value)
             vs[TOKEN] = tok
             vs[LOCAL] = contextvars.copy_context()
         return value
@@ -2318,10 +2415,20 @@ class ConfigMeta(pydantic.BaseSettings.Config):
 
         If a string, it will be interpreted as a path to a file.
 
+    ac_parser
+        The anyconfig parser to use.
+
+    autoupdate_forward_refs
+        Whether to automatically update forward references
+        when `ConfigModel.load()` or `ConfigModel.load_async()`
+        methods are called. For convenience, defaults to `True`.
+
     And all other attributes from `pydantic.BaseSettings.Config`.
     """
 
-    resource: ConfigManager[ConfigModel] | RawResourceT | None = None
+    resource: ConfigAgent[ConfigModel] | RawResourceT | None = None
+    ac_parser: str | None = None
     validate_assignment: bool = True
+    autoupdate_forward_refs: bool = True
 
     Extra = pydantic.Extra
