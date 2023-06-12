@@ -24,7 +24,6 @@ __all__ = (
     "Processor",
 )
 
-
 DirectiveT = TypeVar("DirectiveT")
 
 EXPORT: str = "__configzen_export__"
@@ -80,8 +79,6 @@ class DirectiveContext:
         The key of the directive.
     prefix
         The prefix of the directive.
-    arguments
-        The arguments of the directive.
     snippet
         The config snippet where this directive was invoked.
     container
@@ -189,10 +186,10 @@ class BaseProcessor(Generic[ConfigModelT]):
             if metadata:
                 cls._export(state, metadata)
             else:
-                cls.export(list(state.values()), metadata=None)
+                cls.export(list(state.values()))
         elif is_list_like(state):
             for item in state:
-                cls.export(item, metadata=None)
+                cls.export(item)
 
     @classmethod
     async def export_async(
@@ -220,10 +217,10 @@ class BaseProcessor(Generic[ConfigModelT]):
             if metadata:
                 await cls._export_async(state, metadata)
             else:
-                await cls.export_async(list(state.values()), metadata=None)
+                await cls.export_async(list(state.values()))
         elif is_list_like(state):
             for item in state:
-                await cls.export_async(item, metadata=None)
+                await cls.export_async(item)
 
     @classmethod
     def _export(
@@ -715,14 +712,14 @@ class Processor(BaseProcessor[ConfigModelT]):
                     overrides[export_key] = overrides_for_key
 
             elif is_list_like(value):
-                cls.export(value, metadata=None)
+                cls.export(value)
 
             elif counterpart_value != value:
                 overrides[key] = counterpart_value
                 del substituted_values[key]
 
         for value in state.values():
-            cls.export(value, metadata=None)
+            cls.export(value)
 
         cls._export_finalize(
             context=context,
@@ -789,14 +786,14 @@ class Processor(BaseProcessor[ConfigModelT]):
                     overrides[export_key] = overrides_for_key
 
             elif is_list_like(value):
-                await cls.export_async(value, metadata=None)
+                await cls.export_async(value)
 
             elif counterpart_value != value:
                 overrides[key] = counterpart_value
                 del substituted_values[key]
 
         for value in state.values():
-            await cls.export_async(value, metadata=None)
+            await cls.export_async(value)
 
         cls._export_finalize(
             context=context,

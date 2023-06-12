@@ -7,7 +7,7 @@ files in various formats and within a number of advanced methods.
 
 .. code-block:: python
 
-    from configzen import ConfigModel, ConfigResource, ConfigField, ConfigMeta
+    from configzen import ConfigModel, ConfigField, ConfigMeta
 
     class DatabaseConfig(ConfigModel):
         host: str
@@ -108,7 +108,6 @@ from configzen.typedefs import (
     NormalizedResourceT,
     RawResourceT,
     SupportsRoute,
-    T,
 )
 
 try:
@@ -128,13 +127,9 @@ __all__ = (
     "reload",
     "reload_async",
     "pre_serialize",
-    "with_pre_serialize",
     "post_deserialize",
-    "with_post_deserialize",
     "export",
     "export_async",
-    "with_exporter",
-    "with_async_exporter",
 )
 
 _URL_SCHEMES: set[str] = set(
@@ -146,7 +141,7 @@ LOCAL: str = "__local__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -166,7 +161,7 @@ def _get_defaults_from_model_class(
     return defaults
 
 
-def _vars_or_dict(obj: Any) -> dict[str, Any]:
+def _get_object_dict(obj: Any) -> dict[str, Any]:
     obj_dict = obj
     if not isinstance(obj, dict):
         obj_dict = obj.__dict__
@@ -211,51 +206,6 @@ for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
     pre_serialize.register(obj_type, obj_encoder)
 
 
-def with_pre_serialize(
-    func: collections.abc.Callable[[T], Any], cls: type[T] | None = None
-) -> type[T] | Any:
-    """
-    Register a pre-serialization converter function for a type.
-
-    Parameters
-    ----------
-    func
-        The converter function.
-
-    cls
-        The type to register the converter for.
-        Optional for the decoration syntax.
-
-    Returns
-    -------
-    The conversion result class.
-
-    Usage
-    -----
-    .. code-block:: python
-
-        @with_pre_serialize(converter_func)
-        class MyClass:
-            ...
-
-    """
-    if cls is None:
-        return functools.partial(with_pre_serialize, func)
-
-    pre_serialize.register(cls, func)
-
-    if not hasattr(cls, "__get_validators__"):
-
-        def validator_gen() -> (
-            collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
-        ):
-            yield lambda value: post_deserialize.dispatch(cls)(cls, value)
-
-        cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
-
-    return cls
-
-
 @functools.singledispatch
 def post_deserialize(cls: Any, value: Any) -> Any:
     """
@@ -280,31 +230,6 @@ def post_deserialize(cls: Any, value: Any) -> Any:
     if isinstance(value, cls):
         return value
     return cls(value)
-
-
-def with_post_deserialize(
-    func: collections.abc.Callable[[Any], T], cls: type[T] | None = None
-) -> type[T] | Any:
-    """
-    Register a loader function for a type.
-
-    Parameters
-    ----------
-    func
-        The loader function.
-    cls
-        The type to register the loader for.
-
-    Returns
-    -------
-    The loading result class.
-    """
-
-    if cls is None:
-        return functools.partial(with_post_deserialize, func)
-
-    post_deserialize.register(cls, func)
-    return cls
 
 
 @functools.singledispatch
@@ -337,56 +262,6 @@ async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return await obj.export_async(**kwargs)
     return cast(dict[str, Any], await obj.dict_async(**kwargs))
-
-
-def with_exporter(
-    func: collections.abc.Callable[[ConfigModelT], dict[str, Any]],
-    cls: type[ConfigModelT] | None = None,
-) -> type[ConfigModelT] | Any:
-    """
-    Register a custom exporter for a type.
-
-    Parameters
-    ----------
-    func
-        The exporter function.
-    cls
-        The type to register the exporter for.
-    """
-    if cls is None:
-        return functools.partial(with_exporter, func)
-
-    export.register(cls, func)
-    if export_async.dispatch(cls) is export_async:
-
-        async def default_async_func(obj: Any) -> Any:
-            return func(obj)
-
-        export_async.register(cls, default_async_func)
-    return cls
-
-
-def with_async_exporter(
-    func: collections.abc.Callable[
-        [ConfigModelT], collections.abc.Coroutine[Any, Any, dict[str, Any]]
-    ],
-    cls: type[ConfigModelT] | None = None,
-) -> type[ConfigModelT] | Any:
-    """
-    Register a custom exporter for a type.
-
-    Parameters
-    ----------
-    func
-        The exporter function.
-    cls
-        The type to register the exporter for.
-    """
-    if cls is None:
-        return functools.partial(with_exporter, func)
-
-    export_async.register(cls, func)
-    return cls
 
 
 @pre_serialize.register(list)
@@ -1342,7 +1217,7 @@ class Route:
 def at(
     mapping: Any,
     route: SupportsRoute,
-    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _vars_or_dict,
+    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _get_object_dict,
     agent: ConfigAgent[ConfigModelT] | None = None,
 ) -> Any:
     """
@@ -1363,7 +1238,7 @@ def at(
     """
     route = Route(route)
     route_here = []
-    scope = _vars_or_dict(mapping)
+    scope = _get_object_dict(mapping)
     try:
         for part in route:
             route_here.append(part)
@@ -1423,12 +1298,12 @@ class ConfigAt(Generic[ConfigModelT]):
         route = list(Route(self.route))
         mapping = self.mapping or self.owner
         key = route.pop()
-        scope = _vars_or_dict(mapping)
+        scope = _get_object_dict(mapping)
         route_here = []
         try:
             for part in route:
                 route_here.append(part)
-                scope = _vars_or_dict(scope[part])
+                scope = _get_object_dict(scope[part])
             scope[key] = value
         except KeyError:
             raise ConfigAccessError(self.owner, route_here) from None
@@ -2396,11 +2271,15 @@ class ConfigModel(
 
     @classmethod
     def __field_setup__(cls, value: Any, field: ModelField) -> Any:
+        """
+        Called when this configuration model is being initialized as a field
+        of some other configuration model.
+        """
         context = current_context.get()
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            vs = _vars_or_dict(value)
+            vs = _get_object_dict(value)
             vs[TOKEN] = tok
             vs[LOCAL] = contextvars.copy_context()
         return value

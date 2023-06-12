@@ -6,7 +6,6 @@ import collections.abc
 import contextlib
 from typing import TYPE_CHECKING, Any
 
-
 if TYPE_CHECKING:
     from configzen.config import ConfigAgent
     from configzen.typedefs import ConfigModelT

@@ -4,8 +4,7 @@ import sys
 import tempfile
 
 import pytest
-from configzen import ConfigModel, ConfigMeta, ConfigAgent
-from configzen.config import get_context
+from configzen import ConfigModel, ConfigAgent
 
 
 class Model(ConfigModel):
