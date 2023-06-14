@@ -387,7 +387,6 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     _resource: NormalizedResourceT
     processor_class: type[Processor[ConfigModelT]]
-    ac_parser: str | None
     create_if_missing: bool
     relative: bool = False
     allowed_url_schemes: set[str]
@@ -468,6 +467,8 @@ class ConfigAgent(Generic[ConfigModelT]):
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
+        self._ac_parser = None
+
         if processor_class is None:
             processor_class = Processor[ConfigModelT]
 
@@ -530,10 +531,20 @@ class ConfigAgent(Generic[ConfigModelT]):
         if self.ac_parser is None:
             self.ac_parser = self._guess_ac_parser()
 
+    @property
+    def ac_parser(self) -> str | None:
+        return self._ac_parser
+
+    @ac_parser.setter
+    def ac_parser(self, value: str | None) -> None:
+        if value is not None:
+            value = value.casefold()
+        self._ac_parser = value
+
     def _guess_ac_parser(self) -> str | None:
         ac_parser = None
         if isinstance(self.resource, pathlib.Path):
-            ac_parser = self.resource.suffix[1:].casefold()
+            ac_parser = self.resource.suffix[1:]
             if not ac_parser:
                 msg = (
                     "Could not guess the anyconfig parser to use for "
@@ -568,7 +579,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = self.load_into_dict(blob, ac_parser=ac_parser, **kwargs)
+        dict_config = self.load_dict(blob, ac_parser=ac_parser, **kwargs)
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
@@ -598,14 +609,14 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = await self.load_into_dict_async(
+        dict_config = await self.load_dict_async(
             blob, ac_parser=ac_parser, **kwargs
         )
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
 
-    def _load_into_dict_impl(
+    def _load_dict_impl(
         self,
         blob: str,
         ac_parser: str | None = None,
@@ -630,7 +641,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             raise TypeError(msg)
         return dict(loaded)
 
-    def load_into_dict(
+    def load_dict(
         self,
         blob: str,
         ac_parser: str | None = None,
@@ -657,12 +668,12 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._load_into_dict_impl(blob, ac_parser=ac_parser, **kwargs)
+        loaded = self._load_dict_impl(blob, ac_parser=ac_parser, **kwargs)
         if preprocess:
             loaded = self.processor_class(self, loaded).preprocess()
         return loaded
 
-    async def load_into_dict_async(
+    async def load_dict_async(
         self,
         blob: str,
         ac_parser: str | None = None,
@@ -687,7 +698,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._load_into_dict_impl(blob, ac_parser, **kwargs)
+        loaded = self._load_dict_impl(blob, ac_parser, **kwargs)
         if preprocess:
             loaded = await self.processor_class(self, loaded).preprocess_async()
         return loaded
@@ -796,7 +807,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             raise UnspecifiedParserError(msg)
         kwargs = self.dump_options | kwargs
         return anyconfig.dumps(
-            pre_serialize(data), ac_parser=ac_parser.casefold(), **kwargs
+            pre_serialize(data), ac_parser=ac_parser, **kwargs
         )
 
     @property
@@ -958,14 +969,13 @@ class ConfigAgent(Generic[ConfigModelT]):
             with self.open_resource(**kwargs) as fp:
                 blob = fp.read()
         except FileNotFoundError:
-            blob = None
             if self.create_if_missing:
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
                 self.write(blob, **(create_kwargs or {}))
             else:
                 raise
-        return self.load_into(config_class, cast(str, blob), **self.load_options)
+        return self.load_into(config_class, blob, **self.load_options)
 
     def write(self, blob: str, **kwargs: Any) -> int:
         """

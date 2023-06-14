@@ -592,7 +592,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         agent, orig_agent, route = self._get_substitution_means(ctx)
 
         with agent.processor_open_resource() as reader:
-            source = orig_agent.load_into_dict(reader.read(), preprocess=preprocess)
+            source = orig_agent.load_dict(reader.read(), preprocess=preprocess)
 
         self._substitute_impl(
             ctx,
@@ -609,7 +609,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         agent, orig_agent, route = self._get_substitution_means(ctx)
 
         async with agent.processor_open_resource_async() as reader:
-            source = orig_agent.load_into_dict(
+            source = orig_agent.load_dict(
                 await reader.read(), preprocess=preprocess
             )
 
@@ -681,7 +681,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         with agent.processor_open_resource() as reader:
             # Here we intentionally always preprocess the loaded configuration.
-            loaded = agent.load_into_dict(reader.read())
+            loaded = agent.load_dict(reader.read())
 
             if route:
                 loaded = at(loaded, route, agent=agent)
@@ -755,7 +755,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         async with agent.processor_open_resource_async() as reader:
             # Here we intentionally always preprocess the loaded configuration.
-            loaded = await agent.load_into_dict_async(await reader.read())
+            loaded = await agent.load_dict_async(await reader.read())
 
             if route:
                 loaded = at(loaded, route, agent=agent)

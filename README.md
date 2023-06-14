@@ -87,41 +87,41 @@ IPv4Address('0.0.0.0')
 as well as reload particular values, without touching the rest of the configuration:
 
 ```python
->> > db_config.at("port").reload()
+>>> db_config.at("port").reload()
 5432
->> > db_config
+>>> db_config
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
->> > db_config.at("host").reload()
+>>> db_config.at("host").reload()
 IPv4Address('127.0.0.1')
->> > db_config
+>>> db_config
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or reload the whole configuration:
 
 ```python
->> > db_config.port = 1234
->> > db_config.reload()
+>>> db_config.port = 1234
+>>> db_config.reload()
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or save a particular value, without touching the rest of the configuration:
 
 ```python
->> > db_config.host = "0.0.0.0"
->> > db_config.port = 443
->> > db_config
+>>> db_config.host = "0.0.0.0"
+>>> db_config.port = 443
+>>> db_config
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=443, user='postgres', password='password')
->> > db_config.at("host").save()
+>>> db_config.at("host").save()
 40
->> > db_config.reload()
+>>> db_config.reload()
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
 ```
 
 or save the whole configuration:
 
 ```python
->> > db_config.save()
+>>> db_config.save()
 39
 ```
 
