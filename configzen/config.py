@@ -439,6 +439,12 @@ class ConfigAgent(Generic[ConfigModelT]):
         "exclude_defaults",
         "exclude_none",
     }
+    FILEEXT_PARSER_ALIASES: ClassVar[dict[str, str]] = {
+        "yml": "yaml",
+        "toml": "toml",
+        "conf": "ini",
+        "cfg": "ini",
+    }
 
     def __init__(
         self,
@@ -544,14 +550,15 @@ class ConfigAgent(Generic[ConfigModelT]):
     def _guess_ac_parser(self) -> str | None:
         ac_parser = None
         if isinstance(self.resource, pathlib.Path):
-            ac_parser = self.resource.suffix[1:]
-            if not ac_parser:
+            suffix = self.resource.suffix[1:].casefold()
+            if not suffix:
                 msg = (
                     "Could not guess the anyconfig parser to use for "
                     f"{self.resource!r}.\n"
                     f"Available parsers: {', '.join(anyconfig.list_types())}"
                 )
                 raise UnspecifiedParserError(msg)
+            ac_parser = self.FILEEXT_PARSER_ALIASES.get(suffix, suffix)
         return ac_parser
 
     def load_into(
