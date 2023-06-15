@@ -1677,12 +1677,7 @@ class ConfigModel(
     metaclass=ConfigModelMetaclass,
     root=True,
 ):
-    """
-    The base class for configuration models.
-
-    It is not recommended to inherit from this class directly for basic usage.
-    Instead, use either :class:`ConfigModel` or :class:`AsyncConfigModel`.
-    """
+    """The base class for configuration models."""
 
     def __init__(self, **kwargs: Any) -> None:
         # Set private attributes via the constructor
