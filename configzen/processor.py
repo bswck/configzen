@@ -10,9 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, ca
 
 from anyconfig.utils import is_dict_like, is_list_like
 
-from configzen.errors import (
-    ConfigPreprocessingError,
-)
+from configzen.errors import ConfigPreprocessingError
 from configzen.typedefs import ConfigModelT, SupportsRoute
 
 if TYPE_CHECKING:
@@ -609,9 +607,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         agent, orig_agent, route = self._get_substitution_means(ctx)
 
         async with agent.processor_open_resource_async() as reader:
-            source = orig_agent.load_dict(
-                await reader.read(), preprocess=preprocess
-            )
+            source = orig_agent.load_dict(await reader.read(), preprocess=preprocess)
 
         self._substitute_impl(
             ctx,

@@ -1,5 +1,5 @@
 """
-The core module of the _configzen_ library.
+The main module of the configzen library.
 
 This module provides an API to manage configuration files and resources
 in a consistent way. It also provides tools to load and save configuration
@@ -83,8 +83,8 @@ from typing import (
 import anyconfig
 import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
-from pydantic.fields import (  # type: ignore[attr-defined]
-    ModelField,
+from pydantic.fields import (
+    ModelField,  # type: ignore[attr-defined]
     make_generic_validator,
 )
 from pydantic.json import ENCODERS_BY_TYPE
@@ -93,13 +93,12 @@ from pydantic.utils import ROOT_KEY
 
 from configzen.errors import (
     ConfigAccessError,
-    InternalSyntaxError,
     ResourceLookupError,
-    UnspecifiedParserError,
     UnavailableParserError,
-    formatted_syntax_error,
+    UnspecifiedParserError,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
+from configzen.route import ConfigRoute
 from configzen.typedefs import (
     AsyncConfigIO,
     ConfigIO,
@@ -141,7 +140,7 @@ LOCAL: str = "__local__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -616,9 +615,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = await self.load_dict_async(
-            blob, ac_parser=ac_parser, **kwargs
-        )
+        dict_config = await self.load_dict_async(blob, ac_parser=ac_parser, **kwargs)
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
@@ -813,9 +810,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             )
             raise UnspecifiedParserError(msg)
         kwargs = self.dump_options | kwargs
-        return anyconfig.dumps(
-            pre_serialize(data), ac_parser=ac_parser, **kwargs
-        )
+        return anyconfig.dumps(pre_serialize(data), ac_parser=ac_parser, **kwargs)
 
     @property
     def is_url(self) -> bool:
@@ -1067,7 +1062,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ctx: DirectiveContext,
         /,
         route_separator: str = ":",
-        route_class: type[Route] | None = None,
+        route_class: type[ConfigRoute] | None = None,
     ) -> tuple[ConfigAgent[ConfigModelT], SupportsRoute | None]:
         """
         Create a configuration agent from a preprocessor directive context.
@@ -1084,13 +1079,15 @@ class ConfigAgent(Generic[ConfigModelT]):
         The configuration agent.
         """
         if route_class is None:
-            route_class = Route
+            route_class = ConfigRoute
         route: SupportsRoute | None = None
         args: list[Any] = []
         kwargs: dict[str, Any] = {}
         if isinstance(ctx.snippet, str):
             path, _, route = ctx.snippet.partition(route_separator)
-            route = Route(route.strip().replace(route_separator, route_class.TOK_DOT))
+            route = ConfigRoute(
+                route.strip().replace(route_separator, route_class.TOK_DOT)
+            )
             args.append(path)
         elif isinstance(ctx.snippet, int):
             args.append(ctx.snippet)
@@ -1108,127 +1105,6 @@ class ConfigAgent(Generic[ConfigModelT]):
     def __repr__(self) -> str:
         resource = self.resource
         return f"{type(self).__name__}({resource=!r})"
-
-
-class Route:
-    TOK_DOT: ClassVar[str] = "."
-    TOK_ESCAPE: ClassVar[str] = "\\"
-    TOK_DOTLISTESC_ENTER: ClassVar[str] = "["
-    TOK_DOTLISTESC_EXIT: ClassVar[str] = "]"
-
-    def __init__(self, route: SupportsRoute) -> None:
-        self.list_route = self.parse(route)
-
-    @classmethod
-    def parse(cls, route: SupportsRoute) -> list[str]:
-        if isinstance(route, Route):
-            return route.list_route
-        if isinstance(route, list):
-            return route
-        if isinstance(route, str):
-            with formatted_syntax_error(route):
-                return cls._decompose(route)
-        raise TypeError(f"invalid route type {type(route)!r}")
-
-    @classmethod
-    def _decompose(cls, route: str) -> list[str]:  # noqa: C901, PLR0912
-        tok_dot = cls.TOK_DOT
-        tok_escape = cls.TOK_ESCAPE
-        tok_dle_enter = cls.TOK_DOTLISTESC_ENTER
-        tok_dle_exit = cls.TOK_DOTLISTESC_EXIT
-
-        route = route.removesuffix(tok_dot) + tok_dot
-
-        part = ""
-        dle_ctx = None
-        list_route: list[str] = []
-        enter = list_route.append
-        error = functools.partial(InternalSyntaxError, prefix="Route(", suffix=")")
-        escape = False
-
-        for index, char in enumerate(route):
-            if escape:
-                part += char
-                escape = False
-                continue
-            is_last = index == len(route) - 1
-            if char == tok_dot:
-                if dle_ctx is not None:
-                    part += char
-                else:
-                    enter(part)
-                    part = ""
-            elif char == tok_escape:
-                if is_last:
-                    part += char
-                else:
-                    escape = True
-            elif char == tok_dle_enter:
-                if dle_ctx is not None:
-                    # a special character at its place
-                    part += char
-                else:
-                    dle_ctx = index
-            elif char == tok_dle_exit:
-                if is_last or route[index + 1] == tok_dot:
-                    if dle_ctx is None:
-                        msg = (
-                            "Dotlist escape sequence "
-                            f"was not opened with {tok_dle_enter!r}"
-                        )
-                        raise error(msg, index=index)
-                    dle_ctx = None
-                else:
-                    # a special character at its place
-                    part += char
-            else:
-                part += char
-            if is_last and dle_ctx is not None:
-                msg = (
-                    "Unclosed dotlist escape sequence "
-                    f"(expected {tok_dle_exit!r} token)"
-                )
-                raise error(msg, index=dle_ctx)
-        return list_route
-
-    @classmethod
-    def decompose(cls, route: str) -> list[str]:
-        with formatted_syntax_error(route):
-            return cls._decompose(route)
-
-    def compose(self) -> str:
-        escape = (self.TOK_DOTLISTESC_ENTER, self.TOK_DOTLISTESC_EXIT)
-        raw = ("", "")
-        return self.TOK_DOT.join(
-            fragment.join(escape).replace(
-                self.TOK_DOTLISTESC_EXIT + self.TOK_DOT,
-                self.TOK_DOTLISTESC_EXIT + self.TOK_ESCAPE + self.TOK_DOT,
-            )
-            if self.TOK_DOT in fragment
-            else fragment.join(raw)
-            for fragment in self.list_route
-        )
-
-    def enter(self, subroute: SupportsRoute) -> Route:
-        return type(self)(self.list_route + self.parse(subroute))
-
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, Route):
-            return self.list_route == other.list_route
-        if isinstance(other, str):
-            return self.list_route == self.decompose(other)
-        if isinstance(other, list):
-            return self.list_route == other
-        return NotImplemented
-
-    def __str__(self) -> str:
-        return self.compose()
-
-    def __iter__(self) -> collections.abc.Iterator[str]:
-        yield from self.list_route
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.list_route})"
 
 
 def at(
@@ -1253,7 +1129,7 @@ def at(
     -------
     The item at the route.
     """
-    route = Route(route)
+    route = ConfigRoute(route)
     route_here = []
     scope = _get_object_dict(mapping)
     try:
@@ -1312,7 +1188,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The updated mapping.
         """
-        route = list(Route(self.route))
+        route = list(ConfigRoute(self.route))
         mapping = self.mapping or self.owner
         key = route.pop()
         scope = _get_object_dict(mapping)
@@ -1546,9 +1422,9 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
         """Trace the route to where the configuration subcontext points to."""
 
     @property
-    def route(self) -> Route:
+    def route(self) -> ConfigRoute:
         """The route to where the configuration subcontext points to."""
-        return Route(list(self.trace_route()))
+        return ConfigRoute(list(self.trace_route()))
 
     @overload
     def enter(self: BaseContext[ConfigModelT], part: None) -> BaseContext[ConfigModelT]:
@@ -2032,7 +1908,13 @@ class ConfigModel(
         state = dict(self._iter(to_dict=False))
         state.pop(LOCAL, None)
         state.pop(TOKEN, None)
-        return type(self)(**copy.deepcopy(state))
+        clone = copy.deepcopy(state)
+        return type(self).parse_obj(
+            {
+                field.alias: clone[field_name]
+                for field_name, field in self.__fields__.items()
+            }
+        )
 
     @classmethod
     def load(
@@ -2296,9 +2178,9 @@ class ConfigModel(
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            vs = _get_object_dict(value)
-            vs[TOKEN] = tok
-            vs[LOCAL] = contextvars.copy_context()
+            state = _get_object_dict(value)
+            state[TOKEN] = tok
+            state[LOCAL] = contextvars.copy_context()
         return value
 
 

@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import collections.abc
+import functools
+from typing import Any, ClassVar, TYPE_CHECKING
+
+from configzen.errors import InternalSyntaxError, formatted_syntax_error
+
+if TYPE_CHECKING:
+    from configzen.typedefs import SupportsRoute
+
+__all__ = ("ConfigRoute",)
+
+
+class ConfigRoute:
+    TOK_DOT: ClassVar[str] = "."
+    TOK_ESCAPE: ClassVar[str] = "\\"
+    TOK_DOTLISTESC_ENTER: ClassVar[str] = "["
+    TOK_DOTLISTESC_EXIT: ClassVar[str] = "]"
+
+    def __init__(self, route: SupportsRoute) -> None:
+        self.list_route = self.parse(route)
+
+    @classmethod
+    def parse(cls, route: SupportsRoute) -> list[str]:
+        if isinstance(route, ConfigRoute):
+            return route.list_route
+        if isinstance(route, list):
+            return route
+        if isinstance(route, str):
+            with formatted_syntax_error(route):
+                return cls._decompose(route)
+        raise TypeError(f"invalid route type {type(route)!r}")
+
+    @classmethod
+    def _decompose(cls, route: str) -> list[str]:  # noqa: C901, PLR0912
+        tok_dot = cls.TOK_DOT
+        tok_escape = cls.TOK_ESCAPE
+        tok_dle_enter = cls.TOK_DOTLISTESC_ENTER
+        tok_dle_exit = cls.TOK_DOTLISTESC_EXIT
+
+        route = route.removesuffix(tok_dot) + tok_dot
+
+        part = ""
+        dle_ctx = None
+        list_route: list[str] = []
+        enter = list_route.append
+        error = functools.partial(InternalSyntaxError, prefix="Route(", suffix=")")
+        escape = False
+
+        for index, char in enumerate(route):
+            if escape:
+                part += char
+                escape = False
+                continue
+            is_last = index == len(route) - 1
+            if char == tok_dot:
+                if dle_ctx is not None:
+                    part += char
+                else:
+                    enter(part)
+                    part = ""
+            elif char == tok_escape:
+                if is_last:
+                    part += char
+                else:
+                    escape = True
+            elif char == tok_dle_enter:
+                if dle_ctx is not None:
+                    # a special character at its place
+                    part += char
+                else:
+                    dle_ctx = index
+            elif char == tok_dle_exit:
+                if is_last or route[index + 1] == tok_dot:
+                    if dle_ctx is None:
+                        msg = (
+                            "Dotlist escape sequence "
+                            f"was not opened with {tok_dle_enter!r}"
+                        )
+                        raise error(msg, index=index)
+                    dle_ctx = None
+                else:
+                    # a special character at its place
+                    part += char
+            else:
+                part += char
+            if is_last and dle_ctx is not None:
+                msg = (
+                    "Unclosed dotlist escape sequence "
+                    f"(expected {tok_dle_exit!r} token)"
+                )
+                raise error(msg, index=dle_ctx)
+        return list_route
+
+    @classmethod
+    def decompose(cls, route: str) -> list[str]:
+        with formatted_syntax_error(route):
+            return cls._decompose(route)
+
+    def compose(self) -> str:
+        escape = (self.TOK_DOTLISTESC_ENTER, self.TOK_DOTLISTESC_EXIT)
+        raw = ("", "")
+        return self.TOK_DOT.join(
+            fragment.join(escape).replace(
+                self.TOK_DOTLISTESC_EXIT + self.TOK_DOT,
+                self.TOK_DOTLISTESC_EXIT + self.TOK_ESCAPE + self.TOK_DOT,
+            )
+            if self.TOK_DOT in fragment
+            else fragment.join(raw)
+            for fragment in self.list_route
+        )
+
+    def enter(self, subroute: SupportsRoute) -> ConfigRoute:
+        return type(self)(self.list_route + self.parse(subroute))
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, ConfigRoute):
+            return self.list_route == other.list_route
+        if isinstance(other, str):
+            return self.list_route == self.decompose(other)
+        if isinstance(other, list):
+            return self.list_route == other
+        return NotImplemented
+
+    def __str__(self) -> str:
+        return self.compose()
+
+    def __iter__(self) -> collections.abc.Iterator[str]:
+        yield from self.list_route
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.list_route})"

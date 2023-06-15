@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 import collections.abc
 import functools
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from configzen.config import post_deserialize, pre_serialize, export, export_async
+from configzen.config import export, export_async, post_deserialize, pre_serialize
 
 if TYPE_CHECKING:
-    from configzen.typedefs import T, ConfigModelT
+    from configzen.typedefs import ConfigModelT, T
 
 __all__ = (
     "with_exporter",
@@ -50,6 +51,7 @@ def with_pre_serialize(
     pre_serialize.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
+
         def validator_gen() -> (
             collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
         ):
@@ -104,6 +106,7 @@ def with_exporter(
 
     export.register(cls, func)
     if export_async.dispatch(cls) is export_async:
+
         async def default_async_func(obj: Any) -> Any:
             return func(obj)
 

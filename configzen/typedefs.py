@@ -14,12 +14,13 @@ if TYPE_CHECKING:
     from aiofiles.base import AiofilesContextManager
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-    from configzen.config import ConfigModel, Route
+    from configzen.config import ConfigModel
+    from configzen.route import ConfigRoute
 
 T = TypeVar("T")
 
 ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
-SupportsRoute: TypeAlias = Union[str, list[str], "Route"]
+SupportsRoute: TypeAlias = Union[str, list[str], "ConfigRoute"]
 
 ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
 AsyncConfigIO: TypeAlias = "AiofilesContextManager[None, None, AsyncTextIOWrapper]"
