@@ -1772,7 +1772,9 @@ class ConfigModel(
         if kwargs.get("to_dict", False) and _exporting.get():
             state = {}
             for key, value in super()._iter(**kwargs):
-                state[key] = value
+                field = self.__fields__.get(key)
+                actual_key = field.alias if field else key
+                state[actual_key] = value
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1787,7 +1789,9 @@ class ConfigModel(
         if kwargs.get("to_dict", False) and _exporting.get():
             state = {}
             for key, value in super()._iter(**kwargs):
-                state[key] = value
+                field = self.__fields__.get(key)
+                actual_key = field.alias if field else key
+                state[actual_key] = value
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
