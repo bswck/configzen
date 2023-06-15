@@ -709,8 +709,10 @@ class Processor(BaseProcessor[ConfigModelT]):
 
             elif is_list_like(value):
                 cls.export(value)
+                if value != counterpart_value:
+                    overrides[key] = counterpart_value
 
-            elif counterpart_value != value:
+            elif value != counterpart_value:
                 overrides[key] = counterpart_value
                 del substituted_values[key]
 
@@ -783,6 +785,8 @@ class Processor(BaseProcessor[ConfigModelT]):
 
             elif is_list_like(value):
                 await cls.export_async(value)
+                if value != counterpart_value:
+                    overrides[key] = counterpart_value
 
             elif counterpart_value != value:
                 overrides[key] = counterpart_value
