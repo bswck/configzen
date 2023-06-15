@@ -486,7 +486,11 @@ class ConfigAgent(Generic[ConfigModelT]):
         ):
             raw_path = os.fspath(resource)
             resource = pathlib.Path(raw_path)
-            if raw_path.startswith(".") and len(resource.parts) > 1:
+            if (
+                raw_path.startswith(".")
+                and resource.parts
+                and not resource.parts[0].startswith(".")
+            ):
                 self.relative = True
 
         self.resource = resource
