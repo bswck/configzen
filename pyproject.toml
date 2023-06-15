@@ -16,11 +16,6 @@ aiofiles = { version = "^23.1.0" }
 pyyaml = { version = "^6.0" }
 toml = { version = "^0.10.2" }
 
-[tool.poetry.extras]
-async = ["aiofiles"]
-yaml = ["pyyaml"]
-toml = ["toml"]
-
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.0.267"
 mypy = "^1.3.0"
