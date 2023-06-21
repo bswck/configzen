@@ -1705,9 +1705,12 @@ class ConfigModel(
         for private_attr in self.__private_attributes__:
             value = kwargs.pop(private_attr, Undefined)
             if value is not Undefined:
-                setattr(self, private_attr, value)
                 if private_attr == CONTEXT:
+                    context = current_context.get()
+                    if context:
+                        value = context
                     current_context.set(value)
+                setattr(self, private_attr, value)
         super().__init__(**kwargs)
 
     def _init_private_attributes(self) -> None:
@@ -2022,7 +2025,6 @@ class ConfigModel(
         config = local.run(agent.read, config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
-        context._agent = agent
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -2152,7 +2154,6 @@ class ConfigModel(
         config = await task
         setattr(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
-        context._agent = agent
         context.owner = config
         return config
 
