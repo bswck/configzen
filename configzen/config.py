@@ -1890,6 +1890,12 @@ class ConfigModel(
         The configuration accessor.
         """
         if route is None:
+            context = get_context_or_none(self)
+            self_at = None
+            if context is not None:
+                self_at = context.at
+            if self_at is not None:
+                return self_at
             return self
         return ConfigAt(self, None, route)
 
