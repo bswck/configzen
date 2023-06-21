@@ -2010,17 +2010,18 @@ class ConfigModel(
             ac_parser=ac_parser,
             create_if_missing=create_if_missing,
         )
-        context = Context(agent)  # type: Context[ConfigModelT]
-        current_context.set(context)
+        tok = current_context.set(Context(agent))
         local = contextvars.copy_context()
+        current_context.reset(tok)
         if getattr(
             cls.__config__,
             "autoupdate_forward_refs",
             ConfigMeta.autoupdate_forward_refs,
         ):
             cls.update_forward_refs()
-        config = agent.read(config_class=cls, **kwargs)
+        config = local.run(agent.read, config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
+        context = cast(Context[ConfigModelT], local.get(current_context))
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -2040,11 +2041,12 @@ class ConfigModel(
         """
         context = get_context(self)
         tok = current_context.set(get_context(context.owner))
-        if context.owner is self:
-            changed = context.agent.read(config_class=type(self), **kwargs)
-        else:
-            changed = reload(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
+        local = contextvars.copy_context()
         current_context.reset(tok)
+        if context.owner is self:
+            changed = local.run(context.agent.read, config_class=type(self), **kwargs)
+        else:
+            changed = local.run(reload, cast(ConfigModelT, context.at), **kwargs)
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
@@ -2133,17 +2135,22 @@ class ConfigModel(
         agent = cls._resolve_agent(
             resource, create_if_missing=create_if_missing, ac_parser=ac_parser
         )
-        context = Context(agent)  # type: Context[ConfigModelT]
-        current_context.set(context)
+        tok = current_context.set(Context(agent))
         local = contextvars.copy_context()
+        current_context.reset(tok)
         if getattr(
             cls.__config__,
             "autoupdate_forward_refs",
             ConfigMeta.autoupdate_forward_refs,
         ):
             cls.update_forward_refs()
-        config = await agent.read_async(config_class=cls, **kwargs)
+        task = local.run(
+            asyncio.create_task,
+            agent.read_async(config_class=cls, **kwargs)
+        )
+        config = await task
         setattr(config, LOCAL, local)
+        context = cast(Context[ConfigModelT], local.get(current_context))
         context.owner = config
         return config
 
@@ -2163,12 +2170,14 @@ class ConfigModel(
         context = get_context(self)
         tok = current_context.set(get_context(context.owner))
         if context.owner is self:
-            changed = await context.agent.read_async(config_class=type(self), **kwargs)
+            coro = context.agent.read_async(config_class=type(self), **kwargs)
         else:
-            changed = await reload_async(
+            coro = reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
+        task = asyncio.create_task(coro)
         current_context.reset(tok)
+        changed = await task
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
