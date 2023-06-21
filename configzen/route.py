@@ -18,19 +18,22 @@ class ConfigRoute:
     TOK_DOTLISTESC_ENTER: ClassVar[str] = "["
     TOK_DOTLISTESC_EXIT: ClassVar[str] = "]"
 
-    def __init__(self, route: SupportsRoute) -> None:
-        self.list_route = self.parse(route)
+    def __init__(self, route: SupportsRoute, *, allow_empty: bool = False) -> None:
+        items = self.parse(route)
+        if not (allow_empty or items):
+            raise ValueError("Empty configuration route")
+        self.items = items
 
     @classmethod
     def parse(cls, route: SupportsRoute) -> list[str]:
         if isinstance(route, ConfigRoute):
-            return route.list_route
+            return route.items
         if isinstance(route, list):
             return route
         if isinstance(route, str):
             with formatted_syntax_error(route):
                 return cls._decompose(route)
-        raise TypeError(f"invalid route type {type(route)!r}")
+        raise TypeError(f"Invalid route type {type(route)!r}")
 
     @classmethod
     def _decompose(cls, route: str) -> list[str]:  # noqa: C901, PLR0912
@@ -43,8 +46,8 @@ class ConfigRoute:
 
         part = ""
         dle_ctx = None
-        list_route: list[str] = []
-        enter = list_route.append
+        items: list[str] = []
+        enter = items.append
         error = functools.partial(InternalSyntaxError, prefix="Route(", suffix=")")
         escape = False
 
@@ -91,7 +94,7 @@ class ConfigRoute:
                     f"(expected {tok_dle_exit!r} token)"
                 )
                 raise error(msg, index=dle_ctx)
-        return list_route
+        return items
 
     @classmethod
     def decompose(cls, route: str) -> list[str]:
@@ -108,26 +111,26 @@ class ConfigRoute:
             )
             if self.TOK_DOT in fragment
             else fragment.join(raw)
-            for fragment in self.list_route
+            for fragment in self.items
         )
 
     def enter(self, subroute: SupportsRoute) -> ConfigRoute:
-        return type(self)(self.list_route + self.parse(subroute))
+        return type(self)(self.items + self.parse(subroute))
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, ConfigRoute):
-            return self.list_route == other.list_route
+            return self.items == other.items
         if isinstance(other, str):
-            return self.list_route == self.decompose(other)
+            return self.items == self.decompose(other)
         if isinstance(other, list):
-            return self.list_route == other
+            return self.items == other
         return NotImplemented
 
     def __str__(self) -> str:
         return self.compose()
 
     def __iter__(self) -> collections.abc.Iterator[str]:
-        yield from self.list_route
+        yield from self.items
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.list_route})"
+        return f"{type(self).__name__}({self.items})"

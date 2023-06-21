@@ -83,9 +83,10 @@ from typing import (
 import anyconfig
 import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
-from pydantic.fields import (
-    ModelField,  # type: ignore[attr-defined]
+from pydantic.fields import (  # type: ignore[attr-defined]
+    ModelField,
     make_generic_validator,
+    Undefined
 )
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import BaseModel, ModelMetaclass
@@ -140,7 +141,7 @@ LOCAL: str = "__local__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -1164,19 +1165,34 @@ class ConfigAt(Generic[ConfigModelT]):
     mapping: dict[str, Any] | None
     route: SupportsRoute
 
-    def get(self) -> Any:
+    def get(self, route: SupportsRoute | None = None, default: Any = Undefined) -> Any:
         """
         Get the value of the item.
+
+        Parameters
+        ----------
+        route
+            The route to the item. If not given, the sole route of this item is used.
+            If given, the route is appended to the sole route of this item.
+        default
+            The default value to return if the item is not found.
 
         Returns
         -------
         The value of the item.
         """
+        base_route = ConfigRoute(self.route)
+        if route is None:
+            route = base_route
+        else:
+            route = base_route.enter(ConfigRoute(route, allow_empty=True))
         try:
-            scope = at(self.mapping or self.owner, self.route)
-        except KeyError as err:
-            route_here = err.args[1]
-            raise ConfigAccessError(self.owner, route_here) from None
+            scope = at(self.mapping or self.owner, route)
+        except ResourceLookupError as err:
+            if default is Undefined:
+                route_here = err.route
+                raise ConfigAccessError(self.owner, route_here) from None
+            scope = default
         return scope
 
     def update(self, value: Any) -> Any:
@@ -1570,7 +1586,7 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     @property
     def at(self) -> ConfigAt[ConfigModelT]:
         if self.owner is None:
-            msg = "Cannot get section pointed to by an unbound context"
+            msg = "Cannot get at() of a model without parent model"
             raise ValueError(msg)
         return ConfigAt(self.owner, None, self.route)
 
@@ -1686,10 +1702,9 @@ class ConfigModel(
     def __init__(self, **kwargs: Any) -> None:
         # Set private attributes via the constructor
         # to allow preprocessor-related instances to exist.
-        missing = object()
         for private_attr in self.__private_attributes__:
-            value = kwargs.pop(private_attr, missing)
-            if value is not missing:
+            value = kwargs.pop(private_attr, Undefined)
+            if value is not Undefined:
                 setattr(self, private_attr, value)
                 if private_attr == CONTEXT:
                     current_context.set(value)
@@ -1859,8 +1874,8 @@ class ConfigModel(
 
     def at(
         self: ConfigModelT,
-        route: SupportsRoute,
-    ) -> ConfigAt[ConfigModelT]:
+        route: SupportsRoute | None = None,
+    ) -> ConfigModelT | ConfigAt[ConfigModelT]:
         """
         Lazily point to a specific item in the configuration.
 
@@ -1868,14 +1883,51 @@ class ConfigModel(
         ----------
         route
             The access route to the item in this configuration.
+            If None, the whole configuration is returned.
 
         Returns
         -------
         The configuration accessor.
         """
+        if route is None:
+            return self
         return ConfigAt(self, None, route)
 
-    def update(self, **kwargs: Any) -> None:
+    @overload
+    def get(
+        self: ConfigModelT,
+        route: None = None,
+        default: Any = ...
+    ) -> ConfigModelT:
+        ...
+
+    @overload
+    def get(
+        self: ConfigModelT,
+        route: SupportsRoute = ...,
+        default: Any = ...
+    ) -> Any:
+        ...
+
+    def get(
+        self,
+        route: SupportsRoute | None = None,
+        default: Any = Undefined
+    ) -> Any:
+        """
+        Get a value from the configuration.
+
+        Parameters
+        ----------
+        route
+            Route to access the item. If None, the whole configuration is returned.
+        default
+        """
+        if route is None:
+            return self
+        return self.at(route).get(default=default)
+
+    def update(self, kwargs: dict[str, Any]) -> None:
         """
         Update the configuration with new values, in-place.
 
@@ -1989,7 +2041,7 @@ class ConfigModel(
         current_context.reset(tok)
         state = changed.__dict__
         context.initial_state = state
-        self.update(**state)
+        self.update(state)
         return self
 
     def save(
@@ -2113,7 +2165,7 @@ class ConfigModel(
         current_context.reset(tok)
         state = changed.__dict__
         context.initial_state = state
-        self.update(**state)
+        self.update(state)
         return self
 
     async def save_async(

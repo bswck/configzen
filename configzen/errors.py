@@ -104,6 +104,7 @@ class ResourceLookupError(ConfigError, LookupError):
         self, resource: ConfigAgent[ConfigModelT] | None, route: list[str]
     ) -> None:
         resource_name = resource.resource if resource else "the provided resource"
+        self.route = route
         super().__init__(f"{route} not found in {resource_name}")
 
 

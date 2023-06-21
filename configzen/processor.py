@@ -6,6 +6,7 @@ import dataclasses
 import enum
 import pathlib
 from collections.abc import Callable
+from pydantic.fields import Undefined
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
 from anyconfig.utils import is_dict_like, is_list_like
@@ -96,7 +97,7 @@ def parse_directive_call(
     directive_name: str,
 ) -> str:
     if directive_name.startswith(prefix):
-        directive_name = directive_name[len(prefix) :].casefold()
+        directive_name = directive_name[len(prefix):].casefold()
 
         if not directive_name.isidentifier():
             msg = f"Invalid directive name: {directive_name}"
@@ -653,7 +654,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             }
 
     @classmethod
-    def _export(
+    def _export(  # noqa: C901
         cls,
         state: dict[str, Any],
         metadata: ExportMetadata[ConfigModelT],
@@ -684,11 +685,9 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         substituted_values = loaded.copy()
 
-        missing = object()
-
         for key, value in loaded.items():
-            counterpart_value = state.pop(key, missing)
-            if counterpart_value is missing:
+            counterpart_value = state.pop(key, Undefined)
+            if counterpart_value is Undefined:
                 continue
             counterpart_value = pre_serialize(counterpart_value)
 
@@ -700,7 +699,8 @@ class Processor(BaseProcessor[ConfigModelT]):
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
                     if (
-                        (orig := value.get(sub_key, missing)) is missing or orig != comp
+                        (orig := value.get(sub_key, Undefined))
+                        is Undefined or orig != comp
                     )
                 }
                 if overrides_for_key:
@@ -729,7 +729,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
     @classmethod
-    async def _export_async(
+    async def _export_async(  # noqa: C901
         cls,
         state: dict[str, Any],
         metadata: ExportMetadata[ConfigModelT],
@@ -760,11 +760,9 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         substituted_values = loaded.copy()
 
-        missing = object()
-
         for key, value in loaded.items():
-            counterpart_value = state.pop(key, missing)
-            if counterpart_value is missing:
+            counterpart_value = state.pop(key, Undefined)
+            if counterpart_value is Undefined:
                 continue
             counterpart_value = pre_serialize(counterpart_value)
 
@@ -776,7 +774,8 @@ class Processor(BaseProcessor[ConfigModelT]):
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
                     if (
-                        (orig := value.get(sub_key, missing)) is missing or orig != comp
+                        (orig := value.get(sub_key, Undefined))
+                        is Undefined or orig != comp
                     )
                 }
                 if overrides_for_key:
