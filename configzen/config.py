@@ -2022,6 +2022,7 @@ class ConfigModel(
         config = local.run(agent.read, config_class=cls, **kwargs)
         setattr(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
+        context._agent = agent
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -2151,6 +2152,7 @@ class ConfigModel(
         config = await task
         setattr(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
+        context._agent = agent
         context.owner = config
         return config
 
