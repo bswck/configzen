@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import collections.abc
+import contextlib
 import functools
 from typing import TYPE_CHECKING, Any
 
-from configzen.config import export, export_async, post_deserialize, pre_serialize
+from configzen.config import (
+    export_model,
+    export_model_async,
+    post_deserialize,
+    pre_serialize,
+)
 
 if TYPE_CHECKING:
     from configzen.typedefs import ConfigModelT, T
@@ -57,7 +63,8 @@ def with_pre_serialize(
         ):
             yield lambda value: post_deserialize.dispatch(cls)(cls, value)
 
-        cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
+        with contextlib.suppress(TypeError):
+            cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
 
     return cls
 
@@ -92,7 +99,7 @@ def with_exporter(
     cls: type[ConfigModelT] | None = None,
 ) -> type[ConfigModelT] | Any:
     """
-    Register a custom exporter for a type.
+    Register a custom exporter for a configuration model class.
 
     Parameters
     ----------
@@ -104,13 +111,13 @@ def with_exporter(
     if cls is None:
         return functools.partial(with_exporter, func)
 
-    export.register(cls, func)
-    if export_async.dispatch(cls) is export_async:
+    export_model.register(cls, func)
+    if export_model_async.dispatch(cls) is export_model_async:
 
         async def default_async_func(obj: Any) -> Any:
             return func(obj)
 
-        export_async.register(cls, default_async_func)
+        export_model_async.register(cls, default_async_func)
     return cls
 
 
@@ -121,7 +128,7 @@ def with_async_exporter(
     cls: type[ConfigModelT] | None = None,
 ) -> type[ConfigModelT] | Any:
     """
-    Register a custom exporter for a type.
+    Register a custom exporter for a configuration model class.
 
     Parameters
     ----------
@@ -133,5 +140,5 @@ def with_async_exporter(
     if cls is None:
         return functools.partial(with_exporter, func)
 
-    export_async.register(cls, func)
+    export_model_async.register(cls, func)
     return cls

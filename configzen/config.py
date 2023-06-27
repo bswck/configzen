@@ -86,7 +86,7 @@ from anyconfig.utils import filter_options, is_dict_like, is_list_like
 from pydantic.fields import (  # type: ignore[attr-defined]
     ModelField,
     make_generic_validator,
-    Undefined
+    Undefined,
 )
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import BaseModel, ModelMetaclass
@@ -128,8 +128,8 @@ __all__ = (
     "reload_async",
     "pre_serialize",
     "post_deserialize",
-    "export",
-    "export_async",
+    "export_model",
+    "export_model_async",
 )
 
 _URL_SCHEMES: set[str] = set(
@@ -141,7 +141,7 @@ LOCAL: str = "__local__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -198,7 +198,7 @@ def pre_serialize(obj: Any) -> Any:
     if dataclasses.is_dataclass(obj):
         return pre_serialize(dataclasses.asdict(obj))
     if _is_namedtuple(obj):
-        return _ps_namedtuple(obj)
+        return _pre_serialize_namedtuple(obj)
     return obj
 
 
@@ -233,7 +233,7 @@ def post_deserialize(cls: Any, value: Any) -> Any:
 
 
 @functools.singledispatch
-def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
+def export_model(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -249,7 +249,7 @@ def export(obj: Any, **kwargs: Any) -> dict[str, Any]:
 
 
 @functools.singledispatch
-async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
+async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     Export a ConfigModel to a safely-serializable format.
     Register a custom exporter for a type using the `with_exporter` decorator,
@@ -264,8 +264,25 @@ async def export_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     return cast(dict[str, Any], await obj.dict_async(**kwargs))
 
 
+@pre_serialize.register(pathlib.PureWindowsPath)
+def _pre_serialize_windows_path(obj: pathlib.PureWindowsPath) -> str:
+    """
+    Convert a Windows path to a string.
+
+    Parameters
+    ----------
+    obj
+        The path to convert.
+
+    Returns
+    -------
+    The converted path.
+    """
+    return obj.as_posix()
+
+
 @pre_serialize.register(list)
-def _ps_list(obj: list[Any]) -> list[Any]:
+def _pre_serialize_list(obj: list[Any]) -> list[Any]:
     """
     Convert a list to safely-serializable form.
 
@@ -282,7 +299,7 @@ def _ps_list(obj: list[Any]) -> list[Any]:
 
 
 @pre_serialize.register(collections.abc.Mapping)
-def _ps_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
+def _pre_serialize_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
     """
     Convert a mapping to safely-serializable form.
 
@@ -299,7 +316,7 @@ def _ps_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
 
 
 @functools.singledispatch
-def _ps_namedtuple(obj: tuple[Any, ...]) -> Any:
+def _pre_serialize_namedtuple(obj: tuple[Any, ...]) -> Any:
     """
     Convert a namedtuple to safely-serializable form.
 
@@ -445,12 +462,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "cfg": "ini",
         "pkl": "pickle",
     }
-    BINARY_AC_PARSERS: ClassVar[set[str]] = {
-        "bson",
-        "cbor",
-        "msgpack",
-        "pickle"
-    }
+    BINARY_AC_PARSERS: ClassVar[set[str]] = {"bson", "cbor", "msgpack", "pickle"}
 
     def __init__(
         self,
@@ -755,7 +767,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             ctx = contextvars.copy_context()
             _exporting.reset(tok)
             return ctx.run(config.json, **export_kwargs)
-        data = export(config, **export_kwargs)
+        data = export_model(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
     async def dump_config_async(
@@ -791,7 +803,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             task = asyncio.create_task(config.json_async(**export_kwargs))
             _exporting.reset(tok)
             return await task
-        data = await export_async(config, **export_kwargs)
+        data = await export_model_async(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
     def dump_data(
@@ -1853,11 +1865,12 @@ class ConfigModel(
     @no_type_check
     def _get_value(cls, value: Any, *, to_dict: bool, **kwds: Any) -> Any:
         if _exporting.get():
-            exporter = export.dispatch(type(value))
+            exporter = export_model.dispatch(type(value))
             if (
-                isinstance(value, BaseModel) or exporter != export.dispatch(object)
+                isinstance(value, BaseModel)
+                or exporter != export_model.dispatch(object)
             ) and to_dict:
-                value_dict = export(value, **kwds)
+                value_dict = export_model(value, **kwds)
                 if ROOT_KEY in value_dict:
                     return value_dict[ROOT_KEY]
                 return value_dict
@@ -1929,26 +1942,14 @@ class ConfigModel(
         return ConfigAt(self, None, route)
 
     @overload
-    def get(
-        self: ConfigModelT,
-        route: None = None,
-        default: Any = ...
-    ) -> ConfigModelT:
+    def get(self: ConfigModelT, route: None = None, default: Any = ...) -> ConfigModelT:
         ...
 
     @overload
-    def get(
-        self: ConfigModelT,
-        route: SupportsRoute = ...,
-        default: Any = ...
-    ) -> Any:
+    def get(self: ConfigModelT, route: SupportsRoute = ..., default: Any = ...) -> Any:
         ...
 
-    def get(
-        self,
-        route: SupportsRoute | None = None,
-        default: Any = Undefined
-    ) -> Any:
+    def get(self, route: SupportsRoute | None = None, default: Any = Undefined) -> Any:
         """
         Get a value from the configuration.
 
@@ -2174,8 +2175,7 @@ class ConfigModel(
         ):
             cls.update_forward_refs()
         task = local.run(
-            asyncio.create_task,
-            agent.read_async(config_class=cls, **kwargs)
+            asyncio.create_task, agent.read_async(config_class=cls, **kwargs)
         )
         config = await task
         setattr(config, LOCAL, local)
@@ -2201,9 +2201,7 @@ class ConfigModel(
         if context.owner is self:
             coro = context.agent.read_async(config_class=type(self), **kwargs)
         else:
-            coro = reload_async(
-                cast(ConfigAt[ConfigModelT], context.at), **kwargs
-            )
+            coro = reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
         task = asyncio.create_task(coro)
         current_context.reset(tok)
         changed = await task

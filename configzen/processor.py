@@ -97,7 +97,7 @@ def parse_directive_call(
     directive_name: str,
 ) -> str:
     if directive_name.startswith(prefix):
-        directive_name = directive_name[len(prefix):].casefold()
+        directive_name = directive_name[len(prefix) :].casefold()
 
         if not directive_name.isidentifier():
             msg = f"Invalid directive name: {directive_name}"
@@ -699,8 +699,8 @@ class Processor(BaseProcessor[ConfigModelT]):
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
                     if (
-                        (orig := value.get(sub_key, Undefined))
-                        is Undefined or orig != comp
+                        (orig := value.get(sub_key, Undefined)) is Undefined
+                        or orig != comp
                     )
                 }
                 if overrides_for_key:
@@ -774,8 +774,8 @@ class Processor(BaseProcessor[ConfigModelT]):
                     sub_key: comp
                     for sub_key, comp in counterpart_value.items()
                     if (
-                        (orig := value.get(sub_key, Undefined))
-                        is Undefined or orig != comp
+                        (orig := value.get(sub_key, Undefined)) is Undefined
+                        or orig != comp
                     )
                 }
                 if overrides_for_key:
@@ -814,7 +814,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         route: str | None,
         key_order: list[str],
     ) -> None:
-        # TODO: Optimize. We iterate over the same way too many times.
+        from configzen.config import pre_serialize
 
         state |= overrides
         extras: dict[str, Any] = {
@@ -823,7 +823,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         if values:
             substitution_directive = cls.directive(Directives.EXTEND)
-            resource = str(context.agent.resource)
+            resource = str(pre_serialize(context.agent.resource))
             if route:
                 resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.
