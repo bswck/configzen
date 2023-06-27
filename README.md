@@ -166,7 +166,7 @@ create another configuration file like this, overriding desired sections as need
   debug: false
 ```
 
-and load the `production.yaml` configuration file. No changes to the code snippet from the [Managing content](#managing-content) section are needed.
+and load the `production.yaml` configuration file. No explicit changes to the code indicating the use of the `base.json` file are needed.
 
 _Note: Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it._
