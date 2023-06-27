@@ -6,10 +6,7 @@ __all__ = ("ConfigField",)
 
 
 # noinspection PyPep8Naming
-def ConfigField(  # noqa: N802
-    default: Any = Undefined,
-    **kwargs: Any
-) -> FieldInfo:
+def ConfigField(default: Any = Undefined, **kwargs: Any) -> FieldInfo:  # noqa: N802
     # Since configzen involves BaseSettings implicitly,
     # this would be very convenient to have.
     alias = kwargs.get("alias")
