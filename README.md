@@ -84,56 +84,56 @@ There are additional features brought to you by _configzen_ worth checking out, 
 You can use the `db_config` object defined above to access the configuration values:
 
 ```python
->> > db_config.host
+>>> db_config.host
 IPv4Address('127.0.0.1')
 ```
 
 modify them, if the pydantic model validation allows it ([`<Your model>.Config.validate_assignment`](https://docs.pydantic.dev/latest/usage/model_config/#options) will be `True` by default):
 
 ```python
->> > db_config.host = "0.0.0.0"
->> > db_config.host
+>>> db_config.host = "0.0.0.0"
+>>> db_config.host
 IPv4Address('0.0.0.0')
 ```
 
 as well as reload particular values, without touching the rest of the configuration:
 
 ```python
->> > db_config.at("port").reload()
+>>> db_config.at("port").reload()
 5432
->> > db_config
+>>> db_config
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
->> > db_config.at("host").reload()
+>>> db_config.at("host").reload()
 IPv4Address('127.0.0.1')
->> > db_config
+>>> db_config
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or reload the whole configuration:
 
 ```python
->> > db_config.port = 1234
->> > db_config.reload()
+>>> db_config.port = 1234
+>>> db_config.reload()
 DatabaseConfig(host=IPv4Address('127.0.0.1'), port=5432, user='postgres', password='password')
 ```
 
 or save a particular value, without touching the rest of the configuration:
 
 ```python
->> > db_config.host = "0.0.0.0"
->> > db_config.port = 443
->> > db_config
+>>> db_config.host = "0.0.0.0"
+>>> db_config.port = 443
+>>> db_config
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=443, user='postgres', password='password')
->> > db_config.at("host").save()
+>>> db_config.at("host").save()
 40
->> > db_config.reload()
+>>> db_config.reload()
 DatabaseConfig(host=IPv4Address('0.0.0.0'), port=5432, user='postgres', password='password')
 ```
 
 or save the whole configuration:
 
 ```python
->> > db_config.save()
+>>> db_config.save()
 39
 ```
 
@@ -146,14 +146,14 @@ Having a base configuration file like this (`base.json`):
 
 ```json
 {
-    "i18n": {
-        "language": "en",
-        "timezone": "UTC"
-    },
-    "app": {
-        "debug": true,
-        "expose": 8000
-    }
+  "i18n": {
+    "language": "en",
+    "timezone": "UTC"
+  },
+  "app": {
+    "debug": true,
+    "expose": 8000
+  }
 }
 ```
 create another configuration file like this, overriding desired sections as needed:
@@ -163,7 +163,7 @@ create another configuration file like this, overriding desired sections as need
 ^extend: base.json
 
 +app:
-    debug: false
+  debug: false
 ```
 
 and load the `production.yaml` configuration file. No changes to the code snippet from the [Managing content](#managing-content) section are needed.
@@ -180,11 +180,11 @@ The above example is equivalent to as if you used:
 ```yaml
 # production.yaml
 i18n:
-    language: en
-    timezone: UTC
+  language: en
+  timezone: UTC
 app:
-    debug: false
-    expose: 8000
+  debug: false
+  expose: 8000
 ```
 
 but with a significant difference: when you save the above configuration, the `^extend` relation to the base configuration file `base.json` is preserved.
@@ -195,9 +195,9 @@ Any changes made locally to the model will result in `+` sections being automati
 
 | Directive   | Is the referenced file preprocessed? | Is the directive preserved? |
 |-------------|--------------------------------------|-----------------------------|
-| `^extend`   | yes                                  | yes                         |
-| `^include`  | yes                                  | no                          |
-| `^copy`     | no                                   | no                          |
+| `^extend`   | Yes                                  | Yes                         |
+| `^include`  | Yes                                  | No                          |
+| `^copy`     | No                                   | No                          |
 
 ## Setup
 
