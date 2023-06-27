@@ -388,7 +388,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     _resource: NormalizedResourceT
     processor_class: type[Processor[ConfigModelT]]
     create_if_missing: bool
-    relative: bool = False
+    is_relative: bool = False
     allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
     default_load_options: dict[str, Any] = {}
@@ -441,9 +441,15 @@ class ConfigAgent(Generic[ConfigModelT]):
     }
     FILEEXT_PARSER_ALIASES: ClassVar[dict[str, str]] = {
         "yml": "yaml",
-        "toml": "toml",
         "conf": "ini",
         "cfg": "ini",
+        "pkl": "pickle",
+    }
+    BINARY_AC_PARSERS: ClassVar[set[str]] = {
+        "bson",
+        "cbor",
+        "msgpack",
+        "pickle"
     }
 
     def __init__(
@@ -469,11 +475,15 @@ class ConfigAgent(Generic[ConfigModelT]):
         use_pydantic_json
             Whether to use Pydantic's JSON encoder/decoder instead of the default
             anyconfig one.
+        uses_binary_data
+            Whether to treat the data as binary. Defaults to True for BSON,
+            CBOR, MessagePack and Pickle formats.
         **kwargs
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
         self._ac_parser = None
+        self._uses_binary_data = kwargs.get("uses_binary_data", False)
 
         if processor_class is None:
             processor_class = Processor[ConfigModelT]
@@ -492,7 +502,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 and resource.parts
                 and not resource.parts[0].startswith(".")
             ):
-                self.relative = True
+                self.is_relative = True
 
         self.resource = resource
         self.create_if_missing = create_if_missing
@@ -568,7 +578,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     def load_into(
         self,
         config_class: type[ConfigModelT],
-        blob: str,
+        blob: str | bytes,
         ac_parser: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -598,7 +608,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     async def async_load_into(
         self,
         config_class: type[ConfigModelT],
-        blob: str,
+        blob: str | bytes,
         ac_parser: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -627,7 +637,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     def _load_dict_impl(
         self,
-        blob: str,
+        blob: str | bytes,
         ac_parser: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -652,7 +662,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     def load_dict(
         self,
-        blob: str,
+        blob: str | bytes,
         ac_parser: str | None = None,
         *,
         preprocess: bool = True,
@@ -684,7 +694,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     async def load_dict_async(
         self,
-        blob: str,
+        blob: str | bytes,
         ac_parser: str | None = None,
         *,
         preprocess: bool = True,
@@ -819,8 +829,20 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     @property
     def is_url(self) -> bool:
-        """Whether the resource is a URL."""
+        """
+        Whether the resource is a URL.
+
+        This simply checks if the resource object is a string, since local paths
+        are converted into `pathlib.Path` objects.
+        """
         return isinstance(self.resource, str)
+
+    @property
+    def uses_binary_data(self) -> bool:
+        """
+        Whether the resource uses bytes for storing data, not str.
+        """
+        return self._uses_binary_data or self.ac_parser in self.BINARY_AC_PARSERS
 
     def open_resource(self, **kwds: Any) -> ConfigIO:
         """
@@ -838,6 +860,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         The opened resource.
         """
         if self.resource is None:
+            if self.uses_binary_data:
+                return io.BytesIO()
             return io.StringIO()
         if self.is_url:
             url = urllib.parse.urlparse(cast(str, self.resource))
@@ -939,9 +963,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         new_kwargs = cast(dict[str, Any], kwargs).copy()
         if not self.is_url:
             if method == "read":
-                new_kwargs.setdefault("mode", "r")
+                new_kwargs.setdefault("mode", "rb" if self.uses_binary_data else "r")
             elif method == "write":
-                new_kwargs.setdefault("mode", "w")
+                new_kwargs.setdefault("mode", "wb" if self.uses_binary_data else "w")
             else:
                 msg = f"Invalid resource access method: {method!r}"
                 raise ValueError(msg)
@@ -984,7 +1008,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 raise
         return self.load_into(config_class, blob, **self.load_options)
 
-    def write(self, blob: str, **kwargs: Any) -> int:
+    def write(self, blob: str | bytes, **kwargs: Any) -> int:
         """
         Write the configuration file.
 
@@ -1001,7 +1025,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         """
         kwargs = self._get_default_kwargs("write", kwargs=kwargs)
         with self.open_resource(**kwargs) as fp:
-            return fp.write(blob)
+            return fp.write(cast(str, blob))
 
     async def read_async(
         self,
@@ -1040,7 +1064,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     async def write_async(
         self,
-        blob: str,
+        blob: str | bytes,
         **kwargs: Any,
     ) -> int:
         """
@@ -1059,7 +1083,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         """
         kwargs = self._get_default_kwargs("write", kwargs=kwargs)
         async with self.open_resource_async(**kwargs) as fp:
-            return await fp.write(blob)
+            # Technically those might be also bytes,
+            # todo(bswck): type it properly
+            return await fp.write(cast(str, blob))
 
     @classmethod
     def from_directive_context(
@@ -2086,7 +2112,7 @@ class ConfigModel(
             **kwargs,
         )
 
-    def write(self, blob: str, **kwargs: Any) -> int:
+    def write(self, blob: str | bytes, **kwargs: Any) -> int:
         """
         Overwrite the configuration file with the given string or bytes.
 
@@ -2220,7 +2246,7 @@ class ConfigModel(
             **kwargs,
         )
 
-    async def write_async(self, blob: str, **kwargs: Any) -> int:
+    async def write_async(self, blob: str | bytes, **kwargs: Any) -> int:
         """
         Overwrite the configuration file asynchronously with the given string or bytes.
 
