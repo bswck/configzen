@@ -5,8 +5,9 @@ _configzen_ – managing configuration files easily.
 ## What is this?
 
 _configzen_ is a good choice if you need to create complex configurations with schemas.
-Based on [pydantic](https://docs.pydantic.dev/latest/), it allows you to create data models
+Being based on [pydantic](https://docs.pydantic.dev/latest/), this tool will allow you to create _models_
 for your configuration files, and then load, modify and save them with scope control.
+To see how it works, check out the [Features](#features) section.
 
 _configzen_ also allows you to use built-in preprocessing directives in your configuration files,
 offering features such as extending configuration files from configuration files (without writing any code).
