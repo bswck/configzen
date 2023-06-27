@@ -7,13 +7,15 @@ _configzen_ – managing configuration files easily.
 _configzen_ is a good choice if you need to create complex configurations with schemas.
 Being based on [pydantic](https://docs.pydantic.dev/latest/), this tool will allow you to create _models_
 for your configuration files, and then load, modify and save them with scope control.
-To see how it works, check out the [Features](#features) section.
+To see roughly how it works, check out the [Features](#features) section.
 
-_configzen_ also allows you to use built-in preprocessing directives in your configuration files,
+### Preprocessing
+_configzen_ provides built-in preprocessing directives in your configuration files,
 offering features such as extending configuration files from configuration files (without writing any code).
 You might think of it as something that is analogous
 to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
 broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats)) and with some extra features planned.
+The directive `^copy` may also be handy in quick conversions between the mentioned formats.
 
 ## Supported file formats
 
@@ -27,7 +29,7 @@ broadened to any from the supported configuration file formats (see [Supported f
 * [Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format))
 * [BSON](https://en.wikipedia.org/wiki/BSON), [CBOR](https://en.wikipedia.org/wiki/CBOR)
 * [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction)
-* [MessagePack](https://en.wikipedia.org/wiki/MessagePack).
+* [MessagePack](https://en.wikipedia.org/wiki/MessagePack)
 
 ## Features
 
