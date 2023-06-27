@@ -576,7 +576,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             )
 
         actual_agent = agent
-        if agent.relative:
+        if agent.is_relative:
             parent = cast(pathlib.Path, self.agent.resource).parent
             child = cast(pathlib.Path, agent.resource)
 
