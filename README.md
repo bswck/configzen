@@ -5,17 +5,18 @@ _configzen_ – managing configuration files easily.
 ## What is this?
 
 _configzen_ is a good choice if you need to create complex configurations with schemas.
-Being based on [pydantic](https://docs.pydantic.dev/latest/), this tool will allow you to create _models_
+Being based on [pydantic](https://docs.pydantic.dev/latest/), this tool will allow you to create _configuration models_
 for your configuration files, and then load, modify and save them with scope control.
 To see roughly how it works, check out the [Features](#features) section.
 
 ### Preprocessing
-_configzen_ provides built-in preprocessing directives in your configuration files,
-offering features such as extending configuration files from configuration files (without writing any code).
+_configzen_ provides built-in preprocessing directives to your configuration files,
+offering features such as extending configuration files directly from other configuration files (without writing any code).
 You might think of it as something that is analogous
 to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
 broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats)) and with some extra features planned.
 The directive `^copy` may also be handy in quick conversions between the mentioned formats.
+See [Preprocessing directives](#preprocessing-directives) for more information.
 
 ## Supported file formats
 
@@ -66,10 +67,10 @@ class DatabaseConfig(ConfigModel):
 db_config = DatabaseConfig.load()
 ```
 
-Now you can load your configuration from a file as well as from the environment variables
+With this code written, you can load your configuration from a file as well as from the environment variables
 `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. Since `password` is a field created with
 the option `exclude=True`, it will not be included in the configuration's exported data: that
-guarantees that your password won't leak into `database.yaml` on save – but you may still pass it
+guarantees that your password does never leak into `database.yaml` on save – but you may still pass it
 through an environment variable (here – the mentioned `DB_PASSWORD`). Secret files are also supported,
 see [the pydantic documentation](https://docs.pydantic.dev/latest/usage/settings/#secret-support) section
 for more information.
@@ -78,7 +79,7 @@ for more information.
 Configuration models inherit from the `pydantic.BaseSettings` class, so you can use all of its features:
 schema generation, type conversion, validation, etc.
 
-There are additional features brought by _configzen_ worth checking out, though.
+There are additional features brought to you by _configzen_ worth checking out, though.
 
 You can use the `db_config` object defined above to access the configuration values:
 
@@ -87,7 +88,7 @@ You can use the `db_config` object defined above to access the configuration val
 IPv4Address('127.0.0.1')
 ```
 
-modify them, if the pydantic model allows it:
+modify them, if the pydantic model validation allows it ([`<Your model>.Config.validate_assignment`](https://docs.pydantic.dev/latest/usage/model_config/#options) will be `True` by default):
 
 ```python
 >> > db_config.host = "0.0.0.0"
@@ -138,6 +139,9 @@ or save the whole configuration:
 
 ### Preprocessing directives
 
+To see supported preprocessing directives, see [Supported preprocessing directives](#supported-preprocessing-directives).
+
+#### Basic usage
 Having a base configuration file like this (`base.json`):
 
 ```json
@@ -152,10 +156,7 @@ Having a base configuration file like this (`base.json`):
     }
 }
 ```
-
-You might extend this configuration as follows.
-
-Create another configuration file like this, overriding desired sections as needed:
+create another configuration file like this, overriding desired sections as needed:
 
 ```yaml
 # production.yaml
@@ -165,11 +166,13 @@ Create another configuration file like this, overriding desired sections as need
     debug: false
 ```
 
-Note: Using `+` in front of a key will update the section already defined at that key,
-instead of replacing it.
+and load the `production.yaml` configuration file. No changes to the code snippet from the [Managing content](#managing-content) section are needed.
 
-Notice how configuration file formats don't matter in _configzen_: you can
-extend JSON configurations in YAML, but that might be as well any other format
+_Note: Using `+` in front of a key will update the section already defined at that key,
+instead of replacing it._
+
+Notice how configuration file formats do not matter in _configzen_: you can
+extend JSON configurations with YAML, but that might be as well any other format
 among the supported ones (see the [Supported file formats](#supported-file-formats) section).
 
 The above example is equivalent to as if you used:
@@ -184,10 +187,17 @@ app:
     expose: 8000
 ```
 
-with a significant difference.
+but with a significant difference: when you save the above configuration, the `^extend` relation to the base configuration file `base.json` is preserved.
+This basically means that changes made in the base configuration file will apply to the configuration model instance loaded from the `^extend`-ing configuration file.
+Any changes made locally to the model will result in `+` sections being automatically added to the exported configuration data.
 
-When you save the above configuration, the `extend` relation to the base configuration file `base.json` will be preserved.
-This basically means that changes made in the base configuration file will apply to the configuration model instance loaded from the extended configuration file.
+#### Supported preprocessing directives
+
+| Directive   | Is the referenced file preprocessed? | Is the directive preserved? |
+|-------------|--------------------------------------|-----------------------------|
+| `^extend`   | yes                                  | yes                         |
+| `^include`  | yes                                  | no                          |
+| `^copy`     | no                                   | no                          |
 
 ## Setup
 
