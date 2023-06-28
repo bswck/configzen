@@ -10,27 +10,39 @@ for your configuration files, and then load, modify and save them with scope con
 To see roughly how it works, check out the [Features](#features) section.
 
 ### Preprocessing
+
 _configzen_ provides built-in preprocessing directives to your configuration files,
-offering features such as extending configuration files directly from other configuration files (without writing any code).
+offering features such as extending configuration files directly from other configuration files (without writing any
+code).
 You might think of it as something that is analogous
 to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
-broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats)) and with some extra features planned.
+broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats))
+and with some extra features planned.
 The directive `^copy` may also be handy in quick conversions between the mentioned formats.
 See [Preprocessing directives](#preprocessing-directives) for more information.
 
 ## Supported file formats
 
-* [JSON](https://en.wikipedia.org/wiki/JSON)
-* [INI](https://en.wikipedia.org/wiki/INI_file)
-* [XML](https://en.wikipedia.org/wiki/XML)
-* [.properties](https://en.wikipedia.org/wiki/.properties)
-* shellvars
-* [YAML](https://yaml.org)
-* [TOML](https://en.wikipedia.org/wiki/TOML)
-* [Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format))
-* [BSON](https://en.wikipedia.org/wiki/BSON), [CBOR](https://en.wikipedia.org/wiki/CBOR)
-* [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction)
-* [MessagePack](https://en.wikipedia.org/wiki/MessagePack)
+| Name                                                                                                        | To use, install:              | Recognized file extension(s) | Backend library                                                                                         |
+|-------------------------------------------------------------------------------------------------------------|-------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------|
+| [JSON](https://en.wikipedia.org/wiki/JSON)                                                                  | -                             | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                  |
+| [INI](https://en.wikipedia.org/wiki/INI_file)                                                               | -                             | `ini`, `cfg`, `conf`         | [configparser](https://docs.python.org/3/library/configparser.html) (standard library)                  |
+| [TOML](https://en.wikipedia.org/wiki/TOML)                                                                  | -                             | `toml`                       | [toml](https://pypi.python.org/pypi/toml)                                                               |
+| [YAML](https://yaml.org)                                                                                    | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yaml](https://pypi.python.org/pypi/ruamel.yaml) |
+| [XML](https://en.wikipedia.org/wiki/XML)                                                                    | -                             | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                    |
+| [Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format))                                      | `anyconfig-ion-backend`       | `ion`                        | [ion](https://pypi.org/project/amazon.ion/)                                                             |
+| [BSON](https://en.wikipedia.org/wiki/BSON)                                                                  | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                  |
+| [CBOR](https://en.wikipedia.org/wiki/CBOR) ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949))             | `anyconfig-cbor2-backend`     | `cbor`                       | [cbor2](https://pypi.org/project/cbor2/)                                                                |
+| [CBOR](https://en.wikipedia.org/wiki/CBOR) (deprecated, [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049)) | `anyconfig-cbor-backend`      | `cbor`                       | [cbor](https://pypi.org/project/cbor/)                                                                  |
+| [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction)                         | `anyconfig-configobj-backend` | `configobj`                  | [configobj](https://pypi.org/project/configobj/)                                                        |
+| [MessagePack](https://en.wikipedia.org/wiki/MessagePack)                                                    | `anyconfig-msgpack-backend`   | `msgpack`                    | [msgpack](https://pypi.org/project/msgpack/)                                                            |
+| properties                                                                                                  | -                             | `properties`                 | (native)                                                                                                |
+| shellvars                                                                                                   | -                             | `shellvars`                  | (native)                                                                                                |
+
+If your file extension is not recognized, you can register your own file extension
+using `ConfigAgent.register_file_extension()`.
+If your favorite backend library is not supported, report it as an issue or create a pull request.
+Using custom backends is to be supported in the future.
 
 ## Features
 
@@ -88,7 +100,9 @@ You can use the `db_config` object defined above to access the configuration val
 IPv4Address('127.0.0.1')
 ```
 
-modify them, if the pydantic model validation allows it ([`<Your model>.Config.validate_assignment`](https://docs.pydantic.dev/latest/usage/model_config/#options) will be `True` by default):
+modify them, if the pydantic model validation allows
+it ([`<Your model>.Config.validate_assignment`](https://docs.pydantic.dev/latest/usage/model_config/#options) will
+be `True` by default):
 
 ```python
 >>> db_config.host = "0.0.0.0"
@@ -139,9 +153,11 @@ or save the whole configuration:
 
 ### Preprocessing directives
 
-To see supported preprocessing directives, see [Supported preprocessing directives](#supported-preprocessing-directives).
+To see supported preprocessing directives,
+see [Supported preprocessing directives](#supported-preprocessing-directives).
 
 #### Basic usage
+
 Having a base configuration file like this (`base.json`):
 
 ```json
@@ -156,6 +172,7 @@ Having a base configuration file like this (`base.json`):
   }
 }
 ```
+
 create another configuration file like this, overriding desired sections as needed:
 
 ```yaml
@@ -166,7 +183,8 @@ create another configuration file like this, overriding desired sections as need
   debug: false
 ```
 
-and load the `production.yaml` configuration file. No explicit changes to the code indicating the use of the `base.json` file are needed.
+and load the `production.yaml` configuration file. No explicit changes to the code indicating the use of the `base.json`
+file are needed.
 
 _Note: Using `+` in front of a key will update the section already defined at that key,
 instead of replacing it._
@@ -187,17 +205,20 @@ app:
   expose: 8000
 ```
 
-but with a significant difference: when you save the above configuration, the `^extend` relation to the base configuration file `base.json` is preserved.
-This basically means that changes made in the base configuration file will apply to the configuration model instance loaded from the `^extend`-ing configuration file.
-Any changes made locally to the model will result in `+` sections being automatically added to the exported configuration data.
+but with a significant difference: when you save the above configuration, the `^extend` relation to the base
+configuration file `base.json` is preserved.
+This basically means that changes made in the base configuration file will apply to the configuration model instance
+loaded from the `^extend`-ing configuration file.
+Any changes made locally to the model will result in `+` sections being automatically added to the exported
+configuration data.
 
 #### Supported preprocessing directives
 
-| Directive   | Is the referenced file preprocessed? | Is the directive preserved? |
-|-------------|--------------------------------------|-----------------------------|
-| `^extend`   | Yes                                  | Yes                         |
-| `^include`  | Yes                                  | No                          |
-| `^copy`     | No                                   | No                          |
+| Directive  | Is the referenced file preprocessed? | Is the directive preserved on export? |
+|------------|--------------------------------------|---------------------------------------|
+| `^extend`  | Yes                                  | Yes                                   |
+| `^include` | Yes                                  | No                                    |
+| `^copy`    | No                                   | No                                    |
 
 ## Setup
 
@@ -207,7 +228,8 @@ In order to use _configzen_ in your project, install it with your package manage
 pip install configzen
 ```
 
-If you are willing to contribute to the project, which is awesome, simply clone the repository and install its dependencies with [poetry](https://python-poetry.org/):
+If you are willing to contribute to the project, which is awesome, simply clone the repository and install its
+dependencies with [poetry](https://python-poetry.org/):
 
 ```bash
 poetry install --with dev

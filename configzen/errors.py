@@ -66,7 +66,7 @@ class UnavailableParserError(ConfigError):
         "ion": "anyconfig-ion-backend",
         "bson": "anyconfig-bson-backend",
         "msgpack": "anyconfig-msgpack-backend",
-        "cbor": "anyconfig-cbor-backend (or anyconfig-cbor2-backend)",
+        "cbor": "anyconfig-cbor2-backend (or anyconfig-cbor-backend)",
         "configobj": "anyconfig-configobj-backend",
     }
 
