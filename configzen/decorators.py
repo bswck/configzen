@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from configzen.config import (
     export_model,
     export_model_async,
-    post_deserialize,
+    autocast,
     pre_serialize,
 )
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 __all__ = (
     "with_exporter",
     "with_async_exporter",
-    "with_post_deserialize",
+    "with_autocast",
     "with_pre_serialize",
 )
 
@@ -61,7 +61,8 @@ def with_pre_serialize(
         def validator_gen() -> (
             collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
         ):
-            yield lambda value: post_deserialize.dispatch(cls)(cls, value)
+            autocast_func = autocast.dispatch(cls)  # type: ignore[arg-type]
+            yield lambda value: autocast_func(cls, value)
 
         with contextlib.suppress(TypeError):
             cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
@@ -69,11 +70,11 @@ def with_pre_serialize(
     return cls
 
 
-def with_post_deserialize(
-    func: collections.abc.Callable[[Any], T], cls: type[T] | None = None
+def with_autocast(
+    func: collections.abc.Callable[[type[T], Any], T], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
-    Register a loader function for a type.
+    Register an autocast function for a type.
 
     Parameters
     ----------
@@ -88,9 +89,9 @@ def with_post_deserialize(
     """
 
     if cls is None:
-        return functools.partial(with_post_deserialize, func)
+        return functools.partial(with_autocast, func)
 
-    post_deserialize.register(cls, func)
+    autocast.register(cls, func)
     return cls
 
 

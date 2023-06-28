@@ -58,6 +58,7 @@ files in various formats and within a number of advanced methods.
 from __future__ import annotations
 
 import abc
+import ast
 import asyncio
 import collections.abc
 import contextvars
@@ -78,6 +79,8 @@ from typing import (
     cast,
     no_type_check,
     overload,
+    TYPE_CHECKING,
+    get_origin,
 )
 
 import anyconfig
@@ -108,6 +111,7 @@ from configzen.typedefs import (
     NormalizedResourceT,
     RawResourceT,
     SupportsRoute,
+    T,
 )
 
 try:
@@ -127,7 +131,7 @@ __all__ = (
     "reload",
     "reload_async",
     "pre_serialize",
-    "post_deserialize",
+    "autocast",
     "export_model",
     "export_model_async",
 )
@@ -161,7 +165,7 @@ def _get_defaults_from_model_class(
     return defaults
 
 
-def _get_object_dict(obj: Any) -> dict[str, Any]:
+def _get_object_state(obj: Any) -> dict[str, Any]:
     obj_dict = obj
     if not isinstance(obj, dict):
         obj_dict = obj.__dict__
@@ -205,31 +209,69 @@ def pre_serialize(obj: Any) -> Any:
 for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
     pre_serialize.register(obj_type, obj_encoder)
 
+autocast_registrars: Any = functools.singledispatch(lambda _cls, value: value)
 
-@functools.singledispatch
-def post_deserialize(cls: Any, value: Any) -> Any:
-    """
-    Load a value into a type after deserialization.
+if TYPE_CHECKING:
 
-    This function is used to load values that are not supported by
-    `anyconfig` to a format that can be used at runtime. It is used
-    by pydantic while performing validation.
+    class _AutocastType:
+        def __call__(self, cls: type[T], value: Any) -> Any:
+            ...
 
-    Parameters
-    ----------
-    cls
-        The type to load the value into.
+        def register(
+            self,
+            cls: type[T],
+            func: collections.abc.Callable[[type[T], Any], Any] | None = None,
+        ) -> collections.abc.Callable[
+            [collections.abc.Callable[[type[T], Any], Any]],
+            collections.abc.Callable[[type[T] | Any, Any], Any],
+        ]:
+            ...
 
-    value
-        The value to load.
+        def dispatch(
+            self, cls: type[T]
+        ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
+            ...
 
-    Returns
-    -------
-    The loaded value.
-    """
-    if isinstance(value, cls):
-        return value
-    return cls(value)
+    autocast: _AutocastType = _AutocastType()
+
+else:
+
+    def autocast(cls: type[Any], value: Any) -> Any:
+        """
+        Automatically registered pre-validator for values in fields
+        where the outer type is `cls`.
+
+        This function is used to load values that are not supported by
+        `anyconfig` to a format that can be used at runtime. It is used
+        by pydantic while performing validation.
+
+        Parameters
+        ----------
+        cls
+            The type to load the value into.
+
+        value
+            The value to load.
+
+        Returns
+        -------
+        The loaded value.
+        """
+        origin = get_origin(cls)
+        try:
+            if isinstance(value, origin or cls):
+                return value
+        except TypeError:
+            return value
+        if origin:
+            cls = origin
+        try:
+            cast_func = autocast_registrars.dispatch(cls)
+        except KeyError:
+            return value
+        return cast_func(cls, value)
+
+    autocast.register = autocast_registrars.register
 
 
 @functools.singledispatch
@@ -332,6 +374,38 @@ def _pre_serialize_namedtuple(obj: tuple[Any, ...]) -> Any:
     # Initially I wanted it to be pre_serialize(obj._asdict()), but
     # pydantic doesn't seem to be friends with custom NamedTuple-s.
     return pre_serialize(list(obj))
+
+
+@autocast.register(dict)
+@autocast.register(list)
+def _autocast_literal(cls: type[Any], value: Any) -> Any:
+    """
+    Load a dict/list using literal evaluation.
+    Solves nested dictionaries problem in INI files.
+
+    Parameters
+    ----------
+    cls
+        The type to load the value into.
+
+    value
+        The value to load.
+
+    Returns
+    -------
+    The loaded value.
+    """
+    if isinstance(value, cls):
+        return value
+    if isinstance(value, str):
+        try:
+            data = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            # There might be some following validator, let it be like that
+            return value
+        else:
+            return cls(data)
+    return cls(value)
 
 
 def _delegate_ac_options(
@@ -467,6 +541,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "pkl": "pickle",
     }
     BINARY_AC_PARSERS: ClassVar[set[str]] = {
+        "ion",
         "bson",
         "cbor",
         "cbor2",
@@ -592,6 +667,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 recognized_file_extensions = supported_parsers + [
                     alias + "(-> " + actual_parser + ")"
                     for alias, actual_parser in self.ALIAS_FILE_EXTENSIONS.items()
+                    if actual_parser in supported_parsers
                 ]
                 msg = (
                     "Could not guess the anyconfig parser to use for "
@@ -1002,6 +1078,8 @@ class ConfigAgent(Generic[ConfigModelT]):
             else:
                 msg = f"Invalid resource access method: {method!r}"
                 raise ValueError(msg)
+        if self.uses_binary_data:
+            new_kwargs.pop("encoding", None)
         return new_kwargs
 
     def read(
@@ -1194,7 +1272,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 def at(
     mapping: Any,
     route: SupportsRoute,
-    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _get_object_dict,
+    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _get_object_state,
     agent: ConfigAgent[ConfigModelT] | None = None,
 ) -> Any:
     """
@@ -1215,7 +1293,7 @@ def at(
     """
     route = ConfigRoute(route)
     route_here = []
-    scope = _get_object_dict(mapping)
+    scope = _get_object_state(mapping)
     try:
         for part in route:
             route_here.append(part)
@@ -1290,12 +1368,12 @@ class ConfigAt(Generic[ConfigModelT]):
         route = list(ConfigRoute(self.route))
         mapping = self.mapping or self.owner
         key = route.pop()
-        scope = _get_object_dict(mapping)
+        scope = _get_object_state(mapping)
         route_here = []
         try:
             for part in route:
                 route_here.append(part)
-                scope = _get_object_dict(scope[part])
+                scope = _get_object_state(scope[part])
             scope[key] = value
         except KeyError:
             raise ConfigAccessError(self.owner, route_here) from None
@@ -1740,6 +1818,16 @@ def _json_encoder(
     return converted_value
 
 
+# noinspection PyUnusedLocal
+@make_generic_validator
+def _autocast_validator(
+    cls: type[ConfigModelT],  # noqa: ARG001
+    v: Any,
+    field: pydantic.fields.ModelField,
+) -> Any:
+    return autocast(field.outer_type_, v)
+
+
 class ConfigModelMetaclass(ModelMetaclass):
     def __new__(
         cls,
@@ -1757,13 +1845,18 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         new_class = super().__new__(cls, name, bases, namespace, **kwargs)
         for field in new_class.__fields__.values():
+            if field.pre_validators is None:
+                field.pre_validators = []
+            field.pre_validators[:] = [_autocast_validator, *field.pre_validators]
             if type(field.outer_type_) is ConfigModelMetaclass:
-                if field.pre_validators is None:
-                    field.pre_validators = []
                 validator = make_generic_validator(
                     field.outer_type_.__field_setup__  # type: ignore[attr-defined]
                 )
-                field.pre_validators.insert(0, validator)
+                field.pre_validators[:] = [
+                    _autocast_validator,
+                    validator,
+                    *field.pre_validators,
+                ]
         new_class.__json_encoder__ = functools.partial(
             _json_encoder,
             new_class.__json_encoder__,
@@ -2307,7 +2400,7 @@ class ConfigModel(
         return await context.agent.write_async(blob, **kwargs)
 
     @classmethod
-    def __field_setup__(cls, value: Any, field: ModelField) -> Any:
+    def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
         """
         Called when this configuration model is being initialized as a field
         of some other configuration model.
@@ -2316,10 +2409,43 @@ class ConfigModel(
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            state = _get_object_dict(value)
-            state[TOKEN] = tok
-            state[LOCAL] = contextvars.copy_context()
+            return _get_object_state(value) | {
+                TOKEN: tok,
+                LOCAL: contextvars.copy_context(),
+            }
         return value
+
+
+@autocast.register(ConfigModel)
+def _autocast_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
+    """
+    Load a dict/list using literal evaluation.
+    Solves nested dictionaries problem in INI files.
+
+    Parameters
+    ----------
+    cls
+        The type to load the value into.
+
+    value
+        The value to load.
+
+    Returns
+    -------
+    The loaded value.
+    """
+    data = value
+    if isinstance(value, str):
+        try:
+            data = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            # Note: Strings resembling models is probably not intended
+            # to be used with automatic pickle/JSON parsing.
+            # return cls.parse_raw(value)
+            return data
+        else:
+            return cls.parse_obj(data)
+    return data
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
