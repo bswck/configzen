@@ -23,7 +23,7 @@ See [Preprocessing directives](#preprocessing-directives) for more information.
 
 ## Supported file formats
 
-_configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on protocol-specific entities.
+_configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on any protocol-specific entities.
 As a result, comments in your configuration files are lost on save, but you can interchange file formats without any hassle, as well as describe particular particular configuration items throughout _configuration models_ (`ConfigField(description=...)``).
 
 The following table shows the supported file formats, their requirements, file extensions, and the backend libraries used to accomplish this goal.
