@@ -2419,7 +2419,7 @@ class ConfigModel(
 @autocast.register(ConfigModel)
 def _autocast_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
     """
-    Load a dict/list using literal evaluation.
+    Load a model using literal evaluation.
     Solves nested dictionaries problem in INI files.
 
     Parameters
