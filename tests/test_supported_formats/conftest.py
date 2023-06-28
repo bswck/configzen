@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from typing import Union
 
 import configparser
@@ -11,6 +12,7 @@ import cbor2
 import cbor
 import toml
 from amazon.ion import simpleion as ion
+from anyconfig.backend import properties
 
 from configzen import ConfigModel
 from tests.conftest import testpath
@@ -25,10 +27,10 @@ class IncorporatedModel(ConfigModel):
 
 class SectionModel(ConfigModel):
     integer: int
-    incorporated_model: IncorporatedModel
+    incorporated_model: IncorporatedModel = IncorporatedModel(string="Hello world!")
     union_value: Union[bool, float]
     collection_value: list[str]
-    dict_value: dict[str, str]
+    dict_value: dict[str, str] = {"configzen": "is this"}
 
 
 class TestedModel(ConfigModel):
@@ -43,6 +45,20 @@ def ini_compose(data):
     return fp.getvalue()
 
 
+def shellvars_compose(data):
+    output = ""
+    for key, value in data.items():
+        output += f"{key}='{value}'{os.linesep}"
+    return output
+
+
+def properties_compose(data):
+    output = ""
+    for key, value in data.items():
+        output += f"{key}={properties.escape(str(value))}{os.linesep}"
+    return output
+
+
 composer = {
     "ini": ini_compose,
     "json": json.dumps,
@@ -53,6 +69,8 @@ composer = {
     "cbor2": cbor2.dumps,
     "cbor": cbor.dumps,
     "msgpack": msgpack.dumps,
+    "shellvars": shellvars_compose,
+    "properties": properties_compose,
 }
 
 
@@ -86,16 +104,26 @@ def mock_data_fixture(request):
         (composer["bson"], file_dir / "data.bson", True),
         (composer["cbor2"], file_dir / "data.cbor2", True),
         (composer["cbor"], file_dir / "data.cbor", True),
+        (composer["shellvars"], file_dir / "data.shellvars", False),
+        (composer["properties"], file_dir / "data.properties", False),
+
+        # Ones below are unsupported due to anyconfig...
         # (composer["ion"], file_dir / "data.ion", True),
         # (composer["msgpack"], file_dir / "data.msgpack", True),
     ],
 )
 def data_file(request, mock_data):
     dumper, dest_file, uses_binary_data = request.param
+
+    if dumper in (composer["shellvars"], composer["properties"]):
+        used_mock_data = mock_data["main"].copy()
+        mock_data = used_mock_data
+
     dest_file.touch()
     if uses_binary_data:
         dest_file.write_bytes(dumper(mock_data))
     else:
         dest_file.write_text(dumper(mock_data))
     yield dest_file
-    # dest_file.unlink()
+    # if os_dependent:
+    #     dest_file.unlink()
