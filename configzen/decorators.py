@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections.abc
 import contextlib
 import functools
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from configzen.config import (
     export_model,
@@ -95,8 +95,9 @@ def with_post_deserialize(
 
 
 def with_exporter(
-    func: collections.abc.Callable[[ConfigModelT], dict[str, Any]],
+    func: collections.abc.Callable[[ConfigModelT], dict[str, Any]] | None = None,
     cls: type[ConfigModelT] | None = None,
+    **predefined_kwargs: Any,
 ) -> type[ConfigModelT] | Any:
     """
     Register a custom exporter for a configuration model class.
@@ -111,21 +112,48 @@ def with_exporter(
     if cls is None:
         return functools.partial(with_exporter, func)
 
-    export_model.register(cls, func)
-    if export_model_async.dispatch(cls) is export_model_async:
+    if func and predefined_kwargs:
+        raise NotImplementedError(
+            "specifying both a function and predefined kwargs is not supported"
+        )
 
-        async def default_async_func(obj: Any) -> Any:
-            return func(obj)
+    if func is None:
 
-        export_model_async.register(cls, default_async_func)
+        def func(obj: Any, **kwargs: Any) -> Any:
+            kwargs |= predefined_kwargs
+            return obj.export(**kwargs)
+
+        export_model.register(cls, func)
+
+        if export_model_async.dispatch(cls) is export_model_async:
+
+            async def default_async_func(obj: Any, **kwargs: Any) -> Any:
+                kwargs |= predefined_kwargs
+                return await obj.export_async(**kwargs)
+
+            export_model_async.register(cls, default_async_func)
+    else:
+        export_model.register(cls, func)
+        if export_model_async.dispatch(cls) is export_model_async:
+
+            async def default_async_func(obj: Any, **kwargs: Any) -> Any:
+                nonlocal func
+                if TYPE_CHECKING:
+                    func = cast(collections.abc.Callable[..., dict[str, Any]], func)
+
+                return func(obj, **kwargs)
+
+            export_model_async.register(cls, default_async_func)
     return cls
 
 
 def with_async_exporter(
     func: collections.abc.Callable[
         [ConfigModelT], collections.abc.Coroutine[Any, Any, dict[str, Any]]
-    ],
+    ]
+    | None = None,
     cls: type[ConfigModelT] | None = None,
+    **predefined_kwargs: Any,
 ) -> type[ConfigModelT] | Any:
     """
     Register a custom exporter for a configuration model class.
@@ -140,5 +168,18 @@ def with_async_exporter(
     if cls is None:
         return functools.partial(with_exporter, func)
 
-    export_model_async.register(cls, func)
+    if func and predefined_kwargs:
+        raise NotImplementedError(
+            "specifying both a function and default kwargs is not supported"
+        )
+
+    if func is None:
+
+        async def default_async_func(obj: Any, **kwargs: Any) -> Any:
+            kwargs |= predefined_kwargs
+            return await obj.export_async(**kwargs)
+
+        export_model_async.register(cls, default_async_func)
+    else:
+        export_model_async.register(cls, func)
     return cls
