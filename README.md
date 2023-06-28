@@ -1,6 +1,6 @@
 # configzen
 
-_configzen_ – asily create and maintain complex, statically-typed configurations with validation in Python.
+_configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
 ## What is this?
 
