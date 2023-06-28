@@ -39,10 +39,9 @@ See [Preprocessing directives](#preprocessing-directives) for more information.
 | properties                                                                                                 | -                             | `properties`                 | (native)                                                                                                |
 | shellvars                                                                                                  | -                             | `shellvars`                  | (native)                                                                                                |
 
-If your file extension is not recognized, you can register your own file extension
-using `ConfigAgent.register_file_extension()`.
+If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, ac_parser)`.
 
-If your favorite backend library is not supported, please let me know by reporting it as an issue or create a pull request.
+If your favorite backend library is not supported, please let me know by reporting it as an issue.
 Using custom backends is to be supported in the future.
 
 ## Features
