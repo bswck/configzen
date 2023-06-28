@@ -456,13 +456,23 @@ class ConfigAgent(Generic[ConfigModelT]):
         "exclude_defaults",
         "exclude_none",
     }
-    FILEEXT_PARSER_ALIASES: ClassVar[dict[str, str]] = {
+    ALIAS_FILE_EXTENSIONS: ClassVar[dict[str, str]] = {
         "yml": "yaml",
         "conf": "ini",
         "cfg": "ini",
+        # Note: CBOR (RFC 7049) is deprecated, use CBOR (RFC 8949) instead.
+        "cbor": "cbor2",
+        # https://github.com/msgpack/msgpack/issues/291#issuecomment-1370526984
+        "mpk": "msgpack",
         "pkl": "pickle",
     }
-    BINARY_AC_PARSERS: ClassVar[set[str]] = {"bson", "cbor", "msgpack", "pickle"}
+    BINARY_AC_PARSERS: ClassVar[set[str]] = {
+        "bson",
+        "cbor",
+        "cbor2",
+        "msgpack",
+        "pickle",
+    }
 
     def __init__(
         self,
@@ -577,14 +587,25 @@ class ConfigAgent(Generic[ConfigModelT]):
         ac_parser = None
         if isinstance(self.resource, pathlib.Path):
             suffix = self.resource.suffix[1:].casefold()
+            supported_parsers = anyconfig.list_types()
             if not suffix:
+                recognized_file_extensions = supported_parsers + [
+                    alias + "(-> " + actual_parser + ")"
+                    for alias, actual_parser in self.ALIAS_FILE_EXTENSIONS.items()
+                ]
                 msg = (
                     "Could not guess the anyconfig parser to use for "
                     f"{self.resource!r}.\n"
-                    f"Available parsers: {', '.join(anyconfig.list_types())}"
+                    f"Recognized file extensions: {recognized_file_extensions}"
                 )
                 raise UnspecifiedParserError(msg)
-            ac_parser = self.FILEEXT_PARSER_ALIASES.get(suffix, suffix)
+            ac_parser = self.ALIAS_FILE_EXTENSIONS.get(suffix, suffix)
+            if (
+                ac_parser == "cbor2"
+                and "cbor2" not in supported_parsers
+                and "cbor" in supported_parsers
+            ):
+                ac_parser = "cbor"
         return ac_parser
 
     def load_into(
@@ -1144,6 +1165,26 @@ class ConfigAgent(Generic[ConfigModelT]):
             )
             raise ValueError(msg)
         return cls(*args, **kwargs), str(route)
+
+    @classmethod
+    def register_file_extension(
+        cls,
+        file_extension: str,
+        *,
+        ac_parser: str,
+    ) -> None:
+        """
+        Register a file extension with the proper anyconfig parser to use.
+
+        Parameters
+        ----------
+        file_extension
+        ac_parser
+
+        Returns
+        -------
+        """
+        cls.ALIAS_FILE_EXTENSIONS[file_extension] = ac_parser
 
     def __repr__(self) -> str:
         resource = self.resource
