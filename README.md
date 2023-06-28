@@ -1,6 +1,6 @@
 # configzen
 
-_configzen_ – managing configuration files easily.
+_configzen_ – asily create and maintain complex, statically-typed configurations with validation in Python.
 
 ## What is this?
 
