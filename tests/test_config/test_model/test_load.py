@@ -16,7 +16,7 @@ class ModelWithHeader(ConfigModel):
 
 
 default_params = pytest.mark.parametrize(
-    "blob, ac_parser, expected",
+    "blob, parser_name, expected",
     [
         ("{\"item\": 123}", "json", Model(item=123)),
         ("item: 456", "yaml", Model(item=456)),
@@ -27,21 +27,21 @@ default_params = pytest.mark.parametrize(
 
 
 @default_params
-def test_load_stream(blob, ac_parser, expected):
+def test_load_stream(blob, parser_name, expected):
     loaded_model: type[ConfigModel] = type(expected)
     assert loaded_model.load(
-        ConfigAgent(resource=io.StringIO(blob), ac_parser=ac_parser)
+        ConfigAgent(resource=io.StringIO(blob), parser_name=parser_name)
     ) == expected
 
     loaded_model.__config__.resource = io.StringIO(blob)
-    loaded_model.__config__.ac_parser = ac_parser
+    loaded_model.__config__.parser_name = parser_name
     assert loaded_model.load() == expected
 
     loaded_model.__config__.resource = ConfigAgent(
         resource=io.StringIO(blob),
-        ac_parser=ac_parser
+        parser_name=parser_name
     )
-    loaded_model.__config__.ac_parser = None
+    loaded_model.__config__.parser_name = None
     assert loaded_model.load() == expected
 
 
@@ -57,26 +57,26 @@ def get_temp_file(blob):
 
 
 @default_params
-def test_load_file(blob, ac_parser, expected):
+def test_load_file(blob, parser_name, expected):
     loaded_model: type[ConfigModel] = type(expected)
 
     file = get_temp_file(blob)
     assert loaded_model.load(
-        ConfigAgent(resource=file.name, ac_parser=ac_parser)
+        ConfigAgent(resource=file.name, parser_name=parser_name)
     ) == expected
     os.unlink(file.name)
 
     file = get_temp_file(blob)
     loaded_model.__config__.resource = file.name
-    loaded_model.__config__.ac_parser = ac_parser
+    loaded_model.__config__.parser_name = parser_name
     assert loaded_model.load() == expected
     os.unlink(file.name)
 
     file = get_temp_file(blob)
     loaded_model.__config__.resource = ConfigAgent(
         resource=file.name,
-        ac_parser=ac_parser
+        parser_name=parser_name
     )
-    loaded_model.__config__.ac_parser = None
+    loaded_model.__config__.parser_name = None
     assert loaded_model.load() == expected
     os.unlink(file.name)

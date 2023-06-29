@@ -25,7 +25,7 @@ class Item(ConfigModel):
 
 def get_agent():
     resource = io.StringIO("item:\n  foo: 123")
-    agent = ConfigAgent(resource=resource, ac_parser="yaml")
+    agent = ConfigAgent(resource=resource, parser_name="yaml")
     return agent
 
 
@@ -39,15 +39,15 @@ def test_autoupdate_forward_refs():
         NoAutoUpdateForwardRefs.load(get_agent())
 
 
-def test_resource_and_ac_parser():
+def test_resource_and_parser_name():
     class FixedResourceModel(ConfigModel):
         class Config(ConfigMeta):
             resource = io.StringIO("foo: 123")
-            ac_parser = "yaml"
+            parser_name = "yaml"
 
         foo: int
 
     assert FixedResourceModel.load() == FixedResourceModel(foo=123)
 
-    overridden_resource = ConfigAgent(io.StringIO("foo: 456"), ac_parser="yaml")
+    overridden_resource = ConfigAgent(io.StringIO("foo: 456"), parser_name="yaml")
     assert FixedResourceModel.load(overridden_resource) == FixedResourceModel(foo=456)

@@ -45,7 +45,7 @@ The following table shows the supported file formats, their requirements, file e
 [//]: # (| [Amazon Ion]&#40;https://en.wikipedia.org/wiki/Ion_&#40;serialization_format&#41;&#41;              | `anyconfig-ion-backend`       | `ion`                        | [ion]&#40;https://pypi.org/project/amazon.ion/&#41;                                                             |)
 [//]: # (| [MessagePack]&#40;https://en.wikipedia.org/wiki/MessagePack&#41;                            | `anyconfig-msgpack-backend`   | `msgpack`, `mpk`             | [msgpack]&#40;https://pypi.org/project/msgpack/&#41;                                                            |)
 
-If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, ac_parser)`.
+If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, parser_name)`.
 
 If your favorite backend library is not supported, please let me know by reporting it as an issue.
 Using custom backends is to be supported in the future.

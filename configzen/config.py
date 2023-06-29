@@ -58,13 +58,13 @@ files in various formats and within a number of advanced methods.
 from __future__ import annotations
 
 import abc
-import ast
 import asyncio
 import collections.abc
 import contextvars
 import copy
 import dataclasses
 import functools
+import importlib
 import io
 import os
 import pathlib
@@ -90,7 +90,6 @@ import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
 from pydantic.fields import make_generic_validator  # type: ignore[attr-defined]
 from pydantic.fields import ModelField, Undefined
-from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
@@ -171,18 +170,10 @@ def _get_defaults_from_model_class(
 
 
 def _get_object_state(obj: Any) -> dict[str, Any]:
-    obj_dict = obj
+    state = obj
     if not isinstance(obj, dict):
-        obj_dict = obj.__dict__
-    return cast(dict[str, Any], obj_dict)
-
-
-def _is_namedtuple(
-    obj: Any,
-) -> bool:
-    return (
-        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
-    )
+        state = obj.__dict__  # avoidance of vars() is intended
+    return cast(dict[str, Any], state)
 
 
 @functools.singledispatch
@@ -206,13 +197,19 @@ def export_hook(obj: Any) -> Any:
     """
     if dataclasses.is_dataclass(obj):
         return export_hook(dataclasses.asdict(obj))
-    if _is_namedtuple(obj):
+    if (
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
+    ):
         return _export_namedtuple(obj)
     return obj
 
 
-for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
-    export_hook.register(obj_type, obj_encoder)
+@functools.singledispatch
+def _export_namedtuple(obj: tuple[Any, ...]) -> Any:
+    # Initially I wanted it to be export_hook(obj._asdict()), but
+    # pydantic doesn't seem to be friends with custom NamedTuple-s.
+    return export_hook(list(obj))
+
 
 field_hook_registrars: Any = functools.singledispatch(lambda _cls, value: value)
 
@@ -313,107 +310,6 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     return cast(dict[str, Any], await obj.dict_async(**kwargs))
 
 
-@export_hook.register(pathlib.WindowsPath)
-@export_hook.register(pathlib.PureWindowsPath)
-def _export_windows_path(obj: pathlib.WindowsPath | pathlib.PureWindowsPath) -> str:
-    """
-    Convert a Windows path to a string.
-
-    Parameters
-    ----------
-    obj
-        The path to convert.
-
-    Returns
-    -------
-    The converted path.
-    """
-    return obj.as_posix()
-
-
-@export_hook.register(list)
-def _export_list(obj: list[Any]) -> list[Any]:
-    """
-    Convert a list to safely-serializable form.
-
-    Parameters
-    ----------
-    obj
-        The list to convert.
-
-    Returns
-    -------
-    The converted list.
-    """
-    return [export_hook(item) for item in obj]
-
-
-@export_hook.register(collections.abc.Mapping)
-def _export_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
-    """
-    Convert a mapping to safely-serializable form.
-
-    Parameters
-    ----------
-    obj
-        The mapping to convert.
-
-    Returns
-    -------
-    The converted mapping.
-    """
-    return {k: export_hook(v) for k, v in obj.items()}
-
-
-@functools.singledispatch
-def _export_namedtuple(obj: tuple[Any, ...]) -> Any:
-    """
-    Convert a namedtuple to safely-serializable form.
-
-    Parameters
-    ----------
-    obj
-        The namedtuple to convert.
-
-    Returns
-    -------
-    The converted namedtuple (likely a list).
-    """
-    # Initially I wanted it to be export(obj._asdict()), but
-    # pydantic doesn't seem to be friends with custom NamedTuple-s.
-    return export_hook(list(obj))
-
-
-@field_hook.register(dict)
-@field_hook.register(list)
-def _eval_literals(cls: type[Any], value: Any) -> Any:
-    """
-    Load a dict/list using literal evaluation.
-    Solves nested dictionaries problem in INI files.
-
-    Parameters
-    ----------
-    cls
-        The type to load the value into.
-
-    value
-        The value to load.
-
-    Returns
-    -------
-    The loaded value.
-    """
-    if isinstance(value, str):
-        try:
-            data = ast.literal_eval(value)
-        except (SyntaxError, ValueError):
-            # There might be some following validator, let it be like that
-            return value
-        else:
-            return cls(data)
-    return value
-
-
 def _delegate_ac_options(
     load_options: dict[str, Any], dump_options: dict[str, Any], options: dict[str, Any]
 ) -> None:
@@ -453,7 +349,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     processor
         The resource processor to use. If not specified, the processor used will
         be :class:`DefaultProcessor`.
-    ac_parser
+    parser_name
         The name of the engines to use for loading and saving the
         configuration. If not specified, the processor will be guessed
         from the file extension.
@@ -470,7 +366,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     ----------
     create_if_missing
         Whether to create the file if it doesn't exist.
-    ac_parser
+    parser_name
         The name of the engines to use for loading and saving the
         configuration. If not specified, the processor will be guessed
         from the file extension.
@@ -482,7 +378,6 @@ class ConfigAgent(Generic[ConfigModelT]):
     ValueError
     """
 
-    _resource: NormalizedResourceT
     processor_class: type[Processor[ConfigModelT]]
     create_if_missing: bool
     is_relative: bool = False
@@ -498,6 +393,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "ensure_ascii": False,
         "indent": 2,
     }
+    _resource: NormalizedResourceT
 
     predefined_default_kwargs: ClassVar[dict[str, Any]] = {"encoding": "UTF-8"}
     default_allowed_url_schemes: ClassVar[set[str]] = {"file", "http", "https"}
@@ -536,7 +432,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "exclude_defaults",
         "exclude_none",
     }
-    ALIAS_FILE_EXTENSIONS: ClassVar[dict[str, str]] = {
+    EXTRA_FILE_EXTENSIONS: ClassVar[dict[str, str]] = {
         "yml": "yaml",
         "conf": "ini",
         "cfg": "ini",
@@ -546,7 +442,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "mpk": "msgpack",
         "pkl": "pickle",
     }
-    BINARY_AC_PARSERS: ClassVar[set[str]] = {
+    BINARY_DATA_PARSERS: ClassVar[set[str]] = {
         "ion",
         "bson",
         "cbor",
@@ -558,7 +454,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     def __init__(
         self,
         resource: RawResourceT,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         processor_class: type[Processor[ConfigModelT]] | None = None,
         *,
         create_if_missing: bool = False,
@@ -568,9 +464,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         resource
             The URL to the configuration file, or a file-like object.
-        ac_parser
-            The name of the engines to use for loading and saving the configuration.
-            Defaults to 'yaml'.
+        parser_name
+            The name of the anyconfig parser to use
+            for loading and saving the configuration.
         create_if_missing
             Whether to automatically create missing keys when loading the configuration.
         default_kwargs
@@ -579,20 +475,20 @@ class ConfigAgent(Generic[ConfigModelT]):
             Whether to use Pydantic's JSON encoder/decoder instead of the default
             anyconfig one.
         uses_binary_data
-            Whether to treat the data as binary. Defaults to True for BSON,
-            CBOR, MessagePack and Pickle formats.
+            Whether to treat the data as binary.
+            Defaults to True for formats listed in `ConfigAgent.BINARY_DATA_PARSERS`.
         **kwargs
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
         """
-        self._ac_parser = None
+        self._parser_name = None
         self._uses_binary_data = kwargs.get("uses_binary_data", False)
 
         if processor_class is None:
             processor_class = Processor[ConfigModelT]
 
         self.processor_class = processor_class
-        self.ac_parser = ac_parser
+        self.parser_name = parser_name
 
         if isinstance(resource, (str, os.PathLike)) and not (
             isinstance(resource, str)
@@ -651,29 +547,29 @@ class ConfigAgent(Generic[ConfigModelT]):
         The resource of the configuration.
         """
         self._resource = value
-        if self.ac_parser is None:
-            self.ac_parser = self._guess_ac_parser()
+        if self.parser_name is None:
+            self.parser_name = self._guess_parser_name()
 
     @property
-    def ac_parser(self) -> str | None:
-        return self._ac_parser
+    def parser_name(self) -> str | None:
+        return self._parser_name
 
-    @ac_parser.setter
-    def ac_parser(self, value: str | None) -> None:
+    @parser_name.setter
+    def parser_name(self, value: str | None) -> None:
         if value is not None:
             value = value.casefold()
-        self._ac_parser = value
+        self._parser_name = value
 
-    def _guess_ac_parser(self) -> str | None:
-        ac_parser = None
+    def _guess_parser_name(self) -> str | None:
+        parser_name = None
         if isinstance(self.resource, pathlib.Path):
             suffix = self.resource.suffix[1:].casefold()
             supported_parsers = anyconfig.list_types()
             if not suffix:
                 recognized_file_extensions = supported_parsers + [
-                    alias + "(-> " + actual_parser + ")"
-                    for alias, actual_parser in self.ALIAS_FILE_EXTENSIONS.items()
-                    if actual_parser in supported_parsers
+                    alias + "(-> " + actual_parser_name + ")"
+                    for alias, actual_parser_name in self.EXTRA_FILE_EXTENSIONS.items()
+                    if actual_parser_name in supported_parsers
                 ]
                 msg = (
                     "Could not guess the anyconfig parser to use for "
@@ -681,20 +577,20 @@ class ConfigAgent(Generic[ConfigModelT]):
                     f"Recognized file extensions: {recognized_file_extensions}"
                 )
                 raise UnspecifiedParserError(msg)
-            ac_parser = self.ALIAS_FILE_EXTENSIONS.get(suffix, suffix)
+            parser_name = self.EXTRA_FILE_EXTENSIONS.get(suffix, suffix)
             if (
-                ac_parser == "cbor2"
+                parser_name == "cbor2"
                 and "cbor2" not in supported_parsers
                 and "cbor" in supported_parsers
             ):
-                ac_parser = "cbor"
-        return ac_parser
+                parser_name = "cbor"
+        return parser_name
 
     def load_into(
         self,
         config_class: type[ConfigModelT],
         blob: str | bytes,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """
@@ -706,7 +602,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             The `ConfigModel` subclass to load the configuration into.
         blob
             The configuration to load.
-        ac_parser
+        parser_name
             The name of the engines to use for loading the configuration.
         **kwargs
             Additional keyword arguments to pass to `anyconfig.loads()`.
@@ -715,7 +611,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = self.load_dict(blob, ac_parser=ac_parser, **kwargs)
+        dict_config = self.load_dict(blob, parser_name=parser_name, **kwargs)
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
@@ -724,7 +620,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         self,
         config_class: type[ConfigModelT],
         blob: str | bytes,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """
@@ -736,7 +632,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             The `ConfigModel` subclass to load the configuration into.
         blob
             The configuration to load.
-        ac_parser
+        parser_name
             The name of the engines to use for loading the configuration.
         **kwargs
             Additional keyword arguments to pass to `anyconfig.loads()`.
@@ -745,7 +641,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = await self.load_dict_async(blob, ac_parser=ac_parser, **kwargs)
+        dict_config = await self.load_dict_async(blob, parser_name=parser_name,
+                                                 **kwargs)
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
@@ -753,17 +650,17 @@ class ConfigAgent(Generic[ConfigModelT]):
     def _load_dict_impl(
         self,
         blob: str | bytes,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        ac_parser = ac_parser or self.ac_parser or self._guess_ac_parser()
-        if ac_parser is None:
-            msg = "Cannot read configuration because `ac_parser` was not specified"
+        parser_name = parser_name or self.parser_name or self._guess_parser_name()
+        if parser_name is None:
+            msg = "Cannot read configuration because `parser_name` was not specified"
             raise UnspecifiedParserError(msg)
         kwargs = self.load_options | kwargs
         try:
             loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
-                blob, ac_parser=ac_parser, **kwargs
+                blob, ac_parser=parser_name, **kwargs
             )
         except anyconfig.UnknownParserTypeError as exc:
             raise UnavailableParserError(str(exc).split()[-1], self) from exc
@@ -778,7 +675,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     def load_dict(
         self,
         blob: str | bytes,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         *,
         preprocess: bool = True,
         **kwargs: Any,
@@ -792,7 +689,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         blob
             The configuration to load.
-        ac_parser
+        parser_name
             The name of the anyconfig parser to use for loading the configuration.
         preprocess
         **kwargs
@@ -802,7 +699,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._load_dict_impl(blob, ac_parser=ac_parser, **kwargs)
+        loaded = self._load_dict_impl(blob, parser_name=parser_name, **kwargs)
         if preprocess:
             loaded = self.processor_class(self, loaded).preprocess()
         return loaded
@@ -810,7 +707,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     async def load_dict_async(
         self,
         blob: str | bytes,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         *,
         preprocess: bool = True,
         **kwargs: Any,
@@ -822,7 +719,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         blob
             The configuration to load.
-        ac_parser
+        parser_name
             The name of the anyconfig parser to use for loading the configuration.
         preprocess
         **kwargs
@@ -832,7 +729,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration dictionary.
         """
-        loaded = self._load_dict_impl(blob, ac_parser, **kwargs)
+        loaded = self._load_dict_impl(blob, parser_name, **kwargs)
         if preprocess:
             loaded = await self.processor_class(self, loaded).preprocess_async()
         return loaded
@@ -840,7 +737,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     def dump_config(
         self,
         config: ConfigModelT,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -850,7 +747,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         config
             The configuration to dump.
-        ac_parser
+        parser_name
             The name of the anyconfig parser to use for saving the configuration.
         **kwargs
             Additional keyword arguments to pass to `anyconfig.dumps()`.
@@ -859,22 +756,22 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The dumped configuration.
         """
-        if ac_parser is None:
-            ac_parser = self.ac_parser
+        if parser_name is None:
+            parser_name = self.parser_name
         export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
-        if ac_parser == "json" and self.use_pydantic_json:
+        if parser_name == "json" and self.use_pydantic_json:
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
             return isolate(config.json, **export_kwargs)
         data = export_model(config, **export_kwargs)
-        return self.dump_data(data, ac_parser=ac_parser, **kwargs)
+        return self.dump_data(data, parser_name=parser_name, **kwargs)
 
     async def dump_config_async(
         self,
         config: ConfigModelT,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -884,7 +781,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         config
             The configuration to dump.
-        ac_parser
+        parser_name
             The name of the anyconfig parser to use for saving the configuration.
         **kwargs
             Additional keyword arguments to pass to `anyconfig.dumps()`.
@@ -893,22 +790,22 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The dumped configuration.
         """
-        if ac_parser is None:
-            ac_parser = self.ac_parser
+        if parser_name is None:
+            parser_name = self.parser_name
         export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
-        if ac_parser == "json" and self.use_pydantic_json:
+        if parser_name == "json" and self.use_pydantic_json:
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
             return await isolate_async(config.json_async, **export_kwargs)
         data = await export_model_async(config, **export_kwargs)
-        return self.dump_data(data, ac_parser=ac_parser, **kwargs)
+        return self.dump_data(data, parser_name=parser_name, **kwargs)
 
     def dump_data(
         self,
         data: dict[str, Any],
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -918,7 +815,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         ----------
         data
             The data to dump.
-        ac_parser
+        parser_name
             The name of the anyconfig parser to use for saving the configuration.
         kwargs
             Additional keyword arguments to pass to `anyconfig.dumps()`.
@@ -927,16 +824,16 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The dumped configuration.
         """
-        if ac_parser is None:
-            ac_parser = self.ac_parser
-        if ac_parser is None:
+        if parser_name is None:
+            parser_name = self.parser_name
+        if parser_name is None:
             msg = (
-                "Cannot write configuration because `ac_parser` was not specified"
+                "Cannot write configuration because `parser_name` was not specified"
                 f"for agent {self}"
             )
             raise UnspecifiedParserError(msg)
         kwargs = self.dump_options | kwargs
-        return anyconfig.dumps(export_hook(data), ac_parser=ac_parser, **kwargs)
+        return anyconfig.dumps(export_hook(data), ac_parser=parser_name, **kwargs)
 
     @property
     def is_url(self) -> bool:
@@ -953,7 +850,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         """
         Whether the resource uses bytes for storing data, not str.
         """
-        return self._uses_binary_data or self.ac_parser in self.BINARY_AC_PARSERS
+        return self._uses_binary_data or self.parser_name in self.BINARY_DATA_PARSERS
 
     def open_resource(self, **kwds: Any) -> ConfigIO:
         """
@@ -1197,7 +1094,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         kwargs = self._get_default_kwargs("write", kwargs=kwargs)
         async with self.open_resource_async(**kwargs) as fp:
             # Technically those might be also bytes,
-            # todo(bswck): type it properly
+            # todo(bswck): type hint it properly...
             return await fp.write(cast(str, blob))
 
     @classmethod
@@ -1251,7 +1148,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         cls,
         file_extension: str,
         *,
-        ac_parser: str,
+        parser_name: str,
     ) -> None:
         """
         Register a file extension with the proper anyconfig parser to use.
@@ -1259,12 +1156,12 @@ class ConfigAgent(Generic[ConfigModelT]):
         Parameters
         ----------
         file_extension
-        ac_parser
+        parser_name
 
         Returns
         -------
         """
-        cls.ALIAS_FILE_EXTENSIONS[file_extension] = ac_parser
+        cls.EXTRA_FILE_EXTENSIONS[file_extension] = parser_name
 
     def __repr__(self) -> str:
         resource = self.resource
@@ -1911,20 +1808,7 @@ def _interpolate_str(value: str, ctx: dict[str, Any]) -> str:
     return template.safe_substitute(ctx)
 
 
-# Interpolation for mutable types is a non-trivial task.
-
-# @interpolate.register(dict)
-# def _interpolate_dict(value: dict[Any, Any], ctx: dict[str, Any]) -> dict[Any, Any]:
-#     return {
-#         interpolate(k, ctx): interpolate(v, ctx) for k, v in value.items()
-#     }
-#
-#
-# @interpolate.register(list)
-# def _interpolate_lst(value: list, ctx: dict[str, Any]) -> list[Any]:
-#     return {
-#         interpolate(k, ctx): interpolate(v, ctx) for k, v in value.items()
-#     }
+# todo(bswck): Interpolation for compound types. Quite non-trivial.
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
@@ -1941,7 +1825,7 @@ class ConfigMeta(pydantic.BaseSettings.Config):
 
         If a string, it will be interpreted as a path to a file.
 
-    ac_parser
+    parser_name
         The anyconfig parser to use.
 
     autoupdate_forward_refs
@@ -1953,7 +1837,7 @@ class ConfigMeta(pydantic.BaseSettings.Config):
     """
 
     resource: ConfigAgent[ConfigModel] | RawResourceT | None = None
-    ac_parser: str | None = None
+    parser_name: str | None = None
     validate_assignment: bool = True
     autoupdate_forward_refs: bool = True
 
@@ -2142,26 +2026,26 @@ class ConfigModel(
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
     ) -> ConfigAgent[ConfigModelT]:
         if resource is None:
             resource = getattr(cls.__config__, "resource", None)
         if resource is None:
             raise ValueError("No resource specified")
-        if ac_parser is None:
-            ac_parser = getattr(cls.__config__, "ac_parser", None)
+        if parser_name is None:
+            parser_name = getattr(cls.__config__, "parser_name", None)
         agent: ConfigAgent[ConfigModelT]
         if isinstance(resource, ConfigAgent):
             agent = resource
         else:
             agent = ConfigAgent(
                 resource,
-                ac_parser=ac_parser,
+                parser_name=parser_name,
             )
         if create_if_missing is not None:
             agent.create_if_missing = create_if_missing
-        if ac_parser is not None:
-            agent.ac_parser = cast(str, ac_parser)
+        if parser_name is not None:
+            agent.parser_name = cast(str, parser_name)
         return agent
 
     @property
@@ -2263,7 +2147,7 @@ class ConfigModel(
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
         create_if_missing: bool | None = None,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
         """
@@ -2274,7 +2158,7 @@ class ConfigModel(
         ----------
         resource
             The configuration resource to read from/write to.
-        ac_parser
+        parser_name
             The anyconfig parser to use.
         create_if_missing
             Whether to create the configuration file if it does not exist.
@@ -2287,7 +2171,7 @@ class ConfigModel(
         """
         agent = cls._resolve_agent(
             resource,
-            ac_parser=ac_parser,
+            parser_name=parser_name,
             create_if_missing=create_if_missing,
         )
         current_context.set(Context(agent))
@@ -2386,7 +2270,7 @@ class ConfigModel(
         cls: type[ConfigModelT],
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
         *,
-        ac_parser: str | None = None,
+        parser_name: str | None = None,
         create_if_missing: bool | None = None,
         **kwargs: Any,
     ) -> ConfigModelT:
@@ -2398,7 +2282,7 @@ class ConfigModel(
         ----------
         resource
             The configuration resource.
-        ac_parser
+        parser_name
             The anyconfig parser to use.
         create_if_missing
             Whether to create the configuration file if it does not exist.
@@ -2410,7 +2294,7 @@ class ConfigModel(
         self
         """
         agent = cls._resolve_agent(
-            resource, create_if_missing=create_if_missing, ac_parser=ac_parser
+            resource, create_if_missing=create_if_missing, parser_name=parser_name
         )
         current_context.set(Context(agent))
         local = contextvars.copy_context()
@@ -2543,33 +2427,4 @@ class ConfigModel(
         export_async = isolate_calls(export_async)
 
 
-@field_hook.register(ConfigModel)
-def _eval_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
-    """
-    Load a model using dict literal evaluation.
-    Solves nested dictionaries problem in INI files.
-
-    Parameters
-    ----------
-    cls
-        The type to load the value into.
-
-    value
-        The value to load.
-
-    Returns
-    -------
-    The loaded value.
-    """
-    data = value
-    if isinstance(value, str):
-        try:
-            data = ast.literal_eval(value)
-        except (SyntaxError, ValueError):
-            # Note: Strings resembling models is probably not intended
-            # to be used with automatic pickle/JSON parsing.
-            # return cls.parse_raw(value)
-            return data
-        else:
-            return cls.parse_obj(data)
-    return data
+importlib.import_module(os.getenv("CONFIGZEN_SETUP_MODULE", "configzen._setup"))
