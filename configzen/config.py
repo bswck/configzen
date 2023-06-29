@@ -400,8 +400,6 @@ def _eval_literals(cls: type[Any], value: Any) -> Any:
     -------
     The loaded value.
     """
-    if isinstance(value, cls):
-        return value
     if isinstance(value, str):
         try:
             data = ast.literal_eval(value)
@@ -410,7 +408,7 @@ def _eval_literals(cls: type[Any], value: Any) -> Any:
             return value
         else:
             return cls(data)
-    return cls(value)
+    return value
 
 
 def _delegate_ac_options(
