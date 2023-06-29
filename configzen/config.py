@@ -2360,4 +2360,5 @@ class ConfigModel(
         export_async = isolate_calls(export_async)
 
 
-importlib.import_module(os.getenv("CONFIGZEN_SETUP_MODULE", "configzen._setup"))
+if os.getenv("CONFIGZEN_SETUP") != "0":
+    importlib.import_module("configzen._setup")

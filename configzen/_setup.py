@@ -1,8 +1,8 @@
 """
 Convenience hooks for quicker development with _configzen_.
 
-You can replace this module with a custom one and then set it
-in the CONFIGZEN_SETUP_MODULE environment variable to use it.
+For advanced use cases, you can prevent this module from executing
+by setting the environment variable ``CONFIGZEN_SETUP`` to ``0``.
 """
 
 from __future__ import annotations
