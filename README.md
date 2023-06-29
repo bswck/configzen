@@ -257,7 +257,7 @@ AppConfig(num_workers=4, num_jobs=4)
 ```
 
 
-#### Synchronizing interpolated configuration (inclusion)
+#### Reusable configuration with inclusion
 
 You can share independent configuration models as namespaces through inclusion:
 
@@ -275,6 +275,7 @@ expose: 8000
 
 ```python
 >>> from configzen import ConfigModel, include
+>>> from ipaddress import IPv4Address
 >>>
 >>> @include("app_config")
 ... class DatabaseConfig(ConfigModel):
@@ -289,7 +290,12 @@ expose: 8000
 >>> app_config
 AppConfig(db_host='localhost', expose=8000)
 >>> db_config = DatabaseConfig.load("database.yml")
-DatabaseConfig(host=IPv4Address('localhost'), port=8000)
+>>> db_config
+DatabaseConfig(host=IPv4Address('127.0.0.1'), port=8000)
+>>> db_config.dict()
+{'host': IPv4Address('127.0.0.1'), 'port': 8000}
+>>> db_config.export()  # used when saving
+{'host': '${app_config::db_host}', 'port': '${app_config::expose}'}
 ```
 
 You do not have to pass a variable name to `@include`, though. `@include` lets you overwrite the main interpolation namespace
