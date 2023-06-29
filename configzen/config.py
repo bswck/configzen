@@ -116,6 +116,7 @@ from configzen.typedefs import (
     SupportsRoute,
     T,
 )
+from configzen._isolation import isolate_calls, isolate_and_run
 
 try:
     import aiofiles
@@ -870,10 +871,8 @@ class ConfigAgent(Generic[ConfigModelT]):
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
-            tok = _exporting.set(True)  # noqa: FBT003
-            ctx = contextvars.copy_context()
-            _exporting.reset(tok)
-            return ctx.run(config.json, **export_kwargs)
+            _exporting.set(True)  # noqa: FBT003
+            return isolate_and_run(config.json, **export_kwargs)
         data = export_model(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
@@ -906,10 +905,8 @@ class ConfigAgent(Generic[ConfigModelT]):
             export_kwargs |= filter_options(
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
-            tok = _exporting.set(True)  # noqa: FBT003
-            task = asyncio.create_task(config.json_async(**export_kwargs))
-            _exporting.reset(tok)
-            return await task
+            _exporting.set(True)  # noqa: FBT003
+            return await isolate_and_run(config.json_async, **export_kwargs)
         data = await export_model_async(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
@@ -1796,7 +1793,10 @@ def get_context(config: ConfigModelT) -> BaseContext[ConfigModelT]:
     """
     context = get_context_or_none(config)
     if context is None:
-        raise RuntimeError("Cannot get context of unbound configuration model")
+        raise RuntimeError(
+            "This model is either inside a list "
+            "or was not loaded within .load()"
+        )
     return context
 
 
@@ -1814,7 +1814,8 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     The context of the configuration model.
     """
     return cast(
-        Optional[BaseContext[ConfigModelT]], getattr(config, LOCAL).get(current_context)
+        Optional[BaseContext[ConfigModelT]],
+        getattr(config, LOCAL).get(current_context)
     )
 
 
@@ -1989,7 +1990,7 @@ class ConfigModel(
                     if context:
                         value = context
                     current_context.set(value)
-                setattr(self, private_attr, value)
+                object.__setattr__(self, private_attr, value)
         super().__init__(**kwargs)
 
     def __deepcopy__(
@@ -2017,6 +2018,7 @@ class ConfigModel(
         if tok:
             current_context.reset(tok)
 
+    @isolate_calls
     def export(self, **kwargs: Any) -> dict[str, Any]:
         """
         Export the configuration model.
@@ -2025,11 +2027,10 @@ class ConfigModel(
         -------
         The exported configuration model.
         """
-        tok = _exporting.set(True)  # noqa: FBT003
-        ctx = contextvars.copy_context()
-        _exporting.reset(tok)
-        return ctx.run(self.dict, **kwargs)
+        _exporting.set(True)  # noqa: FBT003
+        return isolate_and_run(self.dict, **kwargs)
 
+    @isolate_calls
     async def export_async(self, **kwargs: Any) -> dict[str, Any]:
         """
         Export the configuration model.
@@ -2038,10 +2039,8 @@ class ConfigModel(
         -------
         The exported configuration model.
         """
-        tok = _exporting.set(True)  # noqa: FBT003
-        task = asyncio.create_task(self.dict_async(**kwargs))
-        _exporting.reset(tok)
-        return await task
+        _exporting.set(True)  # noqa: FBT003
+        return await isolate_and_run(self.dict_async, **kwargs)
 
     async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -2267,6 +2266,7 @@ class ConfigModel(
         self.__dict__.update(context.initial_state)
 
     @classmethod
+    @isolate_calls
     def load(
         cls: type[ConfigModelT],
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
@@ -2299,9 +2299,8 @@ class ConfigModel(
             ac_parser=ac_parser,
             create_if_missing=create_if_missing,
         )
-        tok = current_context.set(Context(agent))
+        current_context.set(Context(agent))
         local = contextvars.copy_context()
-        current_context.reset(tok)
         if getattr(
             cls.__config__,
             "autoupdate_forward_refs",
@@ -2309,12 +2308,13 @@ class ConfigModel(
         ):
             cls.update_forward_refs()
         config = local.run(agent.read, config_class=cls, **kwargs)
-        setattr(config, LOCAL, local)
+        object.__setattr__(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
         context.owner = config
         context.initial_state = config.__dict__
         return config
 
+    @isolate_calls
     def reload(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
         """
         Reload the configuration file.
@@ -2329,18 +2329,17 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        tok = current_context.set(get_context(context.owner))
-        local = contextvars.copy_context()
-        current_context.reset(tok)
+        current_context.set(get_context(context.owner))
         if context.owner is self:
-            changed = local.run(context.agent.read, config_class=type(self), **kwargs)
+            changed = context.agent.read(config_class=type(self), **kwargs)
         else:
-            changed = local.run(reload, cast(ConfigModelT, context.at), **kwargs)
+            changed = reload(cast(ConfigModelT, context.at), **kwargs)
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
         return self
 
+    @isolate_calls
     def save(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
@@ -2394,6 +2393,7 @@ class ConfigModel(
         return context.agent.write(blob, **kwargs)
 
     @classmethod
+    @isolate_calls
     async def load_async(
         cls: type[ConfigModelT],
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
@@ -2424,9 +2424,8 @@ class ConfigModel(
         agent = cls._resolve_agent(
             resource, create_if_missing=create_if_missing, ac_parser=ac_parser
         )
-        tok = current_context.set(Context(agent))
+        current_context.set(Context(agent))
         local = contextvars.copy_context()
-        current_context.reset(tok)
         if getattr(
             cls.__config__,
             "autoupdate_forward_refs",
@@ -2437,11 +2436,12 @@ class ConfigModel(
             asyncio.create_task, agent.read_async(config_class=cls, **kwargs)
         )
         config = await task
-        setattr(config, LOCAL, local)
+        object.__setattr__(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
         context.owner = config
         return config
 
+    @isolate_calls
     async def reload_async(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
         """
         Reload the configuration file asynchronously.
@@ -2456,19 +2456,23 @@ class ConfigModel(
         self
         """
         context = get_context(self)
-        tok = current_context.set(get_context(context.owner))
+        current_context.set(get_context(context.owner))
         if context.owner is self:
-            coro = context.agent.read_async(config_class=type(self), **kwargs)
+            changed = await context.agent.read_async(
+                config_class=type(self),
+                **kwargs
+            )
         else:
-            coro = reload_async(cast(ConfigAt[ConfigModelT], context.at), **kwargs)
-        task = asyncio.create_task(coro)
-        current_context.reset(tok)
-        changed = await task
+            changed = await reload_async(
+                cast(ConfigAt[ConfigModelT], context.at),
+                **kwargs
+            )
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
         return self
 
+    @isolate_calls
     async def save_async(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
@@ -2490,10 +2494,8 @@ class ConfigModel(
         if context.owner is self:
             if write_kwargs is None:
                 write_kwargs = {}
-            tok = _exporting.set(True)  # noqa: FBT003
-            task = asyncio.create_task(context.agent.dump_config_async(self, **kwargs))
-            _exporting.reset(tok)
-            blob = await task
+            _exporting.set(True)  # noqa: FBT003
+            blob = await context.agent.dump_config_async(self, **kwargs)
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
