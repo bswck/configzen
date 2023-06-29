@@ -125,10 +125,6 @@ __all__ = (
     "ConfigAgent",
     "ConfigModel",
     "ConfigMeta",
-    "save",
-    "save_async",
-    "reload",
-    "reload_async",
     "export_hook",
     "field_hook",
     "export_model",
@@ -1290,7 +1286,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The number of bytes written.
         """
-        return await save_async(self, **kwargs)
+        return await _save_async(self, **kwargs)
 
     def save(self, **kwargs: Any) -> int:
         """
@@ -1305,7 +1301,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The number of bytes written.
         """
-        return save(self, **kwargs)
+        return _save(self, **kwargs)
 
     async def reload_async(self, **kwargs: Any) -> Any:
         """
@@ -1320,7 +1316,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The reloaded configuration or its belonging item.
         """
-        return await reload_async(self, **kwargs)
+        return await _reload_async(self, **kwargs)
 
     def reload(self, **kwargs: Any) -> Any:
         """
@@ -1335,30 +1331,14 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The reloaded configuration or its belonging item.
         """
-        return reload(self, **kwargs)
+        return _reload(self, **kwargs)
 
 
-def save(
+def _save(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> int:
-    """
-    Save the configuration.
-
-    Parameters
-    ----------
-    section
-        The configuration model instance or the configuration item.
-    write_kwargs
-        Keyword arguments to pass to the writing function.
-    **kwargs
-        Keyword arguments to pass to the dumping function.
-
-    Returns
-    -------
-    The number of bytes written.
-    """
     if isinstance(section, ConfigModel):
         config = section
         return config.save(write_kwargs=write_kwargs, **kwargs)
@@ -1377,27 +1357,11 @@ def save(
     return result
 
 
-async def save_async(
+async def _save_async(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> int:
-    """
-    Save the configuration asynchronously.
-
-    Parameters
-    ----------
-    section
-        The configuration model instance or the configuration item.
-    write_kwargs
-        Keyword arguments to pass to the writing function.
-    **kwargs
-        Keyword arguments to pass to the dumping function.
-
-    Returns
-    -------
-    The number of bytes written.
-    """
     if isinstance(section, ConfigModel):
         config = section
         return await config.save_async(write_kwargs=write_kwargs, **kwargs)
@@ -1416,21 +1380,7 @@ async def save_async(
     return result
 
 
-def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any:
-    """
-    Reload the configuration.
-
-    Parameters
-    ----------
-    section
-        The configuration model instance or the configuration item.
-    **kwargs
-        Keyword arguments to pass to the reloading function.
-
-    Returns
-    -------
-    The reloaded configuration or its belonging item.
-    """
+def _reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any:
     if isinstance(section, ConfigModel):
         config = section
         return config.reload()
@@ -1444,23 +1394,9 @@ def reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any
     return section_data
 
 
-async def reload_async(
+async def _reload_async(
     section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
 ) -> Any:
-    """
-    Reload the configuration asynchronously.
-
-    Parameters
-    ----------
-    section
-        The configuration model instance or the configuration item.
-    kwargs
-        Keyword arguments to pass to the reloading function.
-
-    Returns
-    -------
-    The reloaded configuration or its belonging item.
-    """
     if isinstance(section, ConfigModel):
         config = section
         return await config.reload_async()
@@ -2204,7 +2140,7 @@ class ConfigModel(
         if context.owner is self:
             changed = context.agent.read(config_class=type(self), **kwargs)
         else:
-            changed = reload(cast(ConfigModelT, context.at), **kwargs)
+            changed = _reload(cast(ConfigModelT, context.at), **kwargs)
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
@@ -2235,7 +2171,7 @@ class ConfigModel(
             result = self.write(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
-        return save(
+        return _save(
             cast(ConfigAt[ConfigModelT], context.at),
             write_kwargs=write_kwargs,
             **kwargs,
@@ -2328,7 +2264,7 @@ class ConfigModel(
         if context.owner is self:
             changed = await context.agent.read_async(config_class=type(self), **kwargs)
         else:
-            changed = await reload_async(
+            changed = await _reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
         state = changed.__dict__
@@ -2362,7 +2298,7 @@ class ConfigModel(
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
-        return await save_async(
+        return await _save_async(
             cast(ConfigAt[ConfigModelT], context.at),
             write_kwargs=write_kwargs,
             **kwargs,
