@@ -145,11 +145,11 @@ INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -197,9 +197,7 @@ def export_hook(obj: Any) -> Any:
     """
     if dataclasses.is_dataclass(obj):
         return export_hook(dataclasses.asdict(obj))
-    if (
-        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
-    ):
+    if isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields"):
         return _export_namedtuple(obj)
     return obj
 
@@ -233,7 +231,6 @@ if TYPE_CHECKING:
             self, cls: type[T]
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
-
 
     field_hook: _FieldHookType = _FieldHookType()
 
@@ -273,7 +270,6 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
-
 
     field_hook.register = field_hook_registrars.register
 
@@ -641,8 +637,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         -------
         The loaded configuration.
         """
-        dict_config = await self.load_dict_async(blob, parser_name=parser_name,
-                                                 **kwargs)
+        dict_config = await self.load_dict_async(
+            blob, parser_name=parser_name, **kwargs
+        )
         if dict_config is None:
             dict_config = {}
         return config_class.parse_obj(dict_config)
