@@ -146,11 +146,11 @@ INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -237,6 +237,7 @@ if TYPE_CHECKING:
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
 
+
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -275,6 +276,7 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
+
 
     field_hook.register = field_hook_registrars.register
 
@@ -2005,7 +2007,6 @@ class ConfigModel(
         if tok:
             current_context.reset(tok)
 
-    @isolate_calls
     def export(self, **kwargs: Any) -> dict[str, Any]:
         """
         Export the configuration model.
@@ -2017,7 +2018,6 @@ class ConfigModel(
         _exporting.set(True)  # noqa: FBT003
         return isolate(self.dict, **kwargs)
 
-    @isolate_calls
     async def export_async(self, **kwargs: Any) -> dict[str, Any]:
         """
         Export the configuration model.
@@ -2257,7 +2257,6 @@ class ConfigModel(
         self.__dict__.update(context.initial_state)
 
     @classmethod
-    @isolate_calls
     def load(
         cls: type[ConfigModelT],
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
@@ -2305,7 +2304,6 @@ class ConfigModel(
         context.initial_state = config.__dict__
         return config
 
-    @isolate_calls
     def reload(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
         """
         Reload the configuration file.
@@ -2330,7 +2328,6 @@ class ConfigModel(
         self.update(state)
         return self
 
-    @isolate_calls
     def save(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
@@ -2384,7 +2381,6 @@ class ConfigModel(
         return context.agent.write(blob, **kwargs)
 
     @classmethod
-    @isolate_calls
     async def load_async(
         cls: type[ConfigModelT],
         resource: ConfigAgent[ConfigModelT] | RawResourceT | None = None,
@@ -2432,7 +2428,6 @@ class ConfigModel(
         context.owner = config
         return config
 
-    @isolate_calls
     async def reload_async(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
         """
         Reload the configuration file asynchronously.
@@ -2459,7 +2454,6 @@ class ConfigModel(
         self.update(state)
         return self
 
-    @isolate_calls
     async def save_async(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
     ) -> int:
@@ -2536,6 +2530,16 @@ class ConfigModel(
                 LOCAL: contextvars.copy_context(),
             }
         return value
+
+    if not TYPE_CHECKING:
+        load = isolate_calls(load)
+        load_async = isolate_calls(load_async)
+        reload = isolate_calls(reload)
+        reload_async = isolate_calls(reload_async)
+        save = isolate_calls(save)
+        save_async = isolate_calls(save_async)
+        export = isolate_calls(export)
+        export_async = isolate_calls(export_async)
 
 
 @field_hook.register(ConfigModel)
