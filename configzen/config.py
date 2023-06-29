@@ -313,8 +313,9 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     return cast(dict[str, Any], await obj.dict_async(**kwargs))
 
 
+@export_hook.register(pathlib.WindowsPath)
 @export_hook.register(pathlib.PureWindowsPath)
-def _export_windows_path(obj: pathlib.PureWindowsPath) -> str:
+def _export_windows_path(obj: pathlib.WindowsPath | pathlib.PureWindowsPath) -> str:
     """
     Convert a Windows path to a string.
 
