@@ -211,7 +211,7 @@ def export_hook(obj: Any) -> Any:
     if dataclasses.is_dataclass(obj):
         return export_hook(dataclasses.asdict(obj))
     if _is_namedtuple(obj):
-        return _pre_serialize_namedtuple(obj)
+        return _export_namedtuple(obj)
     return obj
 
 
@@ -318,7 +318,7 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
 
 
 @export_hook.register(pathlib.PureWindowsPath)
-def _pre_serialize_windows_path(obj: pathlib.PureWindowsPath) -> str:
+def _export_windows_path(obj: pathlib.PureWindowsPath) -> str:
     """
     Convert a Windows path to a string.
 
@@ -335,7 +335,7 @@ def _pre_serialize_windows_path(obj: pathlib.PureWindowsPath) -> str:
 
 
 @export_hook.register(list)
-def _pre_serialize_list(obj: list[Any]) -> list[Any]:
+def _export_list(obj: list[Any]) -> list[Any]:
     """
     Convert a list to safely-serializable form.
 
@@ -352,7 +352,7 @@ def _pre_serialize_list(obj: list[Any]) -> list[Any]:
 
 
 @export_hook.register(collections.abc.Mapping)
-def _pre_serialize_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
+def _export_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
     """
     Convert a mapping to safely-serializable form.
 
@@ -369,7 +369,7 @@ def _pre_serialize_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, 
 
 
 @functools.singledispatch
-def _pre_serialize_namedtuple(obj: tuple[Any, ...]) -> Any:
+def _export_namedtuple(obj: tuple[Any, ...]) -> Any:
     """
     Convert a namedtuple to safely-serializable form.
 
@@ -382,7 +382,7 @@ def _pre_serialize_namedtuple(obj: tuple[Any, ...]) -> Any:
     -------
     The converted namedtuple (likely a list).
     """
-    # Initially I wanted it to be pre_serialize(obj._asdict()), but
+    # Initially I wanted it to be export(obj._asdict()), but
     # pydantic doesn't seem to be friends with custom NamedTuple-s.
     return export_hook(list(obj))
 
