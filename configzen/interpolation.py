@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import functools
+import importlib
 import inspect
 import re
 import string
@@ -129,15 +130,25 @@ def _include_str(
     *,
     name: str | None = None,
     stack_offset: int = 2,
+    module: str | None = None,
     isolate_from_toplevel: bool = True,
 ) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
-    callers_globals = inspect.stack()[stack_offset].frame.f_globals
+    if module is None:
+        callers_globals = inspect.stack()[stack_offset].frame.f_globals
+    else:
+        callers_globals = None
 
     if isolate_from_toplevel and name is None:
         name = namespace
 
     def namespace_factory() -> dict[str, Any]:
+        nonlocal callers_globals
         from configzen import ConfigModel
+
+        if callers_globals is None:
+            assert module
+            module_obj = importlib.import_module(module)
+            callers_globals = module_obj.__dict__
 
         try:
             namespace_variable = callers_globals[namespace]
