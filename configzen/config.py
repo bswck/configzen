@@ -68,6 +68,8 @@ import functools
 import io
 import os
 import pathlib
+import re
+import string
 import urllib.parse
 import urllib.request
 from typing import (
@@ -97,6 +99,7 @@ from pydantic.utils import ROOT_KEY
 
 from configzen.errors import (
     ConfigAccessError,
+    # InterpolationError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
@@ -130,8 +133,8 @@ __all__ = (
     "save_async",
     "reload",
     "reload_async",
-    "pre_serialize",
-    "autocast",
+    "export_hook",
+    "field_hook",
     "export_model",
     "export_model_async",
 )
@@ -142,10 +145,15 @@ _URL_SCHEMES: set[str] = set(
 CONTEXT: str = "__context__"
 TOKEN: str = "__context_token__"
 LOCAL: str = "__local__"
+INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
+
+current_interpolation_tracker: contextvars.ContextVar[
+    dict[str, Any] | None
+    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -181,7 +189,7 @@ def _is_namedtuple(
 
 
 @functools.singledispatch
-def pre_serialize(obj: Any) -> Any:
+def export_hook(obj: Any) -> Any:
     """
     Convert a value to a format that can be safely serialized.
 
@@ -200,20 +208,20 @@ def pre_serialize(obj: Any) -> Any:
     Any
     """
     if dataclasses.is_dataclass(obj):
-        return pre_serialize(dataclasses.asdict(obj))
+        return export_hook(dataclasses.asdict(obj))
     if _is_namedtuple(obj):
         return _pre_serialize_namedtuple(obj)
     return obj
 
 
 for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
-    pre_serialize.register(obj_type, obj_encoder)
+    export_hook.register(obj_type, obj_encoder)
 
-autocast_registrars: Any = functools.singledispatch(lambda _cls, value: value)
+field_hook_registrars: Any = functools.singledispatch(lambda _cls, value: value)
 
 if TYPE_CHECKING:
 
-    class _AutocastType:
+    class _FieldHookType:
         def __call__(self, cls: type[T], value: Any) -> Any:
             ...
 
@@ -232,11 +240,12 @@ if TYPE_CHECKING:
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
 
-    autocast: _AutocastType = _AutocastType()
+
+    field_hook: _FieldHookType = _FieldHookType()
 
 else:
 
-    def autocast(cls: type[Any], value: Any) -> Any:
+    def field_hook(cls: type[Any], value: Any) -> Any:
         """
         Automatically registered pre-validator for values in fields
         where the outer type is `cls`.
@@ -266,12 +275,13 @@ else:
         if origin:
             cls = origin
         try:
-            cast_func = autocast_registrars.dispatch(cls)
+            cast_func = field_hook_registrars.dispatch(cls)
         except KeyError:
             return value
         return cast_func(cls, value)
 
-    autocast.register = autocast_registrars.register
+
+    field_hook.register = field_hook_registrars.register
 
 
 @functools.singledispatch
@@ -306,7 +316,7 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     return cast(dict[str, Any], await obj.dict_async(**kwargs))
 
 
-@pre_serialize.register(pathlib.PureWindowsPath)
+@export_hook.register(pathlib.PureWindowsPath)
 def _pre_serialize_windows_path(obj: pathlib.PureWindowsPath) -> str:
     """
     Convert a Windows path to a string.
@@ -323,7 +333,7 @@ def _pre_serialize_windows_path(obj: pathlib.PureWindowsPath) -> str:
     return obj.as_posix()
 
 
-@pre_serialize.register(list)
+@export_hook.register(list)
 def _pre_serialize_list(obj: list[Any]) -> list[Any]:
     """
     Convert a list to safely-serializable form.
@@ -337,10 +347,10 @@ def _pre_serialize_list(obj: list[Any]) -> list[Any]:
     -------
     The converted list.
     """
-    return [pre_serialize(item) for item in obj]
+    return [export_hook(item) for item in obj]
 
 
-@pre_serialize.register(collections.abc.Mapping)
+@export_hook.register(collections.abc.Mapping)
 def _pre_serialize_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
     """
     Convert a mapping to safely-serializable form.
@@ -354,7 +364,7 @@ def _pre_serialize_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, 
     -------
     The converted mapping.
     """
-    return {k: pre_serialize(v) for k, v in obj.items()}
+    return {k: export_hook(v) for k, v in obj.items()}
 
 
 @functools.singledispatch
@@ -373,12 +383,12 @@ def _pre_serialize_namedtuple(obj: tuple[Any, ...]) -> Any:
     """
     # Initially I wanted it to be pre_serialize(obj._asdict()), but
     # pydantic doesn't seem to be friends with custom NamedTuple-s.
-    return pre_serialize(list(obj))
+    return export_hook(list(obj))
 
 
-@autocast.register(dict)
-@autocast.register(list)
-def _autocast_literal(cls: type[Any], value: Any) -> Any:
+@field_hook.register(dict)
+@field_hook.register(list)
+def _eval_literals(cls: type[Any], value: Any) -> Any:
     """
     Load a dict/list using literal evaluation.
     Solves nested dictionaries problem in INI files.
@@ -934,7 +944,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             )
             raise UnspecifiedParserError(msg)
         kwargs = self.dump_options | kwargs
-        return anyconfig.dumps(pre_serialize(data), ac_parser=ac_parser, **kwargs)
+        return anyconfig.dumps(export_hook(data), ac_parser=ac_parser, **kwargs)
 
     @property
     def is_url(self) -> bool:
@@ -1808,24 +1818,52 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     )
 
 
+# noinspection PyUnusedLocal
+@make_generic_validator
+def _common_field_validator(
+    cls: type[ConfigModelT],
+    v: Any,
+    values: dict[str, Any],
+    field: pydantic.fields.ModelField,
+    config: pydantic.BaseConfig
+) -> Any:
+    post_hook_value = field_hook(field.outer_type_, v)
+    disallow_interpolation = getattr(config, "disallow_interpolation", False)
+    disallowed_interpolation_fields = set()
+
+    interpolation_tracker = current_interpolation_tracker.get()
+
+    if interpolation_tracker is None:
+        interpolation_tracker = {}
+        current_interpolation_tracker.set(interpolation_tracker)
+
+    if not isinstance(disallow_interpolation, bool):
+        disallowed_interpolation_fields = set(disallow_interpolation)
+    if (
+        field.field_info.extra.get("interpolate", True)
+        and field.alias not in disallowed_interpolation_fields
+    ):
+        old_value = post_hook_value
+        new_value = interpolate(
+            post_hook_value,
+            cls.get_interpolation_context() | values
+        )
+        if old_value != new_value:
+            interpolation_tracker[field.alias] = (
+                old_value, copy.copy(new_value)
+            )
+        post_hook_value = new_value
+    return post_hook_value
+
+
 def _json_encoder(
     model_encoder: collections.abc.Callable[..., Any], value: Any, **kwargs: Any
 ) -> Any:
     initial_state_type = type(value)
-    converted_value = pre_serialize(value)
+    converted_value = export_hook(value)
     if isinstance(converted_value, initial_state_type):
         return model_encoder(value, **kwargs)
     return converted_value
-
-
-# noinspection PyUnusedLocal
-@make_generic_validator
-def _autocast_validator(
-    cls: type[ConfigModelT],  # noqa: ARG001
-    v: Any,
-    field: pydantic.fields.ModelField,
-) -> Any:
-    return autocast(field.outer_type_, v)
 
 
 class ConfigModelMetaclass(ModelMetaclass):
@@ -1839,29 +1877,96 @@ class ConfigModelMetaclass(ModelMetaclass):
         namespace |= dict.fromkeys(
             (EXPORT, CONTEXT, LOCAL, TOKEN), pydantic.PrivateAttr()
         )
+        namespace[INTERPOLATION_TRACKER] = pydantic.PrivateAttr(default_factory=dict)
 
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
 
-        new_class = super().__new__(cls, name, bases, namespace, **kwargs)
-        for field in new_class.__fields__.values():
+        model = super().__new__(cls, name, bases, namespace, **kwargs)
+        for field in model.__fields__.values():
             if field.pre_validators is None:
                 field.pre_validators = []
-            field.pre_validators[:] = [_autocast_validator, *field.pre_validators]
+            field.pre_validators[:] = [_common_field_validator, *field.pre_validators]
             if type(field.outer_type_) is ConfigModelMetaclass:
                 validator = make_generic_validator(
                     field.outer_type_.__field_setup__  # type: ignore[attr-defined]
                 )
                 field.pre_validators[:] = [
-                    _autocast_validator,
+                    _common_field_validator,
                     validator,
                     *field.pre_validators,
                 ]
-        new_class.__json_encoder__ = functools.partial(
-            _json_encoder,
-            new_class.__json_encoder__,
-        )
-        return cast(type, new_class)
+        model_encoder = model.__json_encoder__
+        model.__json_encoder__ = functools.partial(_json_encoder, model_encoder)
+        return cast(type, model)
+
+
+class ConfigInterpolationTemplate(string.Template):
+    idpattern = r"(?a:[_a-z][\\\.\[\]_a-z0-9]*)"
+    flags = re.IGNORECASE | re.UNICODE
+
+
+@functools.singledispatch
+def interpolate(value: Any, _ctx: dict[str, Any]) -> Any:
+    return value
+
+
+@interpolate.register(str)
+def _interpolate_str(
+    value: str,
+    ctx: dict[str, Any]
+) -> str:
+    template = ConfigInterpolationTemplate(value)
+    return template.safe_substitute(ctx)
+
+
+# Interpolation for mutable types is a non-trivial task.
+
+# @interpolate.register(dict)
+# def _interpolate_dict(value: dict[Any, Any], ctx: dict[str, Any]) -> dict[Any, Any]:
+#     return {
+#         interpolate(k, ctx): interpolate(v, ctx) for k, v in value.items()
+#     }
+#
+#
+# @interpolate.register(list)
+# def _interpolate_lst(value: list, ctx: dict[str, Any]) -> list[Any]:
+#     return {
+#         interpolate(k, ctx): interpolate(v, ctx) for k, v in value.items()
+#     }
+
+
+class ConfigMeta(pydantic.BaseSettings.Config):
+    """
+    Meta-configuration for configuration models.
+
+    See https://docs.pydantic.dev/latest/usage/model_config/ for more information
+    on model configurations.
+
+    Attributes
+    ----------
+    resource
+        The configuration resource to read from/write to.
+
+        If a string, it will be interpreted as a path to a file.
+
+    ac_parser
+        The anyconfig parser to use.
+
+    autoupdate_forward_refs
+        Whether to automatically update forward references
+        when `ConfigModel.load()` or `ConfigModel.load_async()`
+        methods are called. For convenience, defaults to `True`.
+
+    And all other attributes from `pydantic.BaseSettings.Config`.
+    """
+
+    resource: ConfigAgent[ConfigModel] | RawResourceT | None = None
+    ac_parser: str | None = None
+    validate_assignment: bool = True
+    autoupdate_forward_refs: bool = True
+
+    Extra = pydantic.Extra
 
 
 class ConfigModel(
@@ -1870,6 +1975,8 @@ class ConfigModel(
     root=True,
 ):
     """The base class for configuration models."""
+
+    __config__ = ConfigMeta
 
     def __init__(self, **kwargs: Any) -> None:
         # Set private attributes via the constructor
@@ -1885,10 +1992,27 @@ class ConfigModel(
                 setattr(self, private_attr, value)
         super().__init__(**kwargs)
 
+    def __deepcopy__(
+        self: ConfigModelT, memodict: dict[Any, Any] | None = None
+    ) -> ConfigModelT:
+        state = dict(self._iter(to_dict=False))
+        state.pop(LOCAL, None)
+        state.pop(TOKEN, None)
+        clone = copy.deepcopy(state)
+        return type(self).parse_obj(
+            {
+                field.alias: clone[field_name]
+                for field_name, field in self.__fields__.items()
+            }
+        )
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        getattr(self, LOCAL).run(super().__setattr__, key, value)
+
     def _init_private_attributes(self) -> None:
         super()._init_private_attributes()
         local = contextvars.copy_context()
-        setattr(self, LOCAL, local)
+        object.__setattr__(self, LOCAL, local)
         tok = getattr(self, TOKEN, None)
         if tok:
             current_context.reset(tok)
@@ -1964,11 +2088,9 @@ class ConfigModel(
         self, **kwargs: Any
     ) -> collections.abc.Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
-            state = {}
+            state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                field = self.__fields__.get(key)
-                actual_key = field.alias if field else key
-                state[actual_key] = value
+                state |= [self._iter_hook(key, value)]
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1981,11 +2103,9 @@ class ConfigModel(
         self, **kwargs: Any
     ) -> collections.abc.Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
-            state = {}
+            state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                field = self.__fields__.get(key)
-                actual_key = field.alias if field else key
-                state[actual_key] = value
+                state |= [self._iter_hook(key, value)]
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1994,6 +2114,25 @@ class ConfigModel(
                 )
             return ((key, value) for key, value in state.items())
         return super()._iter(**kwargs)
+
+    def _iter_hook(
+        self,
+        key: str,
+        value: Any,
+    ) -> tuple[str, Any]:
+        interpolation_tracker = getattr(self, LOCAL).get(current_interpolation_tracker)
+        field = self.__fields__.get(key)
+        actual_key = field.alias if field else key
+        interpolation_track = interpolation_tracker.get(actual_key)
+        if interpolation_track:
+            old_value, new_value = interpolation_track
+            # if value != new_value:
+            #     raise InterpolationError(
+            #         f"Cannot restore the value of {actual_key!r} "
+            #         "before interpolation."
+            #     )
+            value = old_value
+        return actual_key, value
 
     @classmethod
     @no_type_check
@@ -2126,20 +2265,6 @@ class ConfigModel(
         """
         context = get_context(self)
         self.__dict__.update(context.initial_state)
-
-    def __deepcopy__(
-        self: ConfigModelT, memodict: dict[Any, Any] | None = None
-    ) -> ConfigModelT:
-        state = dict(self._iter(to_dict=False))
-        state.pop(LOCAL, None)
-        state.pop(TOKEN, None)
-        clone = copy.deepcopy(state)
-        return type(self).parse_obj(
-            {
-                field.alias: clone[field_name]
-                for field_name, field in self.__fields__.items()
-            }
-        )
 
     @classmethod
     def load(
@@ -2399,6 +2524,14 @@ class ConfigModel(
             raise NotImplementedError(msg)
         return await context.agent.write_async(blob, **kwargs)
 
+    @staticmethod
+    def get_interpolation_context() -> dict[str, Any]:
+        """
+        Get the interpolation context of this configuration model.
+        This must be either static or class method.
+        """
+        return {}
+
     @classmethod
     def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
         """
@@ -2416,10 +2549,10 @@ class ConfigModel(
         return value
 
 
-@autocast.register(ConfigModel)
-def _autocast_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
+@field_hook.register(ConfigModel)
+def _eval_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
     """
-    Load a model using literal evaluation.
+    Load a model using dict literal evaluation.
     Solves nested dictionaries problem in INI files.
 
     Parameters
@@ -2446,33 +2579,3 @@ def _autocast_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
         else:
             return cls.parse_obj(data)
     return data
-
-
-class ConfigMeta(pydantic.BaseSettings.Config):
-    """
-    Meta-configuration for the `ConfigModel` class.
-
-    Attributes
-    ----------
-    resource
-        The configuration resource to read from/write to.
-
-        If a string, it will be interpreted as a path to a file.
-
-    ac_parser
-        The anyconfig parser to use.
-
-    autoupdate_forward_refs
-        Whether to automatically update forward references
-        when `ConfigModel.load()` or `ConfigModel.load_async()`
-        methods are called. For convenience, defaults to `True`.
-
-    And all other attributes from `pydantic.BaseSettings.Config`.
-    """
-
-    resource: ConfigAgent[ConfigModel] | RawResourceT | None = None
-    ac_parser: str | None = None
-    validate_assignment: bool = True
-    autoupdate_forward_refs: bool = True
-
-    Extra = pydantic.Extra

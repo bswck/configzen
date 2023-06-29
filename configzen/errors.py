@@ -15,6 +15,10 @@ class ConfigError(Exception):
     """An error occurred while loading a configuration."""
 
 
+class InterpolationError(ConfigError):
+    """An error occurred with regard to interpolating a configuration."""
+
+
 class IncorrectConfigError(ConfigError):
     """An error occurred while loading a configuration."""
 
@@ -72,7 +76,7 @@ class UnavailableParserError(ConfigError):
 
     def __init__(self, parser_name: str, agent: ConfigAgent[ConfigModelT]) -> None:
         missing_dependency: str = self.MISSING_DEPENDENCIES.get(
-            parser_name, f"<the proper anyconfig backend for {parser_name} files>"
+            parser_name, f"<the proper anyconfig backend for {parser_name!r} files>"
         )
         super().__init__(
             f"The {parser_name!r} parser required to load configuration "

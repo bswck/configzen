@@ -667,7 +667,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import CONTEXT, at, pre_serialize
+        from configzen.config import CONTEXT, at, export_hook
 
         overrides = {}
 
@@ -689,7 +689,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             counterpart_value = state.pop(key, Undefined)
             if counterpart_value is Undefined:
                 continue
-            counterpart_value = pre_serialize(counterpart_value)
+            counterpart_value = export_hook(counterpart_value)
 
             if is_dict_like(value):
                 if EXPORT in value:
@@ -742,7 +742,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import CONTEXT, at, pre_serialize
+        from configzen.config import CONTEXT, at, export_hook
 
         overrides = {}
 
@@ -764,7 +764,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             counterpart_value = state.pop(key, Undefined)
             if counterpart_value is Undefined:
                 continue
-            counterpart_value = pre_serialize(counterpart_value)
+            counterpart_value = export_hook(counterpart_value)
 
             if is_dict_like(value):
                 if EXPORT in value:
@@ -814,7 +814,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         route: str | None,
         key_order: list[str],
     ) -> None:
-        from configzen.config import pre_serialize
+        from configzen.config import export_hook
 
         state |= overrides
         extras: dict[str, Any] = {
@@ -823,7 +823,7 @@ class Processor(BaseProcessor[ConfigModelT]):
 
         if values:
             substitution_directive = cls.directive(Directives.EXTEND)
-            resource = str(pre_serialize(context.agent.resource))
+            resource = str(export_hook(context.agent.resource))
             if route:
                 resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.

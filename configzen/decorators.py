@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, cast
 from configzen.config import (
     export_model,
     export_model_async,
-    autocast,
-    pre_serialize,
+    field_hook,
+    export_hook,
 )
 
 if TYPE_CHECKING:
@@ -18,12 +18,12 @@ if TYPE_CHECKING:
 __all__ = (
     "with_exporter",
     "with_async_exporter",
-    "with_autocast",
-    "with_pre_serialize",
+    "with_field_hook",
+    "with_export_hook",
 )
 
 
-def with_pre_serialize(
+def with_export_hook(
     func: collections.abc.Callable[[T], Any], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
@@ -46,23 +46,23 @@ def with_pre_serialize(
     -----
     .. code-block:: python
 
-        @with_pre_serialize(converter_func)
+        @with_export_hook(converter_func)
         class MyClass:
             ...
 
     """
     if cls is None:
-        return functools.partial(with_pre_serialize, func)
+        return functools.partial(with_export_hook, func)
 
-    pre_serialize.register(cls, func)
+    export_hook.register(cls, func)
 
     if not hasattr(cls, "__get_validators__"):
 
         def validator_gen() -> (
             collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
         ):
-            autocast_func = autocast.dispatch(cls)  # type: ignore[arg-type]
-            yield lambda value: autocast_func(cls, value)
+            hook_func = field_hook.dispatch(cls)  # type: ignore[arg-type]
+            yield lambda value: hook_func(cls, value)
 
         with contextlib.suppress(TypeError):
             cls.__get_validators__ = validator_gen  # type: ignore[attr-defined]
@@ -70,11 +70,11 @@ def with_pre_serialize(
     return cls
 
 
-def with_autocast(
+def with_field_hook(
     func: collections.abc.Callable[[type[T], Any], T], cls: type[T] | None = None
 ) -> type[T] | Any:
     """
-    Register an autocast function for a type.
+    Register a field hook for a type.
 
     Parameters
     ----------
@@ -89,9 +89,9 @@ def with_autocast(
     """
 
     if cls is None:
-        return functools.partial(with_autocast, func)
+        return functools.partial(with_field_hook, func)
 
-    autocast.register(cls, func)
+    field_hook.register(cls, func)
     return cls
 
 
