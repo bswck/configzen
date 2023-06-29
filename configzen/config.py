@@ -95,8 +95,8 @@ from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
 from configzen._isolation import isolate, isolate_async, isolate_calls
-from configzen.errors import ConfigAccessError
 from configzen.errors import (
+    ConfigAccessError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
@@ -146,11 +146,11 @@ INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -237,6 +237,7 @@ if TYPE_CHECKING:
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
 
+
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -275,6 +276,7 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
+
 
     field_hook.register = field_hook_registrars.register
 
