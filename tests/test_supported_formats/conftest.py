@@ -1,3 +1,4 @@
+import functools
 import io
 import json
 import os
@@ -61,7 +62,7 @@ def properties_compose(data):
 
 composer = {
     "ini": ini_compose,
-    "json": json.dumps,
+    "json": functools.partial(json.dumps, indent=4),
     "yaml": yaml.dump,
     "toml": toml.dumps,
     "ion": ion.dumps,
