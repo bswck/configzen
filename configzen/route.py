@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import functools
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from configzen.errors import InternalSyntaxError, formatted_syntax_error
 

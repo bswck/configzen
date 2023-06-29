@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import collections.abc
 import contextvars
-from typing import Any
+import functools
+from typing import Any, cast
 
 from configzen.typedefs import T
 
@@ -16,22 +19,28 @@ def isolate_calls(
     This decorator will copy the current context and run the function
     in this new isolated context.
     """
+    if asyncio.iscoroutinefunction(func):
+        return cast(
+            collections.abc.Callable[..., T],
+            functools.partial(isolate_async, func)
+        )
+    return functools.partial(isolate, func)
 
-    def wrapper(*args: Any, **kwargs: Any) -> T:
-        # pylint: disable=protected-access
-        return isolate_and_run(func, *args, **kwargs)
 
-    return wrapper
-
-
-def isolate_and_run(
+def isolate(
     func: collections.abc.Callable[..., T],
     *args: Any,
     **kwargs: Any,
 ) -> T:
     """Utility for running a function in an isolated context."""
-    if asyncio.iscoroutinefunction(func):
-        return asyncio.create_task(func(*args, **kwargs))
-
     context = contextvars.copy_context()
     return context.run(func, *args, **kwargs)
+
+
+def isolate_async(
+    func: collections.abc.Callable[..., collections.abc.Coroutine[Any, Any, T]],
+    *args: Any,
+    **kwargs: Any,
+) -> asyncio.Task[T]:
+    """Utility for awaiting a coroutine in an isolated context."""
+    return asyncio.create_task(func(*args, **kwargs))

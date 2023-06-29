@@ -5,12 +5,7 @@ import contextlib
 import functools
 from typing import TYPE_CHECKING, Any, cast
 
-from configzen.config import (
-    export_model,
-    export_model_async,
-    field_hook,
-    export_hook,
-)
+from configzen.config import export_hook, export_model, export_model_async, field_hook
 
 if TYPE_CHECKING:
     from configzen.typedefs import ConfigModelT, T

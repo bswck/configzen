@@ -73,33 +73,30 @@ import string
 import urllib.parse
 import urllib.request
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     Generic,
     Literal,
     Optional,
     cast,
+    get_origin,
     no_type_check,
     overload,
-    TYPE_CHECKING,
-    get_origin,
 )
 
 import anyconfig
 import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
-from pydantic.fields import (  # type: ignore[attr-defined]
-    ModelField,
-    make_generic_validator,
-    Undefined,
-)
+from pydantic.fields import make_generic_validator  # type: ignore[attr-defined]
+from pydantic.fields import ModelField, Undefined
 from pydantic.json import ENCODERS_BY_TYPE
 from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
+from configzen._isolation import isolate, isolate_async, isolate_calls
+from configzen.errors import ConfigAccessError
 from configzen.errors import (
-    ConfigAccessError,
-    # InterpolationError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
@@ -116,7 +113,6 @@ from configzen.typedefs import (
     SupportsRoute,
     T,
 )
-from configzen._isolation import isolate_calls, isolate_and_run
 
 try:
     import aiofiles
@@ -150,11 +146,11 @@ INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -241,7 +237,6 @@ if TYPE_CHECKING:
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
 
-
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -280,7 +275,6 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
-
 
     field_hook.register = field_hook_registrars.register
 
@@ -872,7 +866,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return isolate_and_run(config.json, **export_kwargs)
+            return isolate(config.json, **export_kwargs)
         data = export_model(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
@@ -906,7 +900,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return await isolate_and_run(config.json_async, **export_kwargs)
+            return await isolate_async(config.json_async, **export_kwargs)
         data = await export_model_async(config, **export_kwargs)
         return self.dump_data(data, ac_parser=ac_parser, **kwargs)
 
@@ -1795,7 +1789,7 @@ def get_context(config: ConfigModelT) -> BaseContext[ConfigModelT]:
     if context is None:
         raise RuntimeError(
             "This model is either inside a list "
-            "or was not loaded within .load()"
+            "or was not loaded by a configuration agent."
         )
     return context
 
@@ -1814,8 +1808,7 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     The context of the configuration model.
     """
     return cast(
-        Optional[BaseContext[ConfigModelT]],
-        getattr(config, LOCAL).get(current_context)
+        Optional[BaseContext[ConfigModelT]], getattr(config, LOCAL).get(current_context)
     )
 
 
@@ -1826,7 +1819,7 @@ def _common_field_validator(
     v: Any,
     values: dict[str, Any],
     field: pydantic.fields.ModelField,
-    config: pydantic.BaseConfig
+    config: pydantic.BaseConfig,
 ) -> Any:
     post_hook_value = field_hook(field.outer_type_, v)
     disallow_interpolation = getattr(config, "disallow_interpolation", False)
@@ -1846,13 +1839,10 @@ def _common_field_validator(
     ):
         old_value = post_hook_value
         new_value = interpolate(
-            post_hook_value,
-            cls.get_interpolation_context() | values
+            post_hook_value, cls.get_interpolation_context() | values
         )
         if old_value != new_value:
-            interpolation_tracker[field.alias] = (
-                old_value, copy.copy(new_value)
-            )
+            interpolation_tracker[field.alias] = (old_value, copy.copy(new_value))
         post_hook_value = new_value
     return post_hook_value
 
@@ -1913,10 +1903,7 @@ def interpolate(value: Any, _ctx: dict[str, Any]) -> Any:
 
 
 @interpolate.register(str)
-def _interpolate_str(
-    value: str,
-    ctx: dict[str, Any]
-) -> str:
+def _interpolate_str(value: str, ctx: dict[str, Any]) -> str:
     template = ConfigInterpolationTemplate(value)
     return template.safe_substitute(ctx)
 
@@ -2028,7 +2015,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return isolate_and_run(self.dict, **kwargs)
+        return isolate(self.dict, **kwargs)
 
     @isolate_calls
     async def export_async(self, **kwargs: Any) -> dict[str, Any]:
@@ -2040,7 +2027,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return await isolate_and_run(self.dict_async, **kwargs)
+        return await isolate_async(self.dict_async, **kwargs)
 
     async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -2458,14 +2445,10 @@ class ConfigModel(
         context = get_context(self)
         current_context.set(get_context(context.owner))
         if context.owner is self:
-            changed = await context.agent.read_async(
-                config_class=type(self),
-                **kwargs
-            )
+            changed = await context.agent.read_async(config_class=type(self), **kwargs)
         else:
             changed = await reload_async(
-                cast(ConfigAt[ConfigModelT], context.at),
-                **kwargs
+                cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
         state = changed.__dict__
         context.initial_state = state
