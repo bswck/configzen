@@ -12,7 +12,7 @@ from anyconfig.utils import is_dict_like, is_list_like
 from pydantic.fields import Undefined
 
 from configzen.errors import ConfigPreprocessingError
-from configzen.typedefs import ConfigModelT, SupportsRoute
+from configzen.typedefs import ConfigModelT, ConfigRouteLike
 
 if TYPE_CHECKING:
     from configzen.config import BaseContext, ConfigAgent
@@ -554,7 +554,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     def _get_substitution_means(
         self, ctx: DirectiveContext  # , *, preserve: bool
     ) -> tuple[
-        ConfigAgent[ConfigModelT], ConfigAgent[ConfigModelT], SupportsRoute | None
+        ConfigAgent[ConfigModelT], ConfigAgent[ConfigModelT], ConfigRouteLike | None
     ]:
         agent_class = type(self.agent)
 
@@ -622,7 +622,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     @staticmethod
     def _substitute_impl(  # noqa: PLR0913
         ctx: DirectiveContext,
-        route: SupportsRoute | None,
+        route: ConfigRouteLike | None,
         *,
         source: dict[str, Any],
         agent: ConfigAgent[ConfigModelT],

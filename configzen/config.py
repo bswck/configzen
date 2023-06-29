@@ -110,7 +110,7 @@ from configzen.typedefs import (
     IncludeExcludeT,
     NormalizedResourceT,
     RawResourceT,
-    SupportsRoute,
+    ConfigRouteLike,
     T,
 )
 
@@ -146,11 +146,11 @@ INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -237,7 +237,6 @@ if TYPE_CHECKING:
         ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
             ...
 
-
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -276,7 +275,6 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
-
 
     field_hook.register = field_hook_registrars.register
 
@@ -1208,7 +1206,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         /,
         route_separator: str = ":",
         route_class: type[ConfigRoute] | None = None,
-    ) -> tuple[ConfigAgent[ConfigModelT], SupportsRoute | None]:
+    ) -> tuple[ConfigAgent[ConfigModelT], ConfigRouteLike | None]:
         """
         Create a configuration agent from a preprocessor directive context.
         Return an optional scope that the context points to.
@@ -1225,7 +1223,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         """
         if route_class is None:
             route_class = ConfigRoute
-        route: SupportsRoute | None = None
+        route: ConfigRouteLike | None = None
         args: list[Any] = []
         kwargs: dict[str, Any] = {}
         if isinstance(ctx.snippet, str):
@@ -1274,7 +1272,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
 def at(
     mapping: Any,
-    route: SupportsRoute,
+    route: ConfigRouteLike,
     converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _get_object_state,
     agent: ConfigAgent[ConfigModelT] | None = None,
 ) -> Any:
@@ -1323,9 +1321,11 @@ class ConfigAt(Generic[ConfigModelT]):
 
     owner: ConfigModelT
     mapping: dict[str, Any] | None
-    route: SupportsRoute
+    route: ConfigRouteLike
 
-    def get(self, route: SupportsRoute | None = None, default: Any = Undefined) -> Any:
+    def get(
+        self, route: ConfigRouteLike | None = None, default: Any = Undefined
+    ) -> Any:
         """
         Get the value of the item.
 
@@ -2177,7 +2177,7 @@ class ConfigModel(
 
     def at(
         self: ConfigModelT,
-        route: SupportsRoute | None = None,
+        route: ConfigRouteLike | None = None,
     ) -> ConfigModelT | ConfigAt[ConfigModelT]:
         """
         Lazily point to a specific item in the configuration.
@@ -2207,10 +2207,14 @@ class ConfigModel(
         ...
 
     @overload
-    def get(self: ConfigModelT, route: SupportsRoute = ..., default: Any = ...) -> Any:
+    def get(
+        self: ConfigModelT, route: ConfigRouteLike = ..., default: Any = ...
+    ) -> Any:
         ...
 
-    def get(self, route: SupportsRoute | None = None, default: Any = Undefined) -> Any:
+    def get(
+        self, route: ConfigRouteLike | None = None, default: Any = Undefined
+    ) -> Any:
         """
         Get a value from the configuration.
 

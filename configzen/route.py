@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from configzen.errors import InternalSyntaxError, formatted_syntax_error
 
 if TYPE_CHECKING:
-    from configzen.typedefs import SupportsRoute
+    from configzen.typedefs import ConfigRouteLike
 
 __all__ = ("ConfigRoute",)
 
@@ -18,14 +18,14 @@ class ConfigRoute:
     TOK_DOTLISTESC_ENTER: ClassVar[str] = "["
     TOK_DOTLISTESC_EXIT: ClassVar[str] = "]"
 
-    def __init__(self, route: SupportsRoute, *, allow_empty: bool = False) -> None:
+    def __init__(self, route: ConfigRouteLike, *, allow_empty: bool = False) -> None:
         items = self.parse(route)
         if not (allow_empty or items):
             raise ValueError("Empty configuration route")
         self.items = items
 
     @classmethod
-    def parse(cls, route: SupportsRoute) -> list[str]:
+    def parse(cls, route: ConfigRouteLike) -> list[str]:
         if isinstance(route, ConfigRoute):
             return route.items
         if isinstance(route, list):
@@ -114,7 +114,7 @@ class ConfigRoute:
             for fragment in self.items
         )
 
-    def enter(self, subroute: SupportsRoute) -> ConfigRoute:
+    def enter(self, subroute: ConfigRouteLike) -> ConfigRoute:
         return type(self)(self.items + self.parse(subroute))
 
     def __eq__(self, other: Any) -> bool:

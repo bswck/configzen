@@ -21,8 +21,7 @@ def isolate_calls(
     """
     if asyncio.iscoroutinefunction(func):
         return cast(
-            collections.abc.Callable[..., T],
-            functools.partial(isolate_async, func)
+            collections.abc.Callable[..., T], functools.partial(isolate_async, func)
         )
     return functools.partial(isolate, func)
 

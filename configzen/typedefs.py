@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
-SupportsRoute: TypeAlias = Union[str, list[str], "ConfigRoute"]
+ConfigRouteLike: TypeAlias = Union[str, list[str], "ConfigRoute"]
 
 ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
 AsyncConfigIO: TypeAlias = "AiofilesContextManager[None, None, AsyncTextIOWrapper]"
