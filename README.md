@@ -253,7 +253,7 @@ num_workers: ${cpu.cores}
 ...
 >>> app_config = AppConfig.load("app.yml")
 >>> app_config
-AppConfig(num_workers=4, num_jobs=4)
+AppConfig(cpu=CPUConfig(cores=4), num_workers=4)
 ```
 
 
