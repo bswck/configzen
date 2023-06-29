@@ -38,12 +38,11 @@ The following table shows the supported file formats, their requirements, file e
 | [BSON](https://en.wikipedia.org/wiki/BSON)                                          | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                  |
 | [CBOR](https://cbor.io/) ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949))       | `anyconfig-cbor2-backend`     | `cbor`, `cbor2`              | [cbor2](https://pypi.org/project/cbor2/)                                                                |
 | CBOR (deprecated, [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049))               | `anyconfig-cbor-backend`      | `cbor`                       | [cbor](https://pypi.org/project/cbor/)                                                                  |
-| [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) | `anyconfig-configobj-backend` | `configobj`                  | [configobj](https://pypi.org/project/configobj/)                                                        |
 | properties                                                                          | -                             | `properties`                 | (native)                                                                                                |
 | shellvars                                                                           | -                             | `shellvars`                  | (native)                                                                                                |
 
+[//]: # (| [ConfigObj]&#40;https://configobj.readthedocs.io/en/latest/configobj.html#introduction&#41; | `anyconfig-configobj-backend` | `configobj`                  | [configobj]&#40;https://pypi.org/project/configobj/&#41;                                                        |)
 [//]: # (| [Amazon Ion]&#40;https://en.wikipedia.org/wiki/Ion_&#40;serialization_format&#41;&#41;              | `anyconfig-ion-backend`       | `ion`                        | [ion]&#40;https://pypi.org/project/amazon.ion/&#41;                                                             |)
-
 [//]: # (| [MessagePack]&#40;https://en.wikipedia.org/wiki/MessagePack&#41;                            | `anyconfig-msgpack-backend`   | `msgpack`, `mpk`             | [msgpack]&#40;https://pypi.org/project/msgpack/&#41;                                                            |)
 
 If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, ac_parser)`.
