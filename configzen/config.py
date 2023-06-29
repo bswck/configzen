@@ -2361,4 +2361,4 @@ class ConfigModel(
 
 
 if os.getenv("CONFIGZEN_SETUP") != "0":
-    importlib.import_module("configzen._setup")
+    importlib.import_module("._setup", package=__package__)
