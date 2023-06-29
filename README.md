@@ -16,8 +16,7 @@ offering features such as extending configuration files directly from other conf
 code).
 You might think of it as something that is analogous
 to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
-broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats))
-and with some extra features planned.
+broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats)).
 The directive `^copy` may also be handy in quick conversions between the mentioned formats.
 See [Preprocessing directives](#preprocessing-directives) for more information.
 
@@ -160,7 +159,7 @@ or save the whole configuration:
 39
 ```
 
-### Preprocessing directives
+### Preprocessing
 
 To see supported preprocessing directives,
 see [Supported preprocessing directives](#supported-preprocessing-directives).
@@ -228,6 +227,71 @@ configuration data.
 | `^extend`  | Yes                                  | Yes                                   |
 | `^include` | Yes                                  | No                                    |
 | `^copy`    | No                                   | No                                    |
+
+
+### Interpolation
+
+#### Basic interpolation
+
+You can use interpolation in your configuration files:
+
+```yaml
+cpu:
+  cores: 4
+num_workers: ${cpu.cores}
+```
+
+```python
+>>> from configzen import ConfigModel
+>>> class CPUConfig(ConfigModel):
+...     cores: int
+>>> class AppConfig(ConfigModel):
+...     cpu: CPUConfig
+...     num_workers: int
+...
+>>> app_config = AppConfig.load("app.yml")
+>>> app_config
+AppConfig(num_workers=4, num_jobs=4)
+```
+
+
+#### Synchronizing interpolated configuration (inclusion)
+
+You can share independent configuration models as namespaces through inclusion:
+
+```yaml
+# database.yml
+host: ${app_config::db_host}
+port: ${app_config::expose}
+```
+
+```yaml
+# app.yml
+db_host: localhost
+expose: 8000
+```
+
+```python
+>>> from configzen import ConfigModel, include
+
+>>> @include("app_config")
+... class DatabaseConfig(ConfigModel):
+...     host: IPv4Address
+...     port: int
+...
+>>> class AppConfig(ConfigModel):
+...     db_host: str
+...     expose: int
+...
+>>> app_config = AppConfig.load("app.yml")
+>>> app_config
+AppConfig(db_host='localhost', expose=8000)
+>>> db_config = DatabaseConfig.load("database.yml")
+DatabaseConfig(host=IPv4Address('localhost'), port=8000)
+```
+
+You do not have to pass a variable name to `@include`, though. `@include` lets you overwrite the main interpolation namespace
+or one with a separate name (here: `app_config`) with configuration models, dictionaries and their factories.
 
 ## Setup
 

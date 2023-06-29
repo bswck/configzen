@@ -68,8 +68,6 @@ import importlib
 import io
 import os
 import pathlib
-import re
-import string
 import urllib.parse
 import urllib.request
 from typing import (
@@ -100,16 +98,22 @@ from configzen.errors import (
     UnavailableParserError,
     UnspecifiedParserError,
 )
+from configzen.interpolation import (
+    INTERPOLATION_NAMESPACE_TOKEN,
+    include_const,
+    interpolate,
+    include,
+)
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
 from configzen.typedefs import (
     AsyncConfigIO,
     ConfigIO,
     ConfigModelT,
+    ConfigRouteLike,
     IncludeExcludeT,
     NormalizedResourceT,
     RawResourceT,
-    ConfigRouteLike,
     T,
 )
 
@@ -131,13 +135,16 @@ __all__ = (
     "export_model_async",
 )
 
-_URL_SCHEMES: set[str] = set(
+ALL_URL_SCHEMES: set[str] = set(
     urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params
 ) - {""}
+
 CONTEXT: str = "__context__"
 TOKEN: str = "__context_token__"
 LOCAL: str = "__local__"
+
 INTERPOLATION_TRACKER: str = "__interpolation_tracker__"
+INTERPOLATION_INCLUSIONS: str = "__interpolation_inclusions__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
@@ -484,7 +491,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
         if isinstance(resource, (str, os.PathLike)) and not (
             isinstance(resource, str)
-            and urllib.parse.urlparse(str(resource)).scheme in _URL_SCHEMES
+            and urllib.parse.urlparse(str(resource)).scheme in ALL_URL_SCHEMES
         ):
             raw_path = os.fspath(resource)
             resource = pathlib.Path(raw_path)
@@ -1427,6 +1434,7 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
     """
 
     initial_state: dict[str, Any]
+    interpolation_namespace: dict[str, Any]
 
     @abc.abstractmethod
     def trace_route(self) -> collections.abc.Iterator[str]:
@@ -1462,12 +1470,17 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
         """
         if part is None:
             return self
-        return Subcontext(self, part)
+        return Subcontext(self, part, self.interpolation_namespace.setdefault(part, {}))
 
     @property
     @abc.abstractmethod
     def agent(self) -> ConfigAgent[ConfigModelT]:
         """The configuration agent responsible for loading and saving."""
+
+    @property
+    @abc.abstractmethod
+    def toplevel_interpolation_namespace(self) -> dict[str, Any]:
+        """Top-level interpolation namespace."""
 
     @property
     @abc.abstractmethod
@@ -1506,10 +1519,10 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         agent: ConfigAgent[ConfigModelT],
         owner: ConfigModelT | None = None,
     ) -> None:
-        self._agent = agent
-        self._owner = None
         self._initial_state = {}
-
+        self._owner = None
+        self._agent = agent
+        self.interpolation_namespace = {}
         self.owner = owner
 
     def trace_route(self) -> collections.abc.Iterator[str]:
@@ -1518,6 +1531,10 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     @property
     def agent(self) -> ConfigAgent[ConfigModelT]:
         return self._agent
+
+    @property
+    def toplevel_interpolation_namespace(self) -> dict[str, Any]:
+        return self.interpolation_namespace
 
     @property
     def at(self) -> ConfigModelT | None:
@@ -1562,13 +1579,25 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         The name of the item nested in the item the parent context points to.
     """
 
-    def __init__(self, parent: BaseContext[ConfigModelT], part: str) -> None:
+    __slots__ = ("_parent", "_part", "_interpolation_namespace")
+
+    def __init__(
+        self,
+        parent: BaseContext[ConfigModelT],
+        part: str,
+        interpolation_namespace: dict[str, Any],
+    ) -> None:
         self._parent = parent
         self._part = part
+        self.interpolation_namespace = interpolation_namespace
 
     @property
     def agent(self) -> ConfigAgent[ConfigModelT]:
         return self._parent.agent
+
+    @property
+    def toplevel_interpolation_namespace(self) -> dict[str, Any]:
+        return self._parent.toplevel_interpolation_namespace
 
     def trace_route(self) -> collections.abc.Iterator[str]:
         yield from self._parent.trace_route()
@@ -1671,9 +1700,7 @@ def _common_field_validator(
         and field.alias not in disallowed_interpolation_fields
     ):
         old_value = post_hook_value
-        new_value = interpolate(
-            post_hook_value, cls.get_interpolation_context() | values
-        )
+        new_value = interpolate(post_hook_value, cls, values.copy())
         if old_value != new_value:
             interpolation_tracker[field.alias] = (old_value, copy.copy(new_value))
         post_hook_value = new_value
@@ -1700,8 +1727,10 @@ class ConfigModelMetaclass(ModelMetaclass):
     ) -> type:
         namespace |= dict.fromkeys(
             (EXPORT, CONTEXT, LOCAL, TOKEN), pydantic.PrivateAttr()
-        )
-        namespace[INTERPOLATION_TRACKER] = pydantic.PrivateAttr(default_factory=dict)
+        ) | {INTERPOLATION_TRACKER: pydantic.PrivateAttr(default_factory=dict)}
+
+        if namespace.get(INTERPOLATION_INCLUSIONS) is None:
+            namespace[INTERPOLATION_INCLUSIONS] = {}
 
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1723,25 +1752,6 @@ class ConfigModelMetaclass(ModelMetaclass):
         model_encoder = model.__json_encoder__
         model.__json_encoder__ = functools.partial(_json_encoder, model_encoder)
         return cast(type, model)
-
-
-class ConfigInterpolationTemplate(string.Template):
-    idpattern = r"(?a:[_a-z][\\\.\[\]_a-z0-9]*)"
-    flags = re.IGNORECASE | re.UNICODE
-
-
-@functools.singledispatch
-def interpolate(value: Any, _ctx: dict[str, Any]) -> Any:
-    return value
-
-
-@interpolate.register(str)
-def _interpolate_str(value: str, ctx: dict[str, Any]) -> str:
-    template = ConfigInterpolationTemplate(value)
-    return template.safe_substitute(ctx)
-
-
-# todo(bswck): Interpolation for compound types. Quite non-trivial.
 
 
 class ConfigMeta(pydantic.BaseSettings.Config):
@@ -1823,6 +1833,9 @@ class ConfigModel(
         object.__setattr__(self, LOCAL, local)
         tok = getattr(self, TOKEN, None)
         if tok:
+            context = current_context.get()
+            if context is not None:
+                context.interpolation_namespace |= self.dict()
             current_context.reset(tok)
 
     def export(self, **kwargs: Any) -> dict[str, Any]:
@@ -2325,13 +2338,55 @@ class ConfigModel(
             raise NotImplementedError(msg)
         return await context.agent.write_async(blob, **kwargs)
 
-    @staticmethod
-    def get_interpolation_context() -> dict[str, Any]:
+    @classmethod
+    def _evaluate_interpolation_namespaces(cls) -> dict[str | None, dict[str, Any]]:
+        inclusions = getattr(cls, INTERPOLATION_INCLUSIONS)
+        return {
+            namespace_id: evaluate_namespace()
+            for namespace_id, evaluate_namespace in inclusions.items()
+        }
+
+    @classmethod
+    def get_interpolation_namespace(
+        cls,
+        identifiers: set[str],
+        closest_namespace: dict[str, Any],
+    ) -> tuple[Any, dict[str, Any]]:
         """
         Get the interpolation context of this configuration model.
-        This must be either static or class method.
         """
-        return {}
+        context = current_context.get()
+        interpolation_context = {}
+
+        namespaces = cls._evaluate_interpolation_namespaces()
+        if context is not None:
+            namespaces.setdefault(None, {}).update(
+                context.toplevel_interpolation_namespace
+            )
+        for identifier in identifiers:
+            (
+                namespace_identifier,
+                specifies_namespace,
+                raw_identifier,
+            ) = identifier.rpartition(INTERPOLATION_NAMESPACE_TOKEN)
+            namespace = namespaces.get(None, {})
+            if specifies_namespace:
+                namespace |= namespaces[namespace_identifier]
+            else:
+                namespace |= closest_namespace
+
+            try:
+                value = at(namespace, raw_identifier)
+            except ResourceLookupError:
+                if not specifies_namespace:
+                    raise
+                value = at(closest_namespace, raw_identifier)
+            interpolation_context[identifier] = value
+            if raw_identifier not in closest_namespace:
+                interpolation_context[raw_identifier] = value
+        if len(identifiers) == 1:
+            return interpolation_context[identifiers.pop()], interpolation_context
+        return None, interpolation_context
 
     @classmethod
     def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
@@ -2359,6 +2414,9 @@ class ConfigModel(
         export = isolate_calls(export)
         export_async = isolate_calls(export_async)
 
+
+setattr(ConfigModel, INTERPOLATION_INCLUSIONS, None)
+include.register(ConfigModel, include_const)
 
 if os.getenv("CONFIGZEN_SETUP") != "0":
     importlib.import_module("._setup", package=__package__)

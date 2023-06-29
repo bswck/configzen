@@ -5,7 +5,7 @@ import collections.abc
 import contextvars
 from typing import Any, cast
 
-from configzen.typedefs import T, P
+from configzen.typedefs import P, T
 
 
 def isolate_calls(

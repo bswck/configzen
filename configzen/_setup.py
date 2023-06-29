@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import ast
 import collections.abc
+import ipaddress
 import pathlib
 from typing import TYPE_CHECKING, Any
 
 from pydantic.json import ENCODERS_BY_TYPE
 
-from configzen.config import export_hook, field_hook, ConfigModel
+from configzen.config import ConfigModel, export_hook, field_hook
 
 if TYPE_CHECKING:
     from configzen.typedefs import ConfigModelT
@@ -78,6 +79,18 @@ def _eval_literals(cls: type[Any], value: Any) -> Any:
             return value
         else:
             return cls(data)
+    return value
+
+
+@field_hook.register(ipaddress.IPv4Address)
+@field_hook.register(ipaddress.IPv6Address)
+def _eval_ipaddress(
+    cls: type[ipaddress.IPv4Address | ipaddress.IPv6Address], value: Any
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | Any:
+    if isinstance(value, str) and value.casefold() == "localhost":
+        if issubclass(cls, ipaddress.IPv6Address):
+            return cls("::1")
+        return cls("127.0.0.1")
     return value
 
 

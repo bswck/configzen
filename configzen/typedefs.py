@@ -6,9 +6,9 @@ import sys
 from typing import TYPE_CHECKING, Any, Optional, TextIO, TypeVar, Union
 
 if sys.version_info >= (3, 10):
-    from typing import TypeAlias, ParamSpec
+    from typing import ParamSpec, TypeAlias
 else:
-    from typing_extensions import TypeAlias, ParamSpec
+    from typing_extensions import ParamSpec, TypeAlias
 
 if TYPE_CHECKING:
     from aiofiles.base import AiofilesContextManager
