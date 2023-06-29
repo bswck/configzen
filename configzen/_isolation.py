@@ -3,17 +3,15 @@ from __future__ import annotations
 import asyncio
 import collections.abc
 import contextvars
-from typing import Any, cast, TypeVar
+from typing import TYPE_CHECKING, Any
 
-from configzen.typedefs import T
-
-
-_IsolatedFuncT = TypeVar("_IsolatedFuncT")
+if TYPE_CHECKING:
+    from configzen.typedefs import T, P
 
 
 def isolate_calls(
-    func: _IsolatedFuncT
-) -> _IsolatedFuncT:
+    func: collections.abc.Callable[P, T],
+) -> collections.abc.Callable[P, T]:
     """
     Decorator to copy a function call context automatically (context isolation)
     to prevent collisions.
@@ -22,14 +20,16 @@ def isolate_calls(
     in this new isolated context.
     """
     if asyncio.iscoroutinefunction(func):
-        return cast(
-            _IsolatedFuncT,
-            lambda *args, **kwargs: isolate_async(func, *args, **kwargs)
-        )
-    return cast(
-        _IsolatedFuncT,
-        lambda *args, **kwargs: isolate(func, *args, **kwargs)  # type: ignore[arg-type]
-    )
+
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> asyncio.Task[T]:
+            return isolate_async(func, *args, **kwargs)
+
+    else:
+
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            return isolate(func, *args, **kwargs)
+
+    return wrapper
 
 
 def isolate(

@@ -6,9 +6,9 @@ import sys
 from typing import TYPE_CHECKING, Any, Optional, TextIO, TypeVar, Union
 
 if sys.version_info >= (3, 10):
-    from typing import TypeAlias
+    from typing import TypeAlias, ParamSpec
 else:
-    from typing_extensions import TypeAlias
+    from typing_extensions import TypeAlias, ParamSpec
 
 if TYPE_CHECKING:
     from aiofiles.base import AiofilesContextManager
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from configzen.route import ConfigRoute
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
 ConfigRouteLike: TypeAlias = Union[str, list[str], "ConfigRoute"]
