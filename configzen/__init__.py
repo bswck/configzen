@@ -12,9 +12,6 @@ from .field import *
 from .processor import *
 from .route import *
 
-if TYPE_CHECKING:
-    from typing import Any
-
 __all__ = (
     *config.__all__,
     *field.__all__,
@@ -23,20 +20,5 @@ __all__ = (
     *route.__all__,
     "field_validator",
 )
-
-
-def __getattr__(name: str) -> Any:
-    if name == "ConfigManager":
-        import warnings
-
-        warnings.warn(
-            "``configzen.ConfigManager`` is deprecated, "
-            "import ``configzen.ConfigAgent`` instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return ConfigAgent
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 del annotations, TYPE_CHECKING
