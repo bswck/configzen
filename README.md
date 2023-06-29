@@ -243,8 +243,10 @@ num_workers: ${cpu.cores}
 
 ```python
 >>> from configzen import ConfigModel
+...
 >>> class CPUConfig(ConfigModel):
 ...     cores: int
+...
 >>> class AppConfig(ConfigModel):
 ...     cpu: CPUConfig
 ...     num_workers: int
@@ -273,7 +275,7 @@ expose: 8000
 
 ```python
 >>> from configzen import ConfigModel, include
-
+>>>
 >>> @include("app_config")
 ... class DatabaseConfig(ConfigModel):
 ...     host: IPv4Address

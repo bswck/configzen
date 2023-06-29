@@ -20,7 +20,7 @@ INTERPOLATION_NAMESPACE_TOKEN: str = "::"
 
 
 class ConfigInterpolationTemplate(string.Template):
-    idpattern = rf"(({INTERPOLATION_NAMESPACE_TOKEN})?[_a-z][\\\.\[\]_a-z0-9]*)"
+    idpattern = rf"([_a-z]*({INTERPOLATION_NAMESPACE_TOKEN})?[_a-z][\\\.\[\]_a-z0-9]*)"
     flags = re.IGNORECASE
 
     if sys.version_info < (3, 11):
@@ -129,7 +129,7 @@ def _include_str(
     *,
     name: str | None = None,
     stack_offset: int = 2,
-    isolate_from_toplevel: bool = False,
+    isolate_from_toplevel: bool = True,
 ) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     callers_globals = inspect.stack()[stack_offset].frame.f_globals
 

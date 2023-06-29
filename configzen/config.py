@@ -1700,7 +1700,10 @@ def _common_field_validator(
         and field.alias not in disallowed_interpolation_fields
     ):
         old_value = post_hook_value
-        new_value = interpolate(post_hook_value, cls, values.copy())
+        new_value = field_hook(
+            field.outer_type_,
+            interpolate(post_hook_value, cls, values.copy())
+        )
         if old_value != new_value:
             interpolation_tracker[field.alias] = (old_value, copy.copy(new_value))
         post_hook_value = new_value
@@ -2384,6 +2387,7 @@ class ConfigModel(
             interpolation_context[identifier] = value
             if raw_identifier not in closest_namespace:
                 interpolation_context[raw_identifier] = value
+
         if len(identifiers) == 1:
             return interpolation_context[identifiers.pop()], interpolation_context
         return None, interpolation_context
