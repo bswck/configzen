@@ -257,7 +257,7 @@ AppConfig(num_workers=4, num_jobs=4)
 ```
 
 
-#### Reusable configuration with inclusion
+#### Reusable configuration with namespaces
 
 You can share independent configuration models as namespaces through inclusion:
 
