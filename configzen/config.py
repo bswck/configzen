@@ -106,10 +106,10 @@ from configzen.errors import (
 from configzen.interpolation import (
     INTERPOLATION_NAMESPACE_TOKEN,
     INTERPOLATOR,
+    BaseInterpolator,
     include_const,
     interpolate,
     include,
-    BaseInterpolator,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
@@ -134,6 +134,7 @@ except ImportError:
 
 __all__ = (
     "ConfigAgent",
+    "ConfigAt",
     "ConfigModel",
     "ConfigMeta",
     "export_hook",
