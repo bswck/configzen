@@ -8,9 +8,9 @@ by setting the environment variable ``CONFIGZEN_SETUP`` to ``0``.
 from __future__ import annotations
 
 import ast
-import collections.abc
 import ipaddress
 import pathlib
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from pydantic.json import ENCODERS_BY_TYPE
@@ -47,8 +47,8 @@ def _export_list(obj: list[Any]) -> list[Any]:
     return [export_hook(item) for item in obj]
 
 
-@export_hook.register(collections.abc.Mapping)
-def _export_mapping(obj: collections.abc.Mapping[Any, Any]) -> dict[Any, Any]:
+@export_hook.register(Mapping)
+def _export_mapping(obj: Mapping[Any, Any]) -> dict[Any, Any]:
     return {k: export_hook(v) for k, v in obj.items()}
 
 

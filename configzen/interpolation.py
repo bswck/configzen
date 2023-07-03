@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import collections.abc
 import functools
 import importlib
 import inspect
 import re
 import string
 import sys
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -17,6 +17,7 @@ __all__ = (
     "include",
 )
 
+INTERPOLATOR: str = "__interpolator__"
 INTERPOLATION_NAMESPACE_TOKEN: str = "::"
 
 
@@ -48,31 +49,86 @@ class ConfigInterpolationTemplate(string.Template):
 
 @functools.singledispatch
 def interpolate(
-    value: Any, _cls: type[ConfigModelT], _closest_ns: dict[str, Any]
+    value: Any,
+    _cls: type[ConfigModelT],
+    _closest_ns: dict[str, Any],
+    _target_type: type[Any],
 ) -> Any:
     return value
 
 
 @interpolate.register(str)
-def _interpolate_str(
-    value: str, cls: type[ConfigModelT], closest_namespace: dict[str, Any]
-) -> str:
+def _try_interpolate_str(
+    value: str,
+    cls: type[ConfigModelT],
+    closest_namespace: dict[str, Any],
+    target_type: type[Any],
+) -> Any:
     template = ConfigInterpolationTemplate(value)
-    value, namespace = cls.get_interpolation_namespace(
-        identifiers=set(template.get_identifiers()), closest_namespace=closest_namespace
+    identifiers = set(template.get_identifiers())
+    if not identifiers:
+        return value
+
+    namespace = cls.get_interpolation_namespace(
+        identifiers=identifiers, closest_namespace=closest_namespace
     )
-    if value is None:
+    interpolator: BaseInterpolator = getattr(cls, INTERPOLATOR)
+
+    if len(identifiers) == 1:
+        identifier = identifiers.pop()
+        value = namespace[identifier]
+        return interpolator.interpolate_one(
+            template=template,
+            identifier=identifier,
+            value=value,
+            target_type=target_type,
+        )
+
+    return interpolator.interpolate_many(
+        template=template, namespace=namespace, target_type=target_type
+    )
+
+
+class BaseInterpolator:
+    def interpolate_many(
+        self,
+        template: ConfigInterpolationTemplate,
+        namespace: dict[str, Any],
+        target_type: type[Any],
+    ) -> Any:
+        bulk_render = self.bulk_renderers.dispatch(target_type)
+        return bulk_render(self, template, namespace)
+
+    # noinspection PyMethodMayBeStatic
+    def bulk_render_any(
+        self, template: ConfigInterpolationTemplate, namespace: dict[str, Any]
+    ) -> Any:
         return template.safe_substitute(namespace)
-    return value
 
+    def interpolate_one(
+        self,
+        template: ConfigInterpolationTemplate,
+        identifier: str,
+        value: Any,
+        target_type: type[Any],
+    ) -> Any:
+        render = self.single_renderers.dispatch(target_type)
+        return render(self, template, identifier, value)
 
-# todo(bswck): Interpolation for compound types. Quite non-trivial.
+    # noinspection PyMethodMayBeStatic
+    def single_render_any(
+        self, _template: ConfigInterpolationTemplate, _identifier: str, value: Any
+    ) -> Any:
+        return value
+
+    bulk_renderers = functools.singledispatch(bulk_render_any)
+    single_renderers = functools.singledispatch(single_render_any)
 
 
 def _include_wrapper(
     cls: type[ConfigModelT],
     namespace_name: str | None,
-    namespace_factory: collections.abc.Callable[[], dict[str, Any]],
+    namespace_factory: Callable[[], dict[str, Any]],
 ) -> type[ConfigModelT]:
     from configzen.config import INTERPOLATION_INCLUSIONS
 
@@ -88,7 +144,7 @@ def include(
     *,
     name: str | None = None,  # noqa: ARG001
     **kwargs: Any,  # noqa: ARG001
-) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
+) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     raise TypeError(
         f"Cannot include {namespace} (unexpected type {type(namespace).__name__})"
     )
@@ -96,11 +152,8 @@ def include(
 
 @include.register(dict)
 def include_const(
-    namespace: dict[str, Any] | ConfigModelT,
-    /,
-    *,
-    name: str | None = None
-) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
+    namespace: dict[str, Any] | ConfigModelT, /, *, name: str | None = None
+) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     from configzen import ConfigModel
 
     if isinstance(namespace, ConfigModel):
@@ -111,16 +164,16 @@ def include_const(
 
 
 def _include_factory(
-    namespace_factory: collections.abc.Callable[[], dict[str, Any]],
+    namespace_factory: Callable[[], dict[str, Any]],
     /,
     *,
     name: str | None = None,
-) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
+) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     return lambda cls: _include_wrapper(cls, name, namespace_factory)
 
 
 if not TYPE_CHECKING:
-    include.register(collections.abc.Callable, _include_factory)
+    include.register(Callable, _include_factory)
 
 
 @include.register(str)
@@ -132,7 +185,7 @@ def _include_str(
     stack_offset: int = 2,
     module: str | None = None,
     isolate_from_toplevel: bool = True,
-) -> collections.abc.Callable[[type[ConfigModelT]], type[ConfigModelT]]:
+) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     if module is None:
         callers_globals = inspect.stack()[stack_offset].frame.f_globals
     else:

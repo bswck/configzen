@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import collections.abc
 import functools
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from configzen.errors import InternalSyntaxError, formatted_syntax_error
@@ -45,7 +45,7 @@ class ConfigRoute:
         route = route.removesuffix(tok_dot) + tok_dot
 
         part = ""
-        dle_ctx = None
+        dle_ctx: int | None = None
         items: list[str] = []
         enter = items.append
         error = functools.partial(InternalSyntaxError, prefix="Route(", suffix=")")
@@ -129,7 +129,7 @@ class ConfigRoute:
     def __str__(self) -> str:
         return self.compose()
 
-    def __iter__(self) -> collections.abc.Iterator[str]:
+    def __iter__(self) -> Iterator[str]:
         yield from self.items
 
     def __repr__(self) -> str:

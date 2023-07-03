@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import collections.abc
 import contextlib
 import functools
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable, Iterator, Coroutine
+from typing import TYPE_CHECKING, Any, cast, overload
 
 from configzen.config import export_hook, export_model, export_model_async, field_hook
 
@@ -18,9 +18,25 @@ __all__ = (
 )
 
 
+@overload
 def with_export_hook(
-    func: collections.abc.Callable[[T], Any], cls: type[T] | None = None
-) -> type[T] | Any:
+    func: Callable[[T], Any],
+    cls: None = None,
+) -> functools.partial[type[T]]:
+    ...
+
+
+@overload
+def with_export_hook(
+    func: Callable[[T], Any],
+    cls: type[T],
+) -> type[T]:
+    ...
+
+
+def with_export_hook(
+    func: Callable[[T], Any], cls: type[T] | None = None
+) -> type[T] | functools.partial[type[T]]:
     """
     Register a pre-serialization converter function for a type.
 
@@ -53,9 +69,7 @@ def with_export_hook(
 
     if not hasattr(cls, "__get_validators__"):
 
-        def validator_gen() -> (
-            collections.abc.Iterator[collections.abc.Callable[[Any], Any]]
-        ):
+        def validator_gen() -> Iterator[Callable[[Any], Any]]:
             hook_func = field_hook.dispatch(cls)  # type: ignore[arg-type]
             yield lambda value: hook_func(cls, value)
 
@@ -65,9 +79,25 @@ def with_export_hook(
     return cls
 
 
+@overload
 def with_field_hook(
-    func: collections.abc.Callable[[type[T], Any], T], cls: type[T] | None = None
-) -> type[T] | Any:
+    func: Callable[[type[T], Any], T],
+    cls: type[T],
+) -> type[T]:
+    ...
+
+
+@overload
+def with_field_hook(
+    func: Callable[[type[T], Any], T],
+    cls: None = None,
+) -> functools.partial[type[T]]:
+    ...
+
+
+def with_field_hook(
+    func: Callable[[type[T], Any], T], cls: type[T] | None = None
+) -> type[T] | functools.partial[type[T]]:
     """
     Register a field hook for a type.
 
@@ -91,7 +121,7 @@ def with_field_hook(
 
 
 def with_exporter(
-    func: collections.abc.Callable[[ConfigModelT], dict[str, Any]] | None = None,
+    func: Callable[[ConfigModelT], Any] | None = None,
     cls: type[ConfigModelT] | None = None,
     **predefined_kwargs: Any,
 ) -> type[ConfigModelT] | Any:
@@ -135,7 +165,7 @@ def with_exporter(
             async def default_async_func(obj: Any, **kwargs: Any) -> Any:
                 nonlocal func
                 if TYPE_CHECKING:
-                    func = cast(collections.abc.Callable[..., dict[str, Any]], func)
+                    func = cast(Callable[..., dict[str, Any]], func)
 
                 return func(obj, **kwargs)
 
@@ -144,10 +174,7 @@ def with_exporter(
 
 
 def with_async_exporter(
-    func: collections.abc.Callable[
-        [ConfigModelT], collections.abc.Coroutine[Any, Any, dict[str, Any]]
-    ]
-    | None = None,
+    func: Callable[[ConfigModelT], Coroutine[Any, Any, Any]] | None = None,
     cls: type[ConfigModelT] | None = None,
     **predefined_kwargs: Any,
 ) -> type[ConfigModelT] | Any:

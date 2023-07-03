@@ -59,7 +59,6 @@ from __future__ import annotations
 
 import abc
 import asyncio
-import collections.abc
 import contextvars
 import copy
 import dataclasses
@@ -70,6 +69,11 @@ import os
 import pathlib
 import urllib.parse
 import urllib.request
+from collections.abc import (
+    Callable,
+    Mapping,
+    Iterator,
+)
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -91,18 +95,21 @@ from pydantic.fields import ModelField, Undefined
 from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
-from configzen._isolation import isolate, isolate_async, isolate_calls
+from configzen._isolation import isolate_run, isolate_await, isolation_runner
 from configzen.errors import (
     ConfigAccessError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
+    InterpolationLookupError,
 )
 from configzen.interpolation import (
     INTERPOLATION_NAMESPACE_TOKEN,
+    INTERPOLATOR,
     include_const,
     interpolate,
     include,
+    BaseInterpolator,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
@@ -223,16 +230,14 @@ if TYPE_CHECKING:
         def register(
             self,
             cls: type[T],
-            func: collections.abc.Callable[[type[T], Any], Any] | None = None,
-        ) -> collections.abc.Callable[
-            [collections.abc.Callable[[type[T], Any], Any]],
-            collections.abc.Callable[[type[T] | Any, Any], Any],
+            func: Callable[[type[T], Any], Any] | None = None,
+        ) -> Callable[
+            [Callable[[type[T], Any], Any]],
+            Callable[[type[T] | Any, Any], Any],
         ]:
             ...
 
-        def dispatch(
-            self, cls: type[T]
-        ) -> collections.abc.Callable[[type[T] | Any, Any], Any]:
+        def dispatch(self, cls: type[T]) -> Callable[[type[T] | Any, Any], Any]:
             ...
 
     field_hook: _FieldHookType = _FieldHookType()
@@ -664,7 +669,7 @@ class ConfigAgent(Generic[ConfigModelT]):
             )
         except anyconfig.UnknownParserTypeError as exc:
             raise UnavailableParserError(str(exc).split()[-1], self) from exc
-        if not isinstance(loaded, collections.abc.Mapping):
+        if not isinstance(loaded, Mapping):
             msg = (
                 f"Expected a mapping as a result of loading {self.resource}, "
                 f"got {type(loaded).__name__}."
@@ -764,7 +769,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return isolate(config.json, **export_kwargs)
+            return isolate_run(config.json, **export_kwargs)
         data = export_model(config, **export_kwargs)
         return self.dump_data(data, parser_name=parser_name, **kwargs)
 
@@ -798,7 +803,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return await isolate_async(config.json_async, **export_kwargs)
+            return await isolate_await(config.json_async, **export_kwargs)
         data = await export_model_async(config, **export_kwargs)
         return self.dump_data(data, parser_name=parser_name, **kwargs)
 
@@ -1171,7 +1176,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 def at(
     mapping: Any,
     route: ConfigRouteLike,
-    converter_func: collections.abc.Callable[[Any], dict[str, Any]] = _get_object_state,
+    converter_func: Callable[[Any], dict[str, Any]] = _get_object_state,
     agent: ConfigAgent[ConfigModelT] | None = None,
 ) -> Any:
     """
@@ -1437,7 +1442,7 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
     interpolation_namespace: dict[str, Any]
 
     @abc.abstractmethod
-    def trace_route(self) -> collections.abc.Iterator[str]:
+    def trace_route(self) -> Iterator[str]:
         """Trace the route to where the configuration subcontext points to."""
 
     @property
@@ -1525,7 +1530,7 @@ class Context(BaseContext[ConfigModelT], Generic[ConfigModelT]):
         self.interpolation_namespace = {}
         self.owner = owner
 
-    def trace_route(self) -> collections.abc.Iterator[str]:
+    def trace_route(self) -> Iterator[str]:
         yield from ()
 
     @property
@@ -1599,7 +1604,7 @@ class Subcontext(BaseContext[ConfigModelT], Generic[ConfigModelT]):
     def toplevel_interpolation_namespace(self) -> dict[str, Any]:
         return self._parent.toplevel_interpolation_namespace
 
-    def trace_route(self) -> collections.abc.Iterator[str]:
+    def trace_route(self) -> Iterator[str]:
         yield from self._parent.trace_route()
         yield self._part
 
@@ -1700,19 +1705,25 @@ def _common_field_validator(
         and field.alias not in disallowed_interpolation_fields
     ):
         old_value = post_hook_value
-        new_value = field_hook(
-            field.outer_type_,
-            interpolate(post_hook_value, cls, values.copy())
-        )
+        try:
+            interpolated = interpolate(
+                post_hook_value,
+                cls,
+                values.copy(),
+                field.outer_type_,
+            )
+        except InterpolationLookupError as err:
+            err.message += f" (issued by {cls.__qualname__}.{field.alias})"
+            raise
+
+        new_value = field_hook(field.outer_type_, interpolated)
         if old_value != new_value:
             interpolation_tracker[field.alias] = (old_value, copy.copy(new_value))
         post_hook_value = new_value
     return post_hook_value
 
 
-def _json_encoder(
-    model_encoder: collections.abc.Callable[..., Any], value: Any, **kwargs: Any
-) -> Any:
+def _json_encoder(model_encoder: Callable[..., Any], value: Any, **kwargs: Any) -> Any:
     initial_state_type = type(value)
     converted_value = export_hook(value)
     if isinstance(converted_value, initial_state_type):
@@ -1734,6 +1745,9 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         if namespace.get(INTERPOLATION_INCLUSIONS) is None:
             namespace[INTERPOLATION_INCLUSIONS] = {}
+
+        if namespace.get(INTERPOLATOR) is None:
+            namespace[INTERPOLATOR] = BaseInterpolator()
 
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1850,7 +1864,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return isolate(self.dict, **kwargs)
+        return isolate_run(self.dict, **kwargs)
 
     async def export_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -1861,7 +1875,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return await isolate_async(self.dict_async, **kwargs)
+        return await isolate_await(self.dict_async, **kwargs)
 
     async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -1873,6 +1887,7 @@ class ConfigModel(
         """
         return dict(await self._iter_async(to_dict=True, **kwargs))
 
+    # noinspection PyShadowingNames
     async def json_async(  # noqa: PLR0913
         self,
         include: IncludeExcludeT = None,
@@ -1882,13 +1897,11 @@ class ConfigModel(
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
-        encoder: collections.abc.Callable[[Any], Any] | None = None,
+        encoder: Callable[[Any], Any] | None = None,
         models_as_dict: bool = True,
         **dumps_kwargs: Any,
     ) -> str:
-        encoder = cast(
-            collections.abc.Callable[[Any], Any], encoder or self.__json_encoder__
-        )
+        encoder = cast(Callable[[Any], Any], encoder or self.__json_encoder__)
         data = dict(
             await self._iter_async(
                 to_dict=models_as_dict,
@@ -1906,11 +1919,11 @@ class ConfigModel(
 
     def _iter(  # type: ignore[override]
         self, **kwargs: Any
-    ) -> collections.abc.Iterator[tuple[str, Any]]:
+    ) -> Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                state |= [self._iter_hook(key, value)]
+                state |= [self._export_iter_hook(key, value)]
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1919,13 +1932,11 @@ class ConfigModel(
         else:
             yield from super()._iter(**kwargs)
 
-    async def _iter_async(
-        self, **kwargs: Any
-    ) -> collections.abc.Iterator[tuple[str, Any]]:
+    async def _iter_async(self, **kwargs: Any) -> Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                state |= [self._iter_hook(key, value)]
+                state |= [self._export_iter_hook(key, value)]
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1935,7 +1946,7 @@ class ConfigModel(
             return ((key, value) for key, value in state.items())
         return super()._iter(**kwargs)
 
-    def _iter_hook(
+    def _export_iter_hook(
         self,
         key: str,
         value: Any,
@@ -1943,15 +1954,16 @@ class ConfigModel(
         interpolation_tracker = getattr(self, LOCAL).get(current_interpolation_tracker)
         field = self.__fields__.get(key)
         actual_key = field.alias if field else key
-        interpolation_track = interpolation_tracker.get(actual_key)
-        if interpolation_track:
-            old_value, new_value = interpolation_track
-            # if value != new_value:
-            #     raise InterpolationError(
-            #         f"Cannot restore the value of {actual_key!r} "
-            #         "before interpolation."
-            #     )
-            value = old_value
+        if interpolation_tracker:
+            interpolation_track = interpolation_tracker.get(actual_key)
+            if interpolation_track:
+                old_value, new_value = interpolation_track
+                # if value != new_value:
+                #     raise InterpolationError(
+                #         f"Cannot restore the value of {actual_key!r} "
+                #         "before interpolation."
+                #     )
+                value = old_value
         return actual_key, value
 
     @classmethod
@@ -2253,10 +2265,10 @@ class ConfigModel(
             ConfigMeta.autoupdate_forward_refs,
         ):
             cls.update_forward_refs()
-        task = local.run(
+        reader = local.run(
             asyncio.create_task, agent.read_async(config_class=cls, **kwargs)
         )
-        config = await task
+        config = await reader
         object.__setattr__(config, LOCAL, local)
         context = cast(Context[ConfigModelT], local.get(current_context))
         context.owner = config
@@ -2354,10 +2366,8 @@ class ConfigModel(
         cls,
         identifiers: set[str],
         closest_namespace: dict[str, Any],
-    ) -> tuple[Any, dict[str, Any]]:
-        """
-        Get the interpolation context of this configuration model.
-        """
+    ) -> dict[str, Any]:
+        """Get the interpolation namespace according to requested identifiers."""
         context = current_context.get()
         interpolation_context = {}
 
@@ -2374,7 +2384,10 @@ class ConfigModel(
             ) = identifier.rpartition(INTERPOLATION_NAMESPACE_TOKEN)
             namespace = namespaces.get(None, {})
             if specifies_namespace:
-                namespace |= namespaces[namespace_identifier]
+                try:
+                    namespace |= namespaces[namespace_identifier]
+                except KeyError:
+                    raise InterpolationLookupError(namespace_identifier) from None
             else:
                 namespace |= closest_namespace
 
@@ -2388,9 +2401,7 @@ class ConfigModel(
             if raw_identifier not in closest_namespace:
                 interpolation_context[raw_identifier] = value
 
-        if len(identifiers) == 1:
-            return interpolation_context[identifiers.pop()], interpolation_context
-        return None, interpolation_context
+        return interpolation_context
 
     @classmethod
     def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
@@ -2409,14 +2420,14 @@ class ConfigModel(
         return value
 
     if not TYPE_CHECKING:
-        load = isolate_calls(load)
-        load_async = isolate_calls(load_async)
-        reload = isolate_calls(reload)
-        reload_async = isolate_calls(reload_async)
-        save = isolate_calls(save)
-        save_async = isolate_calls(save_async)
-        export = isolate_calls(export)
-        export_async = isolate_calls(export_async)
+        load = isolation_runner(load)
+        load_async = isolation_runner(load_async)
+        reload = isolation_runner(reload)
+        reload_async = isolation_runner(reload_async)
+        save = isolation_runner(save)
+        save_async = isolation_runner(save_async)
+        export = isolation_runner(export)
+        export_async = isolation_runner(export_async)
 
 
 setattr(ConfigModel, INTERPOLATION_INCLUSIONS, None)

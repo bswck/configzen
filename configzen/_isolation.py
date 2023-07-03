@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-import collections.abc
 import contextvars
+import functools
+from collections.abc import Callable, Coroutine
 from typing import Any, cast
 
 from configzen.typedefs import P, T
 
 
-def isolate_calls(
-    func: collections.abc.Callable[P, T],
-) -> collections.abc.Callable[P, T]:
+def isolation_runner(
+    func: Callable[P, T],
+) -> Callable[P, T]:
     """
     Decorator to copy a function call context automatically (context isolation)
     to prevent collisions.
@@ -19,18 +20,27 @@ def isolate_calls(
     in this new isolated context.
     """
     if isinstance(func, (classmethod, staticmethod)):
-        return type(func)(isolate_calls(func.__func__))
+        return type(func)(isolation_runner(func.__func__))
 
     if asyncio.iscoroutinefunction(func):
-        return cast(
-            collections.abc.Callable[P, T],
-            lambda *args, **kwargs: isolate_async(func, *args, **kwargs),
-        )
-    return lambda *args, **kwargs: isolate(func, *args, **kwargs)
+
+        @functools.wraps(func)
+        def _isolating_async_wrapper(*args: Any, **kwargs: Any) -> asyncio.Task[T]:
+            return isolate_await(
+                cast(Callable[P, Coroutine[Any, Any, T]], func), *args, **kwargs
+            )
+
+        return cast(Callable[P, T], _isolating_async_wrapper)
+
+    @functools.wraps(func)
+    def _isolating_wrapper(*args: Any, **kwargs: Any) -> T:
+        return isolate_run(func, *args, **kwargs)
+
+    return _isolating_wrapper
 
 
-def isolate(
-    func: collections.abc.Callable[..., T],
+def isolate_run(
+    func: Callable[..., T],
     *args: Any,
     **kwargs: Any,
 ) -> T:
@@ -39,8 +49,8 @@ def isolate(
     return context.run(func, *args, **kwargs)
 
 
-def isolate_async(
-    func: collections.abc.Callable[..., collections.abc.Coroutine[Any, Any, T]],
+def isolate_await(
+    func: Callable[..., Coroutine[Any, Any, T]],
     *args: Any,
     **kwargs: Any,
 ) -> asyncio.Task[T]:

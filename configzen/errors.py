@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import collections.abc
 import contextlib
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -14,9 +14,30 @@ if TYPE_CHECKING:
 class ConfigError(Exception):
     """An error occurred while loading a configuration."""
 
+    def __init__(self, message: str) -> None:
+        self._message = message
+        super().__init__(message)
+
+    @property
+    def message(self) -> str:
+        """The error message."""
+        return self._message
+
+    @message.setter
+    def message(self, value: str) -> None:
+        self._message = value
+        super().__init__(self.message)
+
 
 class InterpolationError(ConfigError):
     """An error occurred with regard to interpolating a configuration."""
+
+
+class InterpolationLookupError(ConfigError, LookupError):
+    """An error occurred with regard to interpolating a configuration."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(repr(message))
 
 
 class IncorrectConfigError(ConfigError):
@@ -24,16 +45,16 @@ class IncorrectConfigError(ConfigError):
 
 
 class InternalSyntaxError(ConfigError):
-    """Error in route syntax."""
+    """Syntax error in a _configzen_ component."""
 
     def __init__(
         self,
-        msg: str,
+        message: str,
         index: Any = None,
         prefix: str = "",
         suffix: str = "",
     ) -> None:
-        super().__init__(msg)
+        super().__init__(message)
         self.index = index
         self.prefix = prefix
         self.suffix = suffix
@@ -44,7 +65,9 @@ class ConfigSyntaxError(ConfigError):
 
 
 @contextlib.contextmanager
-def formatted_syntax_error(source: str) -> collections.abc.Iterator[None]:
+def formatted_syntax_error(
+    source: str, error_cls: type[ConfigSyntaxError] = ConfigSyntaxError
+) -> Iterator[None]:
     """Raise a SyntaxError with a message and a source."""
     try:
         yield
@@ -56,7 +79,7 @@ def formatted_syntax_error(source: str) -> collections.abc.Iterator[None]:
         msg = "\n".join(
             map(str, (exc, exc.prefix + repr(source) + exc.suffix, indicator))
         )
-        raise ConfigSyntaxError(msg) from None
+        raise error_cls(msg) from None
 
 
 class UnspecifiedParserError(ConfigError):
@@ -93,7 +116,7 @@ class ConfigAccessError(ConfigError, LookupError):
             route = ".".join(route)
         self.route = route
         super().__init__(
-            f"could not get {type(config).__name__}.{route}",
+            f"Could not access {type(config).__name__}.{route}",
         )
 
 
