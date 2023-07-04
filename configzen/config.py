@@ -101,7 +101,8 @@ from configzen.errors import (
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
-    InterpolationLookupError, InterpolationError,
+    InterpolationLookupError,
+    InterpolationError,
 )
 from configzen.interpolation import (
     NAMESPACE_TOKEN,
@@ -109,7 +110,8 @@ from configzen.interpolation import (
     BaseInterpolator,
     include_const,
     interpolate,
-    include, AT_TOKEN,
+    include,
+    AT_TOKEN,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
@@ -156,11 +158,11 @@ INTERPOLATION_INCLUSIONS: str = "__interpolation_inclusions__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -241,7 +243,6 @@ if TYPE_CHECKING:
         def dispatch(self, cls: type[T]) -> Callable[[type[T] | Any, Any], Any]:
             ...
 
-
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -280,7 +281,6 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
-
 
     field_hook.register = field_hook_registrars.register
 
