@@ -18,11 +18,12 @@ __all__ = (
 )
 
 INTERPOLATOR: str = "__interpolator__"
-INTERPOLATION_NAMESPACE_TOKEN: str = "::"
+NAMESPACE_TOKEN: str = "::"
+AT_TOKEN: str = "@"
 
 
 class ConfigInterpolationTemplate(string.Template):
-    idpattern = rf"([_a-z]*({INTERPOLATION_NAMESPACE_TOKEN})?[_a-z][\\\.\[\]_a-z0-9]*)"
+    idpattern = rf"([_a-z]*({NAMESPACE_TOKEN}|{AT_TOKEN})?[_a-z][\\\.\[\]_a-z0-9]*)"
     flags = re.IGNORECASE
 
     if sys.version_info < (3, 11):

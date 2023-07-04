@@ -101,15 +101,15 @@ from configzen.errors import (
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
-    InterpolationLookupError,
+    InterpolationLookupError, InterpolationError,
 )
 from configzen.interpolation import (
-    INTERPOLATION_NAMESPACE_TOKEN,
+    NAMESPACE_TOKEN,
     INTERPOLATOR,
     BaseInterpolator,
     include_const,
     interpolate,
-    include,
+    include, AT_TOKEN,
 )
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
@@ -156,11 +156,11 @@ INTERPOLATION_INCLUSIONS: str = "__interpolation_inclusions__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -241,6 +241,7 @@ if TYPE_CHECKING:
         def dispatch(self, cls: type[T]) -> Callable[[type[T] | Any, Any], Any]:
             ...
 
+
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -279,6 +280,7 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
+
 
     field_hook.register = field_hook_registrars.register
 
@@ -455,6 +457,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         "msgpack",
         "pickle",
     }
+    SUPPORTED_PARSERS: list[str] = anyconfig.list_types()
 
     def __init__(
         self,
@@ -569,7 +572,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         parser_name = None
         if isinstance(self.resource, pathlib.Path):
             suffix = self.resource.suffix[1:].casefold()
-            supported_parsers = anyconfig.list_types()
+            supported_parsers = self.SUPPORTED_PARSERS
             if not suffix:
                 recognized_file_extensions = supported_parsers + [
                     alias + "(-> " + actual_parser_name + ")"
@@ -1713,8 +1716,8 @@ def _common_field_validator(
                 values.copy(),
                 field.outer_type_,
             )
-        except InterpolationLookupError as err:
-            err.message += f" (issued by {cls.__qualname__}.{field.alias})"
+        except InterpolationError as err:
+            err.message += f" (encountered in {cls.__qualname__}.{field.alias})"
             raise
 
         new_value = field_hook(field.outer_type_, interpolated)
@@ -2381,8 +2384,8 @@ class ConfigModel(
             (
                 namespace_identifier,
                 specifies_namespace,
-                raw_identifier,
-            ) = identifier.rpartition(INTERPOLATION_NAMESPACE_TOKEN)
+                raw_route,
+            ) = identifier.rpartition(NAMESPACE_TOKEN)
             namespace = namespaces.get(None, {})
             if specifies_namespace:
                 try:
@@ -2392,15 +2395,27 @@ class ConfigModel(
             else:
                 namespace |= closest_namespace
 
+            owner, has_at, raw_route = raw_route.rpartition(AT_TOKEN)
+
+            lookup_identifier = owner if has_at else raw_route
             try:
-                value = at(namespace, raw_identifier)
+                value = at(namespace, lookup_identifier)
             except ResourceLookupError:
                 if not specifies_namespace:
                     raise
-                value = at(closest_namespace, raw_identifier)
+                value = at(closest_namespace, lookup_identifier)
+
+            if has_at:
+                owner = value
+                if not isinstance(owner, ConfigModel):
+                    raise InterpolationError(
+                        f"Cannot @-interpolate with {type(owner).__name__!r} objects"
+                    )
+                value = owner.at(raw_route)
+
             interpolation_context[identifier] = value
-            if raw_identifier not in closest_namespace:
-                interpolation_context[raw_identifier] = value
+            if raw_route not in closest_namespace:
+                interpolation_context[raw_route] = value
 
         return interpolation_context
 

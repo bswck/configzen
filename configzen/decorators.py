@@ -70,7 +70,7 @@ def with_export_hook(
     if not hasattr(cls, "__get_validators__"):
 
         def validator_gen() -> Iterator[Callable[[Any], Any]]:
-            hook_func = field_hook.dispatch(cls)  # type: ignore[arg-type]
+            hook_func = field_hook.dispatch(cls)
             yield lambda value: hook_func(cls, value)
 
         with contextlib.suppress(TypeError):
