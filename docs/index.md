@@ -68,7 +68,7 @@ user: postgres
 You can create a _configzen_ configuration model for it like this:
 
 ```python
-# config.py
+# model.py
 from ipaddress import IPv4Address, IPv6Address
 from configzen import ConfigModel, ConfigMeta, ConfigField
 

@@ -4,8 +4,15 @@ repo_name: bswck/configzen
 copyright: Copyright &copy; 2023 bswck
 nav:
 - Home: index.md
+- API Reference:
+  - 'configzen.model': 'api/model.md'
+  - 'configzen.decorators': 'api/decorators.md'
+  - 'configzen.errors': 'api/errors.md'
+  - 'configzen.field': 'api/field.md'
+  - 'configzen.interpolation': 'api/interpolation.md'
+  - 'configzen.processor': 'api/processor.md'
+  - 'configzen.route': 'api/route.md'
 #- Examples: examples.md
-#- API Reference: api.md
 theme:
   name: material
   palette:
@@ -27,6 +34,13 @@ theme:
     toggle:
       icon: material/toggle-switch-off-outline
       name: Switch to light mode
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        options:
+          docstring_style: numpy
 markdown_extensions:
 - admonition
 - footnotes
