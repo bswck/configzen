@@ -37,12 +37,12 @@ class DatabaseConfig(ConfigModel):
 db_config = DatabaseConfig.load()
 ```
 
-With this code written, you can load your configuration from a file as well as from the environment variables
+And you can load your configuration from a file as well as from the environment variables
 `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. Since `password` is a field created with
 the option `exclude=True`, it will not be included in the configuration's exported data: that
 guarantees that your password does never leak into `database.yml` on save – but you may still pass it
 through an environment variable (here – the mentioned `DB_PASSWORD`). Secret files are also supported,
-see [the pydantic documentation](https://docs.pydantic.dev/latest/usage/settings/#secret-support) section
+see [the pydantic documentation](https://docs.pydantic.dev/latest/usage/settings/#secret-support)
 for more information.
 
 [pydantic](https://docs.pydantic.dev/latest/) will naturally take care of parsing and validating the loaded data.
