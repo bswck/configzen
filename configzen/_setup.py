@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic.json import ENCODERS_BY_TYPE
 
-from configzen.config import ConfigModel, export_hook, field_hook
+from configzen.model import ConfigModel, export_hook, field_hook
 
 if TYPE_CHECKING:
     from configzen.typedefs import ConfigModelT

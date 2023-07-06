@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from configzen.config import ConfigRoute
+from configzen.model import ConfigRoute
 from configzen.errors import ConfigSyntaxError
 
 STRING_DECOMPOSITION_PARAMS = [

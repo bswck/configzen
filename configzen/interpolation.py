@@ -131,7 +131,7 @@ def _include_wrapper(
     namespace_name: str | None,
     namespace_factory: Callable[[], dict[str, Any]],
 ) -> type[ConfigModelT]:
-    from configzen.config import INTERPOLATION_INCLUSIONS
+    from configzen.model import INTERPOLATION_INCLUSIONS
 
     getattr(cls, INTERPOLATION_INCLUSIONS)[namespace_name] = namespace_factory
     return cls

@@ -1,7 +1,7 @@
 import argparse
 
 from configzen import ConfigMeta, ConfigModel
-from configzen.config import get_context
+from configzen.model import get_context
 
 
 class Store(ConfigModel):

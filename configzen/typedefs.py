@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
     # noinspection PyUnresolvedReferences
-    from configzen.config import ConfigModel
+    from configzen.model import ConfigModel
     from configzen.route import ConfigRoute
 
 T = TypeVar("T")

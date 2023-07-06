@@ -15,7 +15,7 @@ from configzen.errors import ConfigPreprocessingError
 from configzen.typedefs import ConfigModelT, ConfigRouteLike
 
 if TYPE_CHECKING:
-    from configzen.config import BaseContext, ConfigAgent
+    from configzen.model import BaseContext, ConfigAgent
 
 __all__ = (
     "DirectiveContext",
@@ -178,7 +178,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         """
         if is_dict_like(state):
             if metadata is None:
-                from configzen.config import CONTEXT
+                from configzen.model import CONTEXT
 
                 state.pop(CONTEXT, None)
                 metadata = state.pop(EXPORT, None)
@@ -209,7 +209,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         """
         if is_dict_like(state):
             if metadata is None:
-                from configzen.config import CONTEXT
+                from configzen.model import CONTEXT
 
                 state.pop(CONTEXT, None)
                 metadata = state.pop(EXPORT, None)
@@ -629,7 +629,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         preprocess: bool,
         preserve: bool,
     ) -> None:
-        from configzen.config import CONTEXT, Context, at
+        from configzen.model import CONTEXT, Context, at
 
         if route:
             source = at(source, route, agent=agent)
@@ -667,7 +667,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import CONTEXT, at, export_hook
+        from configzen.model import CONTEXT, at, export_hook
 
         overrides = {}
 
@@ -742,7 +742,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata
         state
         """
-        from configzen.config import CONTEXT, at, export_hook
+        from configzen.model import CONTEXT, at, export_hook
 
         overrides = {}
 
@@ -814,7 +814,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         route: str | None,
         key_order: list[str],
     ) -> None:
-        from configzen.config import export_hook
+        from configzen.model import export_hook
 
         state |= overrides
         extras: dict[str, Any] = {

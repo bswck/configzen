@@ -5,54 +5,54 @@ This module provides an API to manage configuration files and resources
 in a consistent way. It also provides tools to load and save configuration
 files in various formats and within a number of advanced methods.
 
-.. code-block:: python
+```python
+from configzen import ConfigModel, ConfigField, ConfigMeta
 
-    from configzen import ConfigModel, ConfigField, ConfigMeta
+class DatabaseConfig(ConfigModel):
+    host: str
+    port: int
+    user: str
+    password: str = ConfigField(exclude=True)
 
-    class DatabaseConfig(ConfigModel):
-        host: str
-        port: int
-        user: str
-        password: str = ConfigField(exclude=True)
+    class Config(ConfigMeta):
+        resource = "examples/database.json"
 
-        class Config(ConfigMeta):
-            resource = "examples/database.json"
+db_config = DatabaseConfig.load()
+db_config.host = "newhost"
+db_config.port = 5432
 
-    db_config = DatabaseConfig.load()
-    db_config.host = "newhost"
-    db_config.port = 5432
+db_config.save()
 
-    db_config.save()
+db_config = DatabaseConfig.load()
+print(db_config.host)
+print(db_config.port)
 
-    db_config = DatabaseConfig.load()
-    print(db_config.host)
-    print(db_config.port)
+# Output:
+# newhost
+# 5432
 
-    # Output:
-    # newhost
-    # 5432
+db_config.host = "otherhost"
+db_config.port = 5433
 
-    db_config.host = "otherhost"
-    db_config.port = 5433
+db_config.at("host").save()
 
-    db_config.at("host").save()
+print(db_config.host)
+print(db_config.port)
 
-    print(db_config.host)
-    print(db_config.port)
+# Output:
+# otherhost
+# 5432  # <- not 5433, because we saved only host
 
-    # Output:
-    # otherhost
-    # 5432  # <- not 5433, because we saved only host
+db_config.host = "anotherhost"
+db_config.at("port").reload()
 
-    db_config.host = "anotherhost"
-    db_config.at("port").reload()
+print(db_config.host)
+print(db_config.port)
 
-    print(db_config.host)
-    print(db_config.port)
-
-    # Output:
-    # otherhost  # <- not anotherhost, because we reloaded only port
-    # 5432
+# Output:
+# otherhost  # <- not anotherhost, because we reloaded only port
+# 5432
+```
 """
 
 from __future__ import annotations
@@ -348,26 +348,6 @@ class ConfigAgent(Generic[ConfigModelT]):
     can be a file, a URL, or a file-like object. It is used internally
     by `ConfigModel` and `AsyncConfigModel` to load and save
     configuration files.
-
-    Parameters
-    ----------
-    resource
-        The resource to load the configuration from.
-    processor
-        The resource processor to use. If not specified, the processor used will
-        be :class:`DefaultProcessor`.
-    parser_name
-        The name of the engines to use for loading and saving the
-        configuration. If not specified, the processor will be guessed
-        from the file extension.
-    create_if_missing
-        Whether to create the file if it doesn't exist.
-    use_pydantic_json
-        Whether to use pydantic's JSON serialization for saving the
-        configuration. This is useful for preserving the type of
-        values that are not supported by `anyconfig`.
-    kwargs
-        Additional options to pass to `anyconfig` API functions.
 
     Attributes
     ----------
