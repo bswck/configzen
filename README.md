@@ -2,56 +2,6 @@
 
 _configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
-## What is this?
-
-_configzen_ is a good choice if you need to create complex configurations with schemas.
-Being based on [pydantic](https://docs.pydantic.dev/latest/), this tool will allow you to create _configuration models_
-for your configuration files, and then load, modify and save them with scope control.
-To see roughly how it works, check out the [Features](#features) section.
-
-### Preprocessing
-
-_configzen_ provides built-in preprocessing directives to your configuration files,
-offering features such as extending configuration files directly from other configuration files (without writing any
-code).
-You might think of it as something that is analogous
-to [Azure DevOps YAML templates](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops),
-broadened to any from the supported configuration file formats (see [Supported file formats](#supported-file-formats)).
-The directive `^copy` may also be handy in quick conversions between the mentioned formats.
-See [Preprocessing directives](#preprocessing-directives) for more information.
-
-## Supported file formats
-
-_configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on any protocol-specific entities.
-As an example result, comments in your configuration files are lost on save[^1], but you can exchange file formats without any hassle.
-
-The following table shows the supported file formats, their requirements, file extensions, and the backend libraries used to accomplish this goal.
-
-| File Format                                                                         | To use, install:              | Recognized File Extension(s) | Backend Library                                                                                         |
-|-------------------------------------------------------------------------------------|-------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------|
-| [JSON](https://en.wikipedia.org/wiki/JSON)                                          | -                             | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                  |
-| [INI](https://en.wikipedia.org/wiki/INI_file)                                       | -                             | `ini`, `cfg`, `conf`         | [configparser](https://docs.python.org/3/library/configparser.html) (standard library)                  |
-| [TOML](https://en.wikipedia.org/wiki/TOML)                                          | -                             | `toml`                       | [toml](https://pypi.python.org/pypi/toml)                                                               |
-| [YAML](https://yaml.org)                                                            | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yml](https://pypi.python.org/pypi/ruamel.yml) |
-| [XML](https://en.wikipedia.org/wiki/XML)                                            | -                             | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                    |
-| [BSON](https://en.wikipedia.org/wiki/BSON)                                          | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                  |
-| [CBOR](https://cbor.io/) ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949))       | `anyconfig-cbor2-backend`     | `cbor`, `cbor2`              | [cbor2](https://pypi.org/project/cbor2/)                                                                |
-| CBOR (deprecated, [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049))               | `anyconfig-cbor-backend`      | `cbor`                       | [cbor](https://pypi.org/project/cbor/)                                                                  |
-| properties                                                                          | -                             | `properties`                 | (native)                                                                                                |
-| shellvars                                                                           | -                             | `shellvars`                  | (native)                                                                                                |
-
-[//]: # (| [ConfigObj]&#40;https://configobj.readthedocs.io/en/latest/configobj.html#introduction&#41; | `anyconfig-configobj-backend` | `configobj`                  | [configobj]&#40;https://pypi.org/project/configobj/&#41;                                                        |)
-[//]: # (| [Amazon Ion]&#40;https://en.wikipedia.org/wiki/Ion_&#40;serialization_format&#41;&#41;              | `anyconfig-ion-backend`       | `ion`                        | [ion]&#40;https://pypi.org/project/amazon.ion/&#41;                                                             |)
-[//]: # (| [MessagePack]&#40;https://en.wikipedia.org/wiki/MessagePack&#41;                            | `anyconfig-msgpack-backend`   | `msgpack`, `mpk`             | [msgpack]&#40;https://pypi.org/project/msgpack/&#41;                                                            |)
-
-If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, parser_name)`.
-
-If your favorite backend library is not supported, please let me know by reporting it as an issue.
-Using custom backends is to be supported in the future.
-
-[^1]: A suggested alternative for comments is to use the `description` parameter in your configuration models' fields: `ConfigField(description=...)`.
-The provided field descriptions are included in JSON schemas generated by the default implementation of the `ConfigModel.schema()` method.
-
 ## Features
 
 ### Managing content
@@ -300,6 +250,38 @@ DatabaseConfig(host=IPv4Address('127.0.0.1'), port=8000)
 
 You do not have to pass a variable name to `@include`, though. `@include` lets you overwrite the main interpolation namespace
 or one with a separate name (here: `app_config`) with configuration models, dictionaries and their factories.
+
+## Supported file formats
+
+_configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on any protocol-specific entities.
+As an example result, comments in your configuration files are lost on save[^1], but you can exchange file formats without any hassle.
+
+The following table shows the supported file formats, their requirements, file extensions, and the backend libraries used to accomplish this goal.
+
+| File Format                                                                         | To use, install:              | Recognized File Extension(s) | Backend Library                                                                                         |
+|-------------------------------------------------------------------------------------|-------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------|
+| [JSON](https://en.wikipedia.org/wiki/JSON)                                          | -                             | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                  |
+| [INI](https://en.wikipedia.org/wiki/INI_file)                                       | -                             | `ini`, `cfg`, `conf`         | [configparser](https://docs.python.org/3/library/configparser.html) (standard library)                  |
+| [TOML](https://en.wikipedia.org/wiki/TOML)                                          | -                             | `toml`                       | [toml](https://pypi.python.org/pypi/toml)                                                               |
+| [YAML](https://yaml.org)                                                            | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yml](https://pypi.python.org/pypi/ruamel.yml) |
+| [XML](https://en.wikipedia.org/wiki/XML)                                            | -                             | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                    |
+| [BSON](https://en.wikipedia.org/wiki/BSON)                                          | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                  |
+| [CBOR](https://cbor.io/) ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949))       | `anyconfig-cbor2-backend`     | `cbor`, `cbor2`              | [cbor2](https://pypi.org/project/cbor2/)                                                                |
+| CBOR (deprecated, [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049))               | `anyconfig-cbor-backend`      | `cbor`                       | [cbor](https://pypi.org/project/cbor/)                                                                  |
+| properties                                                                          | -                             | `properties`                 | (native)                                                                                                |
+| shellvars                                                                           | -                             | `shellvars`                  | (native)                                                                                                |
+
+[//]: # (| [ConfigObj]&#40;https://configobj.readthedocs.io/en/latest/configobj.html#introduction&#41; | `anyconfig-configobj-backend` | `configobj`                  | [configobj]&#40;https://pypi.org/project/configobj/&#41;                                                        |)
+[//]: # (| [Amazon Ion]&#40;https://en.wikipedia.org/wiki/Ion_&#40;serialization_format&#41;&#41;              | `anyconfig-ion-backend`       | `ion`                        | [ion]&#40;https://pypi.org/project/amazon.ion/&#41;                                                             |)
+[//]: # (| [MessagePack]&#40;https://en.wikipedia.org/wiki/MessagePack&#41;                            | `anyconfig-msgpack-backend`   | `msgpack`, `mpk`             | [msgpack]&#40;https://pypi.org/project/msgpack/&#41;                                                            |)
+
+If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, parser_name)`.
+
+If your favorite backend library is not supported, please let me know by reporting it as an issue.
+Using custom backends is to be supported in the future.
+
+[^1]: A suggested alternative for comments is to use the `description` parameter in your configuration models' fields: `ConfigField(description=...)`.
+The provided field descriptions are included in JSON schemas generated by the default implementation of the `ConfigModel.schema()` method.
 
 ## Setup
 
