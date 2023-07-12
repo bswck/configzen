@@ -34,7 +34,7 @@ class SectionModel(ConfigModel):
     dict_value: dict[str, str] = {"configzen": "is this"}
 
 
-class TestedModel(ConfigModel):
+class MockModel(ConfigModel):
     main: SectionModel
 
 

@@ -64,9 +64,13 @@ import copy
 import dataclasses
 import functools
 import importlib
+import inspect
 import io
+import itertools
 import os
 import pathlib
+import sys
+import types
 import urllib.parse
 import urllib.request
 from collections.abc import (
@@ -81,7 +85,9 @@ from typing import (
     Generic,
     Literal,
     Optional,
+    Union,
     cast,
+    get_args,
     get_origin,
     no_type_check,
     overload,
@@ -95,24 +101,28 @@ from pydantic.fields import ModelField, Undefined
 from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
-from configzen._isolation import isolate_run, isolate_await, isolation_runner
+from configzen._detach import (
+    detached_context_run,
+    detached_context_await,
+    detached_context_function,
+)
 from configzen.errors import (
     ConfigAccessError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
-    InterpolationLookupError,
     InterpolationError,
 )
 from configzen.interpolation import (
-    NAMESPACE_TOKEN,
+    EVALUATION_ENGINE,
     INTERPOLATOR,
     BaseInterpolator,
     include_const,
     interpolate,
     include,
-    AT_TOKEN,
+    BaseEvaluationEngine,
 )
+from configzen.module import MODULE, ConfigModule
 from configzen.processor import EXPORT, DirectiveContext, Processor
 from configzen.route import ConfigRoute
 from configzen.typedefs import (
@@ -158,11 +168,11 @@ INTERPOLATION_INCLUSIONS: str = "__interpolation_inclusions__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-] = contextvars.ContextVar("current_context", default=None)
+    ] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -243,6 +253,7 @@ if TYPE_CHECKING:
         def dispatch(self, cls: type[T]) -> Callable[[type[T] | Any, Any], Any]:
             ...
 
+
     field_hook: _FieldHookType = _FieldHookType()
 
 else:
@@ -269,6 +280,15 @@ else:
         The loaded value.
         """
         origin = get_origin(cls)
+        if origin in [Union] + (
+            [types.UnionType] if sys.version_info >= (3, 10) else []
+        ):
+            for result in itertools.starmap(
+                field_hook, zip(get_args(cls), itertools.repeat(value))
+            ):
+                if result != value:
+                    return result
+            return value
         try:
             if isinstance(value, origin or cls):
                 return value
@@ -276,11 +296,13 @@ else:
             return value
         if origin:
             cls = origin
+
         try:
             cast_func = field_hook_registrars.dispatch(cls)
         except KeyError:
             return value
         return cast_func(cls, value)
+
 
     field_hook.register = field_hook_registrars.register
 
@@ -753,7 +775,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return isolate_run(config.json, **export_kwargs)
+            return detached_context_run(config.json, **export_kwargs)
         data = export_model(config, **export_kwargs)
         return self.dump_data(data, parser_name=parser_name, **kwargs)
 
@@ -787,7 +809,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 self.JSON_KWARGS, self.dump_options | kwargs
             )
             _exporting.set(True)  # noqa: FBT003
-            return await isolate_await(config.json_async, **export_kwargs)
+            return await detached_context_await(config.json_async, **export_kwargs)
         data = await export_model_async(config, **export_kwargs)
         return self.dump_data(data, parser_name=parser_name, **kwargs)
 
@@ -1181,7 +1203,7 @@ def at(
     """
     route = ConfigRoute(route)
     route_here = []
-    scope = _get_object_state(mapping)
+    scope = converter_func(mapping)
     try:
         for part in route:
             route_here.append(part)
@@ -1282,7 +1304,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The number of bytes written.
         """
-        return await _save_async(self, **kwargs)
+        return await _partial_save_async(self, **kwargs)
 
     def save(self, **kwargs: Any) -> int:
         """
@@ -1297,7 +1319,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The number of bytes written.
         """
-        return _save(self, **kwargs)
+        return _partial_save(self, **kwargs)
 
     async def reload_async(self, **kwargs: Any) -> Any:
         """
@@ -1312,7 +1334,7 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The reloaded configuration or its belonging item.
         """
-        return await _reload_async(self, **kwargs)
+        return await _partial_reload_async(self, **kwargs)
 
     def reload(self, **kwargs: Any) -> Any:
         """
@@ -1327,10 +1349,10 @@ class ConfigAt(Generic[ConfigModelT]):
         -------
         The reloaded configuration or its belonging item.
         """
-        return _reload(self, **kwargs)
+        return _partial_reload(self, **kwargs)
 
 
-def _save(
+def _partial_save(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
     **kwargs: Any,
@@ -1353,7 +1375,7 @@ def _save(
     return result
 
 
-async def _save_async(
+async def _partial_save_async(
     section: ConfigModelT | ConfigAt[ConfigModelT],
     write_kwargs: dict[str, Any] | None = None,
     **kwargs: Any,
@@ -1376,7 +1398,9 @@ async def _save_async(
     return result
 
 
-def _reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> Any:
+def _partial_reload(
+    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
+) -> Any:
     if isinstance(section, ConfigModel):
         config = section
         return config.reload()
@@ -1390,7 +1414,7 @@ def _reload(section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any) -> An
     return section_data
 
 
-async def _reload_async(
+async def _partial_reload_async(
     section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
 ) -> Any:
     if isinstance(section, ConfigModel):
@@ -1704,6 +1728,7 @@ def _common_field_validator(
         if old_value != new_value:
             interpolation_tracker[field.alias] = (old_value, copy.copy(new_value))
         post_hook_value = new_value
+
     return post_hook_value
 
 
@@ -1724,7 +1749,7 @@ class ConfigModelMetaclass(ModelMetaclass):
         **kwargs: Any,
     ) -> type:
         namespace |= dict.fromkeys(
-            (EXPORT, CONTEXT, LOCAL, TOKEN), pydantic.PrivateAttr()
+            (EXPORT, CONTEXT, LOCAL, TOKEN, MODULE), pydantic.PrivateAttr()
         ) | {INTERPOLATION_TRACKER: pydantic.PrivateAttr(default_factory=dict)}
 
         if namespace.get(INTERPOLATION_INCLUSIONS) is None:
@@ -1732,6 +1757,9 @@ class ConfigModelMetaclass(ModelMetaclass):
 
         if namespace.get(INTERPOLATOR) is None:
             namespace[INTERPOLATOR] = BaseInterpolator()
+
+        if namespace.get(EVALUATION_ENGINE) is None:
+            namespace[EVALUATION_ENGINE] = BaseEvaluationEngine()
 
         if kwargs.pop("root", None):
             return type.__new__(cls, name, bases, namespace, **kwargs)
@@ -1797,6 +1825,8 @@ class ConfigModel(
 
     __config__ = ConfigMeta
 
+    module_wrapper_class: ClassVar[type[ConfigModule[ConfigModel]]] = ConfigModule
+
     def __init__(self, **kwargs: Any) -> None:
         # Set private attributes via the constructor
         # to allow preprocessor-related instances to exist.
@@ -1848,7 +1878,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return isolate_run(self.dict, **kwargs)
+        return detached_context_run(self.dict, **kwargs)
 
     async def export_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -1859,7 +1889,7 @@ class ConfigModel(
         The exported configuration model.
         """
         _exporting.set(True)  # noqa: FBT003
-        return await isolate_await(self.dict_async, **kwargs)
+        return await detached_context_await(self.dict_async, **kwargs)
 
     async def dict_async(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -2134,82 +2164,6 @@ class ConfigModel(
         context.initial_state = config.__dict__
         return config
 
-    def reload(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
-        """
-        Reload the configuration file.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments to pass to the read method.
-
-        Returns
-        -------
-        self
-        """
-        context = get_context(self)
-        current_context.set(get_context(context.owner))
-        if context.owner is self:
-            changed = context.agent.read(config_class=type(self), **kwargs)
-        else:
-            changed = _reload(cast(ConfigModelT, context.at), **kwargs)
-        state = changed.__dict__
-        context.initial_state = state
-        self.update(state)
-        return self
-
-    def save(
-        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
-    ) -> int:
-        """
-        Save the configuration to the configuration file.
-
-        Parameters
-        ----------
-        write_kwargs
-            Keyword arguments to pass to the write method.
-        **kwargs
-            Keyword arguments to pass to the dumping method.
-
-        Returns
-        -------
-        The number of bytes written.
-        """
-        context = get_context(self)
-        if context.owner is self:
-            if write_kwargs is None:
-                write_kwargs = {}
-            blob = context.agent.dump_config(self, **kwargs)
-            result = self.write(blob, **write_kwargs)
-            context.initial_state = self.__dict__
-            return result
-        return _save(
-            cast(ConfigAt[ConfigModelT], context.at),
-            write_kwargs=write_kwargs,
-            **kwargs,
-        )
-
-    def write(self, blob: str | bytes, **kwargs: Any) -> int:
-        """
-        Overwrite the configuration file with the given string or bytes.
-
-        Parameters
-        ----------
-        blob
-            The blob to write to the configuration file.
-        **kwargs
-            Keyword arguments to pass to the open method.
-
-        Returns
-        -------
-        The number of bytes written.
-        """
-        context = get_context(self)
-        if context.agent.is_url:
-            msg = "Writing to URLs is not yet supported"
-            raise NotImplementedError(msg)
-        return context.agent.write(blob, **kwargs)
-
     @classmethod
     async def load_async(
         cls: type[ConfigModelT],
@@ -2258,6 +2212,44 @@ class ConfigModel(
         context.owner = config
         return config
 
+    def reload(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
+        """
+        Reload the configuration file.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments to pass to the read method.
+
+        Returns
+        -------
+        self
+        """
+        try:
+            context = get_context(self)
+        except RuntimeError:
+            wrapped_module = getattr(self, MODULE, None)
+            if wrapped_module is None:
+                raise
+            importlib.reload(wrapped_module)
+            self.update(
+                {
+                    key: value
+                    for key, value in wrapped_module.__dict__.items()
+                    if key in self.__fields__
+                }
+            )
+            return self
+        current_context.set(get_context(context.owner))
+        if context.owner is self:
+            changed = context.agent.read(config_class=type(self), **kwargs)
+        else:
+            changed = _partial_reload(cast(ConfigModelT, context.at), **kwargs)
+        state = changed.__dict__
+        context.initial_state = state
+        self.update(state)
+        return self
+
     async def reload_async(self: ConfigModelT, **kwargs: Any) -> ConfigModelT:
         """
         Reload the configuration file asynchronously.
@@ -2276,13 +2268,44 @@ class ConfigModel(
         if context.owner is self:
             changed = await context.agent.read_async(config_class=type(self), **kwargs)
         else:
-            changed = await _reload_async(
+            changed = await _partial_reload_async(
                 cast(ConfigAt[ConfigModelT], context.at), **kwargs
             )
         state = changed.__dict__
         context.initial_state = state
         self.update(state)
         return self
+
+    def save(
+        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
+    ) -> int:
+        """
+        Save the configuration to the configuration file.
+
+        Parameters
+        ----------
+        write_kwargs
+            Keyword arguments to pass to the write method.
+        **kwargs
+            Keyword arguments to pass to the dumping method.
+
+        Returns
+        -------
+        The number of bytes written.
+        """
+        context = get_context(self)
+        if context.owner is self:
+            if write_kwargs is None:
+                write_kwargs = {}
+            blob = context.agent.dump_config(self, **kwargs)
+            result = self.write(blob, **write_kwargs)
+            context.initial_state = self.__dict__
+            return result
+        return _partial_save(
+            cast(ConfigAt[ConfigModelT], context.at),
+            write_kwargs=write_kwargs,
+            **kwargs,
+        )
 
     async def save_async(
         self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
@@ -2310,11 +2333,32 @@ class ConfigModel(
             result = await self.write_async(blob, **write_kwargs)
             context.initial_state = self.__dict__
             return result
-        return await _save_async(
+        return await _partial_save_async(
             cast(ConfigAt[ConfigModelT], context.at),
             write_kwargs=write_kwargs,
             **kwargs,
         )
+
+    def write(self, blob: str | bytes, **kwargs: Any) -> int:
+        """
+        Overwrite the configuration file with the given string or bytes.
+
+        Parameters
+        ----------
+        blob
+            The blob to write to the configuration file.
+        **kwargs
+            Keyword arguments to pass to the open method.
+
+        Returns
+        -------
+        The number of bytes written.
+        """
+        context = get_context(self)
+        if context.agent.is_url:
+            msg = "Writing to URLs is not yet supported"
+            raise NotImplementedError(msg)
+        return context.agent.write(blob, **kwargs)
 
     async def write_async(self, blob: str | bytes, **kwargs: Any) -> int:
         """
@@ -2346,58 +2390,94 @@ class ConfigModel(
         }
 
     @classmethod
+    def _evaluate_interpolation_expression(
+        cls,
+        expression: str,
+        *,
+        result_namespace: dict[str, Any],
+        namespaces: dict[str | None, dict[str, Any]],
+        closest_namespace: dict[str, Any],
+        target_type: type[Any],
+    ) -> Any:
+        evaluation_engine: BaseEvaluationEngine = getattr(cls, EVALUATION_ENGINE)
+        return evaluation_engine.evaluate_expression(
+            expression=expression,
+            result_namespace=result_namespace,
+            namespaces=namespaces,
+            closest_namespace=closest_namespace,
+            target_type=target_type,
+        )
+
+    @classmethod
+    def wrap_module(
+        cls: type[ConfigModelT],
+        module_name: str | types.ModuleType,
+        /,
+        **values: Any,
+    ) -> ConfigModelT:
+        module_vars = None
+        if isinstance(module_name, str):
+            module_name = module_name
+            if module_name not in sys.modules:
+                package = None
+                if module_name.startswith("."):
+                    current_frame = inspect.currentframe()
+                    assert current_frame is not None
+                    frame_back = current_frame.f_back
+                    assert frame_back is not None
+                    package = frame_back.f_globals["__package__"]
+                module_vars = vars(
+                    importlib.import_module(module_name, package=package)
+                )
+        else:
+            module_name = module_name.__name__
+        config_module = cls.module_wrapper_class.wrap_module(
+            module_name, cls, module_vars, **values
+        )
+        return cast(ConfigModelT, config_module.get_model())
+
+    @classmethod
+    def wrap_this_module(
+        cls: type[ConfigModelT],
+        **values: Any,
+    ) -> ConfigModelT:
+        current_frame = inspect.currentframe()
+        assert current_frame is not None
+        frame_back = current_frame.f_back
+        assert frame_back is not None
+        return cls.wrap_module(
+            frame_back.f_globals["__name__"],
+            **values
+        )
+
+    @classmethod
     def get_interpolation_namespace(
         cls,
-        identifiers: set[str],
+        expressions: set[str],
         closest_namespace: dict[str, Any],
+        target_type: type[Any],
     ) -> dict[str, Any]:
-        """Get the interpolation namespace according to requested identifiers."""
+        """Get the interpolation namespace according to occuring expressions."""
         context = current_context.get()
-        interpolation_context = {}
+        result_namespace: dict[str, Any] = {}
 
         namespaces = cls._evaluate_interpolation_namespaces()
         if context is not None:
             namespaces.setdefault(None, {}).update(
                 context.toplevel_interpolation_namespace
             )
-        for identifier in identifiers:
-            (
-                namespace_identifier,
-                specifies_namespace,
-                raw_route,
-            ) = identifier.rpartition(NAMESPACE_TOKEN)
-            namespace = namespaces.get(None, {})
-            if specifies_namespace:
-                try:
-                    namespace |= namespaces[namespace_identifier]
-                except KeyError:
-                    raise InterpolationLookupError(namespace_identifier) from None
-            else:
-                namespace |= closest_namespace
 
-            owner, has_at, raw_route = raw_route.rpartition(AT_TOKEN)
+        for expression in expressions:
+            value = cls._evaluate_interpolation_expression(
+                expression=expression,
+                result_namespace=result_namespace,
+                namespaces=namespaces,
+                closest_namespace=closest_namespace,
+                target_type=target_type,
+            )
+            result_namespace[expression] = value
 
-            lookup_identifier = owner if has_at else raw_route
-            try:
-                value = at(namespace, lookup_identifier)
-            except ResourceLookupError:
-                if not specifies_namespace:
-                    raise
-                value = at(closest_namespace, lookup_identifier)
-
-            if has_at:
-                owner = value
-                if not isinstance(owner, ConfigModel):
-                    raise InterpolationError(
-                        f"Cannot @-interpolate with {type(owner).__name__!r} objects"
-                    )
-                value = owner.at(raw_route)
-
-            interpolation_context[identifier] = value
-            if raw_route not in closest_namespace:
-                interpolation_context[raw_route] = value
-
-        return interpolation_context
+        return result_namespace
 
     @classmethod
     def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
@@ -2416,14 +2496,14 @@ class ConfigModel(
         return value
 
     if not TYPE_CHECKING:
-        load = isolation_runner(load)
-        load_async = isolation_runner(load_async)
-        reload = isolation_runner(reload)
-        reload_async = isolation_runner(reload_async)
-        save = isolation_runner(save)
-        save_async = isolation_runner(save_async)
-        export = isolation_runner(export)
-        export_async = isolation_runner(export_async)
+        load = detached_context_function(load)
+        load_async = detached_context_function(load_async)
+        reload = detached_context_function(reload)
+        reload_async = detached_context_function(reload_async)
+        save = detached_context_function(save)
+        save_async = detached_context_function(save_async)
+        export = detached_context_function(export)
+        export_async = detached_context_function(export_async)
 
 
 setattr(ConfigModel, INTERPOLATION_INCLUSIONS, None)

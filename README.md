@@ -251,6 +251,92 @@ DatabaseConfig(host=IPv4Address('127.0.0.1'), port=8000)
 You do not have to pass a variable name to `@include`, though. `@include` lets you overwrite the main interpolation namespace
 or one with a separate name (here: `app_config`) with configuration models, dictionaries and their factories.
 
+
+### Modular configuration
+
+#### Wrapping modules in-place
+
+You can wrap modules in-place with configuration models:
+
+
+1) Without writing a model class:
+
+```python
+# config.py
+from configzen import ConfigModule
+
+HOST: str = "localhost"
+PORT: int = 8000
+
+ConfigModule.wrap_this_module()
+```
+
+2) With a model class:
+
+```python
+# config.py
+from configzen import ConfigModel
+
+class AppConfig(ConfigModel):
+    HOST: str = "localhost"
+    PORT: int = 8000
+    
+AppConfig.wrap_this_module()
+```
+
+Now values `HOST` and `PORT` will be validated as `str` and `int` data types, respectively:
+
+```python
+>>> import config  # <configuration module 'config' from 'config.py'>
+>>> config.HOST
+'localhost'
+>>> config.PORT
+8000
+>>> config.PORT = "8000"
+>>> config.PORT
+8000
+>>> config.PORT = "abc"
+Traceback (most recent call last):
+  ...
+```
+
+#### Wrapping interchangeable modules
+
+You can wrap modules in-place with configuration models:
+
+```python
+# setup.py
+from configzen import ConfigModel
+
+class AppConfig(ConfigModel):
+    HOST: str = "localhost"
+    PORT: int = 8000
+
+config_model = AppConfig.wrap_module("config")
+```
+
+```py
+# config.py
+HOST: str = "0.0.0.0"
+PORT: int = 443
+```
+
+```python
+>>> from setup import config_model
+>>> config_model.HOST
+'0.0.0.0'
+>>> config_model.PORT
+443
+>>> config_model.PORT = "8000"
+>>> config_model.PORT
+8000
+>>> import config
+>>> config.HOST
+'0.0.0.0'
+>>> config.PORT
+8000
+```
+
 ## Supported file formats
 
 _configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on any protocol-specific entities.

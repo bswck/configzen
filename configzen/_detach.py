@@ -9,7 +9,7 @@ from typing import Any, cast
 from configzen.typedefs import P, T
 
 
-def isolation_runner(
+def detached_context_function(
     func: Callable[P, T],
 ) -> Callable[P, T]:
     """
@@ -20,26 +20,26 @@ def isolation_runner(
     in this new isolated context.
     """
     if isinstance(func, (classmethod, staticmethod)):
-        return type(func)(isolation_runner(func.__func__))
+        return type(func)(detached_context_function(func.__func__))
 
     if asyncio.iscoroutinefunction(func):
 
         @functools.wraps(func)
-        def _isolating_async_wrapper(*args: Any, **kwargs: Any) -> asyncio.Task[T]:
-            return isolate_await(
+        def _detaching_async_wrapper(*args: Any, **kwargs: Any) -> asyncio.Task[T]:
+            return detached_context_await(
                 cast(Callable[P, Coroutine[Any, Any, T]], func), *args, **kwargs
             )
 
-        return cast(Callable[P, T], _isolating_async_wrapper)
+        return cast(Callable[P, T], _detaching_async_wrapper)
 
     @functools.wraps(func)
-    def _isolating_wrapper(*args: Any, **kwargs: Any) -> T:
-        return isolate_run(func, *args, **kwargs)
+    def _detaching_wrapper(*args: Any, **kwargs: Any) -> T:
+        return detached_context_run(func, *args, **kwargs)
 
-    return _isolating_wrapper
+    return _detaching_wrapper
 
 
-def isolate_run(
+def detached_context_run(
     func: Callable[..., T],
     *args: Any,
     **kwargs: Any,
@@ -49,7 +49,7 @@ def isolate_run(
     return context.run(func, *args, **kwargs)
 
 
-def isolate_await(
+def detached_context_await(
     func: Callable[..., Coroutine[Any, Any, T]],
     *args: Any,
     **kwargs: Any,

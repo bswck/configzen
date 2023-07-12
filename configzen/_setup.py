@@ -1,5 +1,5 @@
 """
-Convenience hooks for quicker development with _configzen_.
+Convenience hooks for quicker workflow with _configzen_.
 
 For advanced use cases, you can prevent this module from executing
 by setting the environment variable ``CONFIGZEN_SETUP`` to ``0``.
@@ -54,9 +54,11 @@ def _export_mapping(obj: Mapping[Any, Any]) -> dict[Any, Any]:
 
 @field_hook.register(dict)
 @field_hook.register(list)
+@field_hook.register(set)
+@field_hook.register(tuple)
 def _eval_literals(cls: type[Any], value: Any) -> Any:
     """
-    Load a dict/list using literal evaluation.
+    Load a value using literal evaluation.
     Solves nested dictionaries problem in INI files.
 
     Parameters
