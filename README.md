@@ -302,7 +302,7 @@ Traceback (most recent call last):
 
 #### Wrapping interchangeable modules
 
-You can wrap modules in-place with configuration models:
+You can wrap modules outside them with configuration models:
 
 ```python
 # setup.py
