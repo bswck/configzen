@@ -265,6 +265,7 @@ You can wrap modules in-place with configuration models:
 # config.py
 from configzen import ConfigModule
 
+# Annotate config fields
 HOST: str = "localhost"
 PORT: int = 8000
 
@@ -277,8 +278,9 @@ ConfigModule.wrap_this_module()
 # config.py
 from configzen import ConfigModel
 
-HOST: str = "localhost"
-PORT: int = 8000
+# Annotations are optional
+HOST = "localhost"
+PORT = 8000
 
 class AppConfig(ConfigModel):
     HOST: str
