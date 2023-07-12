@@ -2235,8 +2235,8 @@ class ConfigModel(
             self.update(
                 {
                     key: value
-                    for key, value in wrapped_module.__dict__.items()
-                    if key in self.__fields__
+                    for key, value in vars(wrapped_module).items()
+                    if key in {field.alias for field in self.__fields__.values()}
                 }
             )
             return self
@@ -2412,6 +2412,7 @@ class ConfigModel(
     def wrap_module(
         cls: type[ConfigModelT],
         module_name: str | types.ModuleType,
+        package: str | None = None,
         /,
         **values: Any,
     ) -> ConfigModelT:
@@ -2419,8 +2420,7 @@ class ConfigModel(
         if isinstance(module_name, str):
             module_name = module_name
             if module_name not in sys.modules:
-                package = None
-                if module_name.startswith("."):
+                if package is None and module_name.startswith("."):
                     current_frame = inspect.currentframe()
                     assert current_frame is not None
                     frame_back = current_frame.f_back

@@ -277,9 +277,12 @@ ConfigModule.wrap_this_module()
 # config.py
 from configzen import ConfigModel
 
+HOST: str = "localhost"
+PORT: int = 8000
+
 class AppConfig(ConfigModel):
-    HOST: str = "localhost"
-    PORT: int = 8000
+    HOST: str
+    PORT: int
     
 AppConfig.wrap_this_module()
 ```
