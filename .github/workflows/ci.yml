@@ -20,6 +20,7 @@ jobs:
         pip install -r requirements-dev.txt
     - name: Type-check with mypy
       run: >-
+        mypy --install-types
         mypy configzen/ --strict
     - name: Check with black
       run: >-
