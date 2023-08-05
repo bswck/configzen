@@ -9,7 +9,8 @@ import bson
 import cbor
 import cbor2
 import configobj
-import msgpack
+
+# import msgpack
 import pytest
 import toml
 import yaml
@@ -79,7 +80,7 @@ composer = {
     "bson": bson.encode,
     "cbor2": cbor2.dumps,
     "cbor": cbor.dumps,
-    "msgpack": msgpack.dumps,
+    # "msgpack": msgpack.dumps,
     "shellvars": shellvars_compose,
     "properties": properties_compose,
 }
