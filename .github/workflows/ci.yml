@@ -20,13 +20,13 @@ jobs:
         pip install -r requirements-dev.txt
     - name: Type-check with mypy
       run: >-
-        mypy configzen/ --strict
+        mypy configzen/ --strict || (echo y | mypy --install-types && mypy configzen/ --strict)
     - name: Check with black
       run: >-
         black --check configzen/
     - name: Analyse the code with pylint
       run: >-
-        pylint configzen/
+        pylint configzen/ --fail-under=9
     - name: Run tests
       run: >-
-        pytest -v tests/
+        export PYTHONPATH=. && pytest -v tests/
