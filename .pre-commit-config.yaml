@@ -1,60 +1,69 @@
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: 'v4.4.0'
-  hooks:
-  - id: check-yaml
-    name: Check YAML files
-  - id: trailing-whitespace
-    name: Trim Trailing Whitespaces
-- repo: local
-  hooks:
-  - id: isort
-    name: Sort Imports
-    entry: isort
-    language: system
-- repo: https://github.com/psf/black
-  rev: '23.7.0'
-  hooks:
-  - id: black
-    name: Reformatting with Black
-- repo: https://github.com/pylint-dev/pylint/
-  rev: 'v3.0.0a6'
-  hooks:
-  - id: pylint
-    name: Check Pylint
-    entry: pylint
-    args: [configzen/]
-    language: system
-    pass_filenames: false
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: 'v1.4.1'
-  hooks:
-  - id: mypy
-    name: Check Mypy
-    entry: mypy
-    args: [configzen/, --strict]
-    language: system
-    pass_filenames: false
-- repo: https://github.com/python-poetry/poetry
-  rev: '1.5.0'
-  hooks:
-  - id: poetry-check
-    name: Check Poetry environment
-  - id: poetry-lock
-    name: Lock Dependencies with Poetry
-  - id: poetry-export
-    name: Export Dependencies with Poetry
-    args: ["--without=dev", "-f", "requirements.txt", "-o", "requirements.txt"]
-  - id: poetry-export
-    name: Export Dev Dependencies with Poetry
-    args: ["--with=dev", "-f", "requirements.txt", "-o", "requirements-dev.txt"]
-- repo: local
-  hooks:
-  - id: pytest-check
-    name: PyTest Check
-    entry: pytest
-    args: [tests/]
-    language: system
-    pass_filenames: false
-    always_run: true
-    stages: [push]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v4.4.0"
+    hooks:
+      - id: check-yaml
+        name: Check YAML files
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespaces
+  - repo: local
+    hooks:
+      - id: isort
+        name: Sort Imports
+        entry: isort
+        language: system
+  - repo: https://github.com/psf/black
+    rev: "23.7.0"
+    hooks:
+      - id: black
+        name: Reformatting with Black
+  - repo: https://github.com/pylint-dev/pylint/
+    rev: "v3.0.0a6"
+    hooks:
+      - id: pylint
+        name: Check Pylint
+        entry: pylint
+        args: [configzen/]
+        language: system
+        pass_filenames: false
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.4.1"
+    hooks:
+      - id: mypy
+        name: Check Mypy
+        entry: mypy
+        args: [configzen/, --strict]
+        language: system
+        pass_filenames: false
+  - repo: https://github.com/python-poetry/poetry
+    rev: "1.5.0"
+    hooks:
+      - id: poetry-check
+        name: Check Poetry environment
+      - id: poetry-lock
+        name: Lock Dependencies with Poetry
+      - id: poetry-export
+        name: Export Dependencies with Poetry
+        args:
+          ["--without=dev", "-f", "requirements.txt", "-o", "requirements.txt"]
+      - id: poetry-export
+        name: Export Dev Dependencies with Poetry
+        args:
+          [
+            "--with=dev",
+            "--extras=all",
+            "-f",
+            "requirements.txt",
+            "-o",
+            "requirements-dev.txt",
+          ]
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: PyTest Check
+        entry: pytest
+        args: [tests/]
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [push]
