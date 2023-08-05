@@ -1,17 +1,17 @@
+import configparser
 import functools
 import io
 import json
 import os
 from typing import Union
 
-import configparser
+import bson
+import cbor
+import cbor2
 import msgpack
 import pytest
-import yaml
-import bson
-import cbor2
-import cbor
 import toml
+import yaml
 from amazon.ion import simpleion as ion
 from anyconfig.backend import properties
 
@@ -81,14 +81,14 @@ composer = {
     params=[
         {
             "main": {
-                "integer": 0xdeadbeef,
+                "integer": 0xDEADBEEF,
                 "incorporated_model": {"string": "Hello world!"},
                 "union_value": 0.2137,
                 "collection_value": ["this", "is", "configzen"],
-                "dict_value": {"configzen": "is this"}
+                "dict_value": {"configzen": "is this"},
             }
         }
-    ]
+    ],
 )
 def mock_data_fixture(request):
     yield request.param
@@ -107,7 +107,6 @@ def mock_data_fixture(request):
         (composer["cbor"], file_dir / "data.cbor", True),
         (composer["shellvars"], file_dir / "data.shellvars", False),
         (composer["properties"], file_dir / "data.properties", False),
-
         # Ones below are unsupported due to anyconfig...
         # (composer["ion"], file_dir / "data.ion", True),
         # (composer["msgpack"], file_dir / "data.msgpack", True),

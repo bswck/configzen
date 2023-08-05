@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from configzen.model import ConfigRoute
 from configzen.errors import ConfigSyntaxError
+from configzen.model import ConfigRoute
 
 STRING_DECOMPOSITION_PARAMS = [
     ("a.b.c", ["a", "b", "c"]),
@@ -22,24 +22,19 @@ STRING_DECOMPOSITION_PARAMS = [
         (["a", "b", "c"], ["a", "b", "c"]),
         (["a", "b", "c.d"], ["a", "b", "c.d"]),
         (["a.b", "c", "d.e"], ["a.b", "c", "d.e"]),
-
         # Route inputs
         (ConfigRoute(["a", "b", "c"]), ["a", "b", "c"]),
         (ConfigRoute(["a", "b", "c.d"]), ["a", "b", "c.d"]),
         (ConfigRoute(["a.b", "c", "d.e"]), ["a.b", "c", "d.e"]),
-
         # String inputs
-        *STRING_DECOMPOSITION_PARAMS
-    ]
+        *STRING_DECOMPOSITION_PARAMS,
+    ],
 )
 def test_parse(obj, expected):
     assert ConfigRoute.parse(obj) == expected
 
 
-@pytest.mark.parametrize(
-    "composed, decomposed",
-    STRING_DECOMPOSITION_PARAMS
-)
+@pytest.mark.parametrize("composed, decomposed", STRING_DECOMPOSITION_PARAMS)
 def test_decompose(composed, decomposed):
     assert ConfigRoute.decompose(composed) == decomposed
 
@@ -51,7 +46,7 @@ def test_decompose(composed, decomposed):
         "a.b.[c.d",
         "a.b.c]",
         "[a.b.c",
-    ]
+    ],
 )
 def test_illegal_inputs(illegal_input):
     with pytest.raises(ConfigSyntaxError):
@@ -66,7 +61,7 @@ def test_illegal_inputs(illegal_input):
         (ConfigRoute(r"a.b\.c"), "a.[b.c]"),
         (ConfigRoute(r"a.[b.[c.d]\.e].f"), r"a.[b.[c.d]\.e].f"),
         (ConfigRoute(r"a.b\.\[c\.d\]\.e.f"), r"a.[b.[c.d]\.e].f"),
-    ]
+    ],
 )
 def test_compose(route, expected):
     assert route.compose() == expected

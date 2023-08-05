@@ -54,6 +54,7 @@ print(db_config.port)
 # 5432
 ```
 """
+# pyright: reportInvalidTypeVarUse=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
 
@@ -73,11 +74,7 @@ import sys
 import types
 import urllib.parse
 import urllib.request
-from collections.abc import (
-    Callable,
-    Mapping,
-    Iterator,
-)
+from collections.abc import Callable, Iterator, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -102,25 +99,25 @@ from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
 
 from configzen._detach import (
-    detached_context_run,
     detached_context_await,
     detached_context_function,
+    detached_context_run,
 )
 from configzen.errors import (
     ConfigAccessError,
+    InterpolationError,
     ResourceLookupError,
     UnavailableParserError,
     UnspecifiedParserError,
-    InterpolationError,
 )
 from configzen.interpolation import (
     EVALUATION_ENGINE,
     INTERPOLATOR,
+    BaseEvaluationEngine,
     BaseInterpolator,
+    include,
     include_const,
     interpolate,
-    include,
-    BaseEvaluationEngine,
 )
 from configzen.module import MODULE, ConfigModule
 from configzen.processor import EXPORT, DirectiveContext, Processor
@@ -138,11 +135,8 @@ from configzen.typedefs import (
 
 try:
     import aiofiles
-
-    AIOFILES_AVAILABLE = True
 except ImportError:
     aiofiles = None  # type: ignore[assignment]
-    AIOFILES_AVAILABLE = False
 
 __all__ = (
     "ConfigAgent",
@@ -168,11 +162,11 @@ INTERPOLATION_INCLUSIONS: str = "__interpolation_inclusions__"
 
 current_context: contextvars.ContextVar[
     BaseContext[Any] | None
-    ] = contextvars.ContextVar("current_context", default=None)
+] = contextvars.ContextVar("current_context", default=None)
 
 current_interpolation_tracker: contextvars.ContextVar[
     dict[str, Any] | None
-    ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
+] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_exporting", default=False
@@ -236,7 +230,7 @@ field_hook_registrars: Any = functools.singledispatch(lambda _cls, value: value)
 
 if TYPE_CHECKING:
 
-    class _FieldHookType:
+    class _FieldHookType(Generic[T]):
         def __call__(self, cls: type[T], value: Any) -> Any:
             ...
 
@@ -253,8 +247,7 @@ if TYPE_CHECKING:
         def dispatch(self, cls: type[T]) -> Callable[[type[T] | Any, Any], Any]:
             ...
 
-
-    field_hook: _FieldHookType = _FieldHookType()
+    field_hook: _FieldHookType[Any] = _FieldHookType()
 
 else:
 
@@ -302,7 +295,6 @@ else:
         except KeyError:
             return value
         return cast_func(cls, value)
-
 
     field_hook.register = field_hook_registrars.register
 
@@ -392,8 +384,8 @@ class ConfigAgent(Generic[ConfigModelT]):
     is_relative: bool = False
     allowed_url_schemes: set[str]
     use_pydantic_json: bool = True
-    default_load_options: dict[str, Any] = {}
-    default_dump_options: dict[str, Any] = {
+    default_load_options: ClassVar[dict[str, Any]] = {}
+    default_dump_options: ClassVar[dict[str, Any]] = {
         # These are usually desirable for configuration files.
         # If you want to change them, you can do so by monkey-patching
         # these variables. You can also change `load_options` and
@@ -923,7 +915,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         if self.is_url:
             msg = "Asynchronous URL opening is not supported"
             raise NotImplementedError(msg)
-        if not AIOFILES_AVAILABLE:
+        if aiofiles is None:
             msg = (
                 "Aiofiles is not available, cannot open file "
                 "asynchronously (install with `pip install aiofiles`)"
@@ -1081,6 +1073,8 @@ class ConfigAgent(Generic[ConfigModelT]):
                 defaults = _get_defaults_from_model_class(config_class)
                 blob = self.dump_data(defaults)
                 await self.write_async(blob, **(create_kwargs or {}))
+            else:
+                raise
         return await self.async_load_into(config_class, blob, **self.load_options)
 
     async def write_async(
@@ -2065,9 +2059,7 @@ class ConfigModel(
         ...
 
     @overload
-    def get(
-        self: ConfigModelT, route: ConfigRouteLike = ..., default: Any = ...
-    ) -> Any:
+    def get(self, route: ConfigRouteLike = ..., default: Any = ...) -> Any:
         ...
 
     def get(
@@ -2445,10 +2437,7 @@ class ConfigModel(
         assert current_frame is not None
         frame_back = current_frame.f_back
         assert frame_back is not None
-        return cls.wrap_module(
-            frame_back.f_globals["__name__"],
-            **values
-        )
+        return cls.wrap_module(frame_back.f_globals["__name__"], **values)
 
     @classmethod
     def get_interpolation_namespace(

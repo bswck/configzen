@@ -9,6 +9,7 @@ import sys
 from collections import ChainMap
 from collections.abc import Callable, MutableMapping
 from typing import TYPE_CHECKING, Any, ClassVar, cast
+
 from pydantic.fields import Undefined, UndefinedType
 
 from configzen.errors import ResourceLookupError

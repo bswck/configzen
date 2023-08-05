@@ -2,7 +2,7 @@ import os
 from ipaddress import IPv4Address, IPv6Address
 from typing import Union
 
-from configzen import ConfigModel, ConfigMeta, ConfigField
+from configzen import ConfigField, ConfigMeta, ConfigModel
 
 
 class DatabaseConfig(ConfigModel):

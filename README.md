@@ -20,7 +20,8 @@ You can create a _configzen_ configuration model for it like this:
 ```python
 # model.py
 from ipaddress import IPv4Address, IPv6Address
-from configzen import ConfigModel, ConfigMeta, ConfigField
+
+from configzen import ConfigField, ConfigMeta, ConfigModel
 
 
 class DatabaseConfig(ConfigModel):
@@ -285,7 +286,7 @@ PORT = 8000
 class AppConfig(ConfigModel):
     HOST: str
     PORT: int
-    
+
 AppConfig.wrap_this_module()
 ```
 

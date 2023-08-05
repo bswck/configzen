@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from pydantic import validator as field_validator
 
-from . import model, decorators, field, interpolation, module, processor, route
-from .model import *
+from . import decorators, field, interpolation, model, module, processor, route
 from .decorators import *
 from .field import *
 from .interpolation import *
+from .model import *
+from .module import *
 from .processor import *
 from .route import *
-from .module import *
 
 __all__ = (
     *model.__all__,

@@ -3,9 +3,9 @@ from __future__ import annotations
 import io
 
 import pytest
-
 from pydantic import ConfigError
-from configzen import ConfigModel, ConfigAgent, ConfigMeta
+
+from configzen import ConfigAgent, ConfigMeta, ConfigModel
 
 
 class NoAutoUpdateForwardRefs(ConfigModel):
@@ -30,9 +30,8 @@ def get_agent():
 
 
 def test_autoupdate_forward_refs():
-    assert (
-        AutoUpdateForwardRefs.load(get_agent())
-        == AutoUpdateForwardRefs(item=Item(foo=123))
+    assert AutoUpdateForwardRefs.load(get_agent()) == AutoUpdateForwardRefs(
+        item=Item(foo=123)
     )
 
     with pytest.raises(ConfigError):
