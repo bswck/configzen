@@ -389,15 +389,21 @@ dependencies with [poetry](https://python-poetry.org/):
 ```bash
 poetry install --with dev
 ```
+And install [pre-commit](https://pre-commit.com/) hooks:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+And you are good to go.
+
+Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose)
+or [submit a pull request](https://github.com/bswck/configzen/compare).
 
 ## License
 
 [MIT License](https://choosealicense.com/licenses/mit/)
 
-## Contributing
-
-Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose)
-or [submit a pull request](https://github.com/bswck/configzen/compare).
 
 ## Credits
 
@@ -405,4 +411,4 @@ or [submit a pull request](https://github.com/bswck/configzen/compare).
 
 ## Author
 
-* [bswck](https://github.com/bswck) (contact: bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck#8238`)
+* [bswck](https://github.com/bswck) (contact: bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck`)
