@@ -15,7 +15,7 @@ files = [
 name = "amazon-ion"
 version = "0.10.0"
 description = "A Python implementation of Amazon Ion."
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "amazon.ion-0.10.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:fc108e17c19a05e81b2f4ce01848b8c334282735dcd898fb4c00fd6ff024d18d"},
@@ -84,13 +84,12 @@ yaml = ["pyyaml"]
 
 [[package]]
 name = "anyconfig-bson-backend"
-version = "0.1.2"
+version = "0.2.0"
 description = "Backend module for python-anyconfig to load and dump CBOR data"
-optional = false
+optional = true
 python-versions = "*"
 files = [
-    {file = "anyconfig-bson-backend-0.1.2.tar.gz", hash = "sha256:8e719d6297544dab92458e4f3d03e4421af5de5546a699a12699f3db0c453e09"},
-    {file = "anyconfig_bson_backend-0.1.2-py2.py3-none-any.whl", hash = "sha256:b89bc00fe4d289868fcdeaf0d32f60ca094a9e63d56f9e17885c9c41716b4913"},
+    {file = "anyconfig-bson-backend-0.2.0.tar.gz", hash = "sha256:dfe3dee37c07c610bdd652f31be86bc09072aa1df6c9d04705042c7c0c27a7fd"},
 ]
 
 [package.dependencies]
@@ -99,13 +98,12 @@ pymongo = "*"
 
 [[package]]
 name = "anyconfig-cbor-backend"
-version = "0.1.2"
+version = "0.2.0"
 description = "Backend module for python-anyconfig to load and dump CBOR data"
-optional = false
+optional = true
 python-versions = "*"
 files = [
-    {file = "anyconfig-cbor-backend-0.1.2.tar.gz", hash = "sha256:095a01db7057b808cd29c5b63a6a808aedc5d97b7fd58c1ddb310e1b8c9a1a05"},
-    {file = "anyconfig_cbor_backend-0.1.2-py2.py3-none-any.whl", hash = "sha256:5db95830e1581f9117ecaa0bf28144c928ed9d03180d7516eb4d73a4f6968f3b"},
+    {file = "anyconfig-cbor-backend-0.2.0.tar.gz", hash = "sha256:e7760ccbb1f628471b8f6abc89ef7fafa8ad0b22a8ea973f62ffd3dbdb87e1d6"},
 ]
 
 [package.dependencies]
@@ -117,13 +115,13 @@ devel = ["coveralls", "flake8", "mock", "nose", "pycodestyle", "pylint"]
 
 [[package]]
 name = "anyconfig-cbor2-backend"
-version = "0.1.2"
+version = "0.2.0"
 description = "Backend module for python-anyconfig to load and dump CBOR data"
-optional = false
+optional = true
 python-versions = "*"
 files = [
-    {file = "anyconfig-cbor2-backend-0.1.2.tar.gz", hash = "sha256:f0d72d0d367062f78dfdbef6f07fd6541cc305f41f1220ed59ad289dc7f0476e"},
-    {file = "anyconfig_cbor2_backend-0.1.2-py2.py3-none-any.whl", hash = "sha256:af4bee26b885b16ab960277ad5ffa90cd99a671b5c03579d4e6c437f66021cad"},
+    {file = "anyconfig-cbor2-backend-0.2.0.tar.gz", hash = "sha256:58dfcceae2df3bd5c3c9a97d88b6eb603bfe1aeb3b7b8ad8490a8dce75130d72"},
+    {file = "anyconfig_cbor2_backend-0.2.0-py2.py3-none-any.whl", hash = "sha256:1b8214d29fcc672de546cbe08ec2c0625468a0b65633971827df63b1d13f7ffc"},
 ]
 
 [package.dependencies]
@@ -132,13 +130,12 @@ cbor2 = "*"
 
 [[package]]
 name = "anyconfig-configobj-backend"
-version = "0.1.4"
+version = "0.2.0"
 description = "Backend module for python-anyconfig to load and dump configobj data"
-optional = false
+optional = true
 python-versions = "*"
 files = [
-    {file = "anyconfig-configobj-backend-0.1.4.tar.gz", hash = "sha256:28216d5a5714491e1155df26743ae75741e87fb00b5f54f07301dfa56bfe7e5a"},
-    {file = "anyconfig_configobj_backend-0.1.4-py2.py3-none-any.whl", hash = "sha256:140a2e75e92a70ae961d9702bd701afdcfc115f14051ed6ffd0a3dd5f740e29d"},
+    {file = "anyconfig-configobj-backend-0.2.0.tar.gz", hash = "sha256:975649b71d0b304984bdc1feec7b96446a667959de66112e4e492c4bdcb42f25"},
 ]
 
 [package.dependencies]
@@ -147,33 +144,17 @@ configobj = "*"
 
 [[package]]
 name = "anyconfig-ion-backend"
-version = "0.1.1"
+version = "0.2.0"
 description = "Backend module for python-anyconfig to load and dump CBOR data"
-optional = false
+optional = true
 python-versions = "*"
 files = [
-    {file = "anyconfig-ion-backend-0.1.1.tar.gz", hash = "sha256:632995d8e599ab47f63f316690cd91280eb5c4a8e91841e3bc6214ae5cec2ff4"},
-    {file = "anyconfig_ion_backend-0.1.1-py2.py3-none-any.whl", hash = "sha256:8edca1a58757081771521d1709bbdb1ac3cfd65cad220d8beda45792b690ea0c"},
+    {file = "anyconfig-ion-backend-0.2.0.tar.gz", hash = "sha256:e3cc5280602d8b4d43021d096560d30612fc0ab46898e79298395dcc7e6ee7c0"},
 ]
 
 [package.dependencies]
 "amazon.ion" = "*"
 anyconfig = "*"
-
-[[package]]
-name = "anyconfig-msgpack-backend"
-version = "0.1.1"
-description = "Backend module for python-anyconfig to load and dump MessagePack data"
-optional = false
-python-versions = "*"
-files = [
-    {file = "anyconfig-msgpack-backend-0.1.1.tar.gz", hash = "sha256:223c3619dbb4eb433360494b0560f3694e5fa0dd69032db65e8c5318597bb348"},
-    {file = "anyconfig_msgpack_backend-0.1.1-py2.py3-none-any.whl", hash = "sha256:5e4ef702ce3f4f5cc6f0def06da899d9560385dbce887141053447b10f5222e7"},
-]
-
-[package.dependencies]
-anyconfig = "*"
-msgpack = "*"
 
 [[package]]
 name = "argcomplete"
@@ -258,7 +239,7 @@ uvloop = ["uvloop (>=0.15.2)"]
 name = "cbor"
 version = "1.0.0"
 description = "RFC 7049 - Concise Binary Object Representation"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "cbor-1.0.0.tar.gz", hash = "sha256:13225a262ddf5615cbd9fd55a76a0d53069d18b07d2e9f19c39e6acb8609bbb6"},
@@ -268,7 +249,7 @@ files = [
 name = "cbor2"
 version = "5.4.6"
 description = "CBOR (de)serializer with extensive tag support"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "cbor2-5.4.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:309fffbb7f561d67f02095d4b9657b73c9220558701c997e9bfcfbca2696e927"},
@@ -465,7 +446,7 @@ development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
 name = "configobj"
 version = "5.0.8"
 description = "Config file reading, writing and validation."
-optional = false
+optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 files = [
     {file = "configobj-5.0.8-py2.py3-none-any.whl", hash = "sha256:a7a8c6ab7daade85c3f329931a807c8aee750a2494363934f8ea84d8a54c87ea"},
@@ -504,7 +485,7 @@ files = [
 name = "dnspython"
 version = "2.4.1"
 description = "DNS toolkit"
-optional = false
+optional = true
 python-versions = ">=3.8,<4.0"
 files = [
     {file = "dnspython-2.4.1-py3-none-any.whl", hash = "sha256:5b7488477388b8c0b70a8ce93b227c5603bc7b77f1565afe8e729c36c51447d7"},
@@ -933,78 +914,6 @@ griffe = ">=0.30"
 mkdocstrings = ">=0.20"
 
 [[package]]
-name = "msgpack"
-version = "1.0.5"
-description = "MessagePack serializer"
-optional = false
-python-versions = "*"
-files = [
-    {file = "msgpack-1.0.5-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:525228efd79bb831cf6830a732e2e80bc1b05436b086d4264814b4b2955b2fa9"},
-    {file = "msgpack-1.0.5-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:4f8d8b3bf1ff2672567d6b5c725a1b347fe838b912772aa8ae2bf70338d5a198"},
-    {file = "msgpack-1.0.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:cdc793c50be3f01106245a61b739328f7dccc2c648b501e237f0699fe1395b81"},
-    {file = "msgpack-1.0.5-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5cb47c21a8a65b165ce29f2bec852790cbc04936f502966768e4aae9fa763cb7"},
-    {file = "msgpack-1.0.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e42b9594cc3bf4d838d67d6ed62b9e59e201862a25e9a157019e171fbe672dd3"},
-    {file = "msgpack-1.0.5-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:55b56a24893105dc52c1253649b60f475f36b3aa0fc66115bffafb624d7cb30b"},
-    {file = "msgpack-1.0.5-cp310-cp310-musllinux_1_1_aarch64.whl", hash = "sha256:1967f6129fc50a43bfe0951c35acbb729be89a55d849fab7686004da85103f1c"},
-    {file = "msgpack-1.0.5-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:20a97bf595a232c3ee6d57ddaadd5453d174a52594bf9c21d10407e2a2d9b3bd"},
-    {file = "msgpack-1.0.5-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:d25dd59bbbbb996eacf7be6b4ad082ed7eacc4e8f3d2df1ba43822da9bfa122a"},
-    {file = "msgpack-1.0.5-cp310-cp310-win32.whl", hash = "sha256:382b2c77589331f2cb80b67cc058c00f225e19827dbc818d700f61513ab47bea"},
-    {file = "msgpack-1.0.5-cp310-cp310-win_amd64.whl", hash = "sha256:4867aa2df9e2a5fa5f76d7d5565d25ec76e84c106b55509e78c1ede0f152659a"},
-    {file = "msgpack-1.0.5-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:9f5ae84c5c8a857ec44dc180a8b0cc08238e021f57abdf51a8182e915e6299f0"},
-    {file = "msgpack-1.0.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:9e6ca5d5699bcd89ae605c150aee83b5321f2115695e741b99618f4856c50898"},
-    {file = "msgpack-1.0.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:5494ea30d517a3576749cad32fa27f7585c65f5f38309c88c6d137877fa28a5a"},
-    {file = "msgpack-1.0.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1ab2f3331cb1b54165976a9d976cb251a83183631c88076613c6c780f0d6e45a"},
-    {file = "msgpack-1.0.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:28592e20bbb1620848256ebc105fc420436af59515793ed27d5c77a217477705"},
-    {file = "msgpack-1.0.5-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:fe5c63197c55bce6385d9aee16c4d0641684628f63ace85f73571e65ad1c1e8d"},
-    {file = "msgpack-1.0.5-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:ed40e926fa2f297e8a653c954b732f125ef97bdd4c889f243182299de27e2aa9"},
-    {file = "msgpack-1.0.5-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:b2de4c1c0538dcb7010902a2b97f4e00fc4ddf2c8cda9749af0e594d3b7fa3d7"},
-    {file = "msgpack-1.0.5-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:bf22a83f973b50f9d38e55c6aade04c41ddda19b00c4ebc558930d78eecc64ed"},
-    {file = "msgpack-1.0.5-cp311-cp311-win32.whl", hash = "sha256:c396e2cc213d12ce017b686e0f53497f94f8ba2b24799c25d913d46c08ec422c"},
-    {file = "msgpack-1.0.5-cp311-cp311-win_amd64.whl", hash = "sha256:6c4c68d87497f66f96d50142a2b73b97972130d93677ce930718f68828b382e2"},
-    {file = "msgpack-1.0.5-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:a2b031c2e9b9af485d5e3c4520f4220d74f4d222a5b8dc8c1a3ab9448ca79c57"},
-    {file = "msgpack-1.0.5-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4f837b93669ce4336e24d08286c38761132bc7ab29782727f8557e1eb21b2080"},
-    {file = "msgpack-1.0.5-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b1d46dfe3832660f53b13b925d4e0fa1432b00f5f7210eb3ad3bb9a13c6204a6"},
-    {file = "msgpack-1.0.5-cp36-cp36m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:366c9a7b9057e1547f4ad51d8facad8b406bab69c7d72c0eb6f529cf76d4b85f"},
-    {file = "msgpack-1.0.5-cp36-cp36m-musllinux_1_1_aarch64.whl", hash = "sha256:4c075728a1095efd0634a7dccb06204919a2f67d1893b6aa8e00497258bf926c"},
-    {file = "msgpack-1.0.5-cp36-cp36m-musllinux_1_1_i686.whl", hash = "sha256:f933bbda5a3ee63b8834179096923b094b76f0c7a73c1cfe8f07ad608c58844b"},
-    {file = "msgpack-1.0.5-cp36-cp36m-musllinux_1_1_x86_64.whl", hash = "sha256:36961b0568c36027c76e2ae3ca1132e35123dcec0706c4b7992683cc26c1320c"},
-    {file = "msgpack-1.0.5-cp36-cp36m-win32.whl", hash = "sha256:b5ef2f015b95f912c2fcab19c36814963b5463f1fb9049846994b007962743e9"},
-    {file = "msgpack-1.0.5-cp36-cp36m-win_amd64.whl", hash = "sha256:288e32b47e67f7b171f86b030e527e302c91bd3f40fd9033483f2cacc37f327a"},
-    {file = "msgpack-1.0.5-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:137850656634abddfb88236008339fdaba3178f4751b28f270d2ebe77a563b6c"},
-    {file = "msgpack-1.0.5-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0c05a4a96585525916b109bb85f8cb6511db1c6f5b9d9cbcbc940dc6b4be944b"},
-    {file = "msgpack-1.0.5-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:56a62ec00b636583e5cb6ad313bbed36bb7ead5fa3a3e38938503142c72cba4f"},
-    {file = "msgpack-1.0.5-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ef8108f8dedf204bb7b42994abf93882da1159728a2d4c5e82012edd92c9da9f"},
-    {file = "msgpack-1.0.5-cp37-cp37m-musllinux_1_1_aarch64.whl", hash = "sha256:1835c84d65f46900920b3708f5ba829fb19b1096c1800ad60bae8418652a951d"},
-    {file = "msgpack-1.0.5-cp37-cp37m-musllinux_1_1_i686.whl", hash = "sha256:e57916ef1bd0fee4f21c4600e9d1da352d8816b52a599c46460e93a6e9f17086"},
-    {file = "msgpack-1.0.5-cp37-cp37m-musllinux_1_1_x86_64.whl", hash = "sha256:17358523b85973e5f242ad74aa4712b7ee560715562554aa2134d96e7aa4cbbf"},
-    {file = "msgpack-1.0.5-cp37-cp37m-win32.whl", hash = "sha256:cb5aaa8c17760909ec6cb15e744c3ebc2ca8918e727216e79607b7bbce9c8f77"},
-    {file = "msgpack-1.0.5-cp37-cp37m-win_amd64.whl", hash = "sha256:ab31e908d8424d55601ad7075e471b7d0140d4d3dd3272daf39c5c19d936bd82"},
-    {file = "msgpack-1.0.5-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:b72d0698f86e8d9ddf9442bdedec15b71df3598199ba33322d9711a19f08145c"},
-    {file = "msgpack-1.0.5-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:379026812e49258016dd84ad79ac8446922234d498058ae1d415f04b522d5b2d"},
-    {file = "msgpack-1.0.5-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:332360ff25469c346a1c5e47cbe2a725517919892eda5cfaffe6046656f0b7bb"},
-    {file = "msgpack-1.0.5-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:476a8fe8fae289fdf273d6d2a6cb6e35b5a58541693e8f9f019bfe990a51e4ba"},
-    {file = "msgpack-1.0.5-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a9985b214f33311df47e274eb788a5893a761d025e2b92c723ba4c63936b69b1"},
-    {file = "msgpack-1.0.5-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:48296af57cdb1d885843afd73c4656be5c76c0c6328db3440c9601a98f303d87"},
-    {file = "msgpack-1.0.5-cp38-cp38-musllinux_1_1_aarch64.whl", hash = "sha256:addab7e2e1fcc04bd08e4eb631c2a90960c340e40dfc4a5e24d2ff0d5a3b3edb"},
-    {file = "msgpack-1.0.5-cp38-cp38-musllinux_1_1_i686.whl", hash = "sha256:916723458c25dfb77ff07f4c66aed34e47503b2eb3188b3adbec8d8aa6e00f48"},
-    {file = "msgpack-1.0.5-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:821c7e677cc6acf0fd3f7ac664c98803827ae6de594a9f99563e48c5a2f27eb0"},
-    {file = "msgpack-1.0.5-cp38-cp38-win32.whl", hash = "sha256:1c0f7c47f0087ffda62961d425e4407961a7ffd2aa004c81b9c07d9269512f6e"},
-    {file = "msgpack-1.0.5-cp38-cp38-win_amd64.whl", hash = "sha256:bae7de2026cbfe3782c8b78b0db9cbfc5455e079f1937cb0ab8d133496ac55e1"},
-    {file = "msgpack-1.0.5-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:20c784e66b613c7f16f632e7b5e8a1651aa5702463d61394671ba07b2fc9e025"},
-    {file = "msgpack-1.0.5-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:266fa4202c0eb94d26822d9bfd7af25d1e2c088927fe8de9033d929dd5ba24c5"},
-    {file = "msgpack-1.0.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:18334484eafc2b1aa47a6d42427da7fa8f2ab3d60b674120bce7a895a0a85bdd"},
-    {file = "msgpack-1.0.5-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:57e1f3528bd95cc44684beda696f74d3aaa8a5e58c816214b9046512240ef437"},
-    {file = "msgpack-1.0.5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:586d0d636f9a628ddc6a17bfd45aa5b5efaf1606d2b60fa5d87b8986326e933f"},
-    {file = "msgpack-1.0.5-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a740fa0e4087a734455f0fc3abf5e746004c9da72fbd541e9b113013c8dc3282"},
-    {file = "msgpack-1.0.5-cp39-cp39-musllinux_1_1_aarch64.whl", hash = "sha256:3055b0455e45810820db1f29d900bf39466df96ddca11dfa6d074fa47054376d"},
-    {file = "msgpack-1.0.5-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:a61215eac016f391129a013c9e46f3ab308db5f5ec9f25811e811f96962599a8"},
-    {file = "msgpack-1.0.5-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:362d9655cd369b08fda06b6657a303eb7172d5279997abe094512e919cf74b11"},
-    {file = "msgpack-1.0.5-cp39-cp39-win32.whl", hash = "sha256:ac9dd47af78cae935901a9a500104e2dea2e253207c924cc95de149606dc43cc"},
-    {file = "msgpack-1.0.5-cp39-cp39-win_amd64.whl", hash = "sha256:06f5174b5f8ed0ed919da0e62cbd4ffde676a374aba4020034da05fab67b9164"},
-    {file = "msgpack-1.0.5.tar.gz", hash = "sha256:c075544284eadc5cddc70f4757331d99dcbc16b2bbd4849d15f8aae4cf36d31c"},
-]
-
-[[package]]
 name = "mypy"
 version = "1.4.1"
 description = "Optional static typing for Python"
@@ -1279,7 +1188,7 @@ pyyaml = "*"
 name = "pymongo"
 version = "4.4.1"
 description = "Python driver for MongoDB <http://www.mongodb.org>"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "pymongo-4.4.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:bbdd6c719cc2ea440d7245ba71ecdda507275071753c6ffe9c8232647246f575"},
@@ -1858,7 +1767,15 @@ files = [
 docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
 testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy (>=0.9.1)", "pytest-ruff"]
 
+[extras]
+all = ["anyconfig-bson-backend", "anyconfig-cbor-backend", "anyconfig-cbor2-backend", "anyconfig-configobj-backend", "anyconfig-ion-backend"]
+bson = ["anyconfig-bson-backend"]
+cbor = ["anyconfig-cbor-backend"]
+cbor2 = ["anyconfig-cbor2-backend"]
+configobj = ["anyconfig-configobj-backend"]
+ion = ["anyconfig-ion-backend"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "3a6e7d884db8e475d17ce43973fea2488e3fee93ad2d7c1ee8e999b00cd61ae3"
+content-hash = "51dec2bd64c25d9e064c0b52a44f17eaedbee8a8c0acfa9b7403529b25cf55d1"

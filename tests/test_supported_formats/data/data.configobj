@@ -1,0 +1,8 @@
+[main]
+integer = 3735928559
+union_value = 0.2137
+collection_value = this, is, configzen
+[[incorporated_model]]
+string = Hello world!
+[[dict_value]]
+configzen = is this

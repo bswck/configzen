@@ -8,6 +8,7 @@ from typing import Union
 import bson
 import cbor
 import cbor2
+import configobj
 import msgpack
 import pytest
 import toml
@@ -46,6 +47,14 @@ def ini_compose(data):
     return fp.getvalue()
 
 
+def configobj_compose(data):
+    config = configobj.ConfigObj()
+    config.merge(data)
+    fp = io.BytesIO()
+    config.write(fp)
+    return fp.getvalue().decode()
+
+
 def shellvars_compose(data):
     output = ""
     for key, value in data.items():
@@ -62,6 +71,7 @@ def properties_compose(data):
 
 composer = {
     "ini": ini_compose,
+    "configobj": configobj_compose,
     "json": functools.partial(json.dumps, indent=4),
     "yaml": yaml.dump,
     "toml": toml.dumps,
@@ -107,8 +117,8 @@ def mock_data_fixture(request):
         (composer["cbor"], file_dir / "data.cbor", True),
         (composer["shellvars"], file_dir / "data.shellvars", False),
         (composer["properties"], file_dir / "data.properties", False),
-        # Ones below are unsupported due to anyconfig...
-        # (composer["ion"], file_dir / "data.ion", True),
+        (composer["ion"], file_dir / "data.ion", True),
+        (composer["configobj"], file_dir / "data.configobj", False),
         # (composer["msgpack"], file_dir / "data.msgpack", True),
     ],
 )
@@ -125,5 +135,3 @@ def data_file(request, mock_data):
     else:
         dest_file.write_text(dumper(mock_data))
     yield dest_file
-    # if os_dependent:
-    #     dest_file.unlink()

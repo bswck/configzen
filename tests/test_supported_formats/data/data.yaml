@@ -1,0 +1,11 @@
+main:
+  collection_value:
+  - this
+  - is
+  - configzen
+  dict_value:
+    configzen: is this
+  incorporated_model:
+    string: Hello world!
+  integer: 3735928559
+  union_value: 0.2137
