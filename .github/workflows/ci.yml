@@ -29,4 +29,4 @@ jobs:
         pylint configzen/ --fail-under=9
     - name: Run tests
       run: >-
-        pytest -v tests/
+        export PYTHONPATH=. && pytest -v tests/
