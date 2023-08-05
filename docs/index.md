@@ -252,6 +252,97 @@ DatabaseConfig(host=IPv4Address('127.0.0.1'), port=8000)
 You do not have to pass a variable name to `@include`, though. `@include` lets you overwrite the main interpolation namespace
 or one with a separate name (here: `app_config`) with configuration models, dictionaries and their factories.
 
+
+### Modular configuration
+
+#### Wrapping modules in-place
+
+You can wrap modules in-place with configuration models:
+
+
+1) Without writing a model class:
+
+```python
+# config.py
+from configzen import ConfigModule
+
+# Annotate config fields
+HOST: str = "localhost"
+PORT: int = 8000
+
+ConfigModule.wrap_this_module()
+```
+
+2) With a model class:
+
+```python
+# config.py
+from configzen import ConfigModel
+
+# Annotations are optional
+HOST = "localhost"
+PORT = 8000
+
+class AppConfig(ConfigModel):
+    HOST: str
+    PORT: int
+
+AppConfig.wrap_this_module()
+```
+
+Now values `HOST` and `PORT` will be validated as `str` and `int` data types, respectively:
+
+```python
+>>> import config  # <configuration module 'config' from 'config.py'>
+>>> config.HOST
+'localhost'
+>>> config.PORT
+8000
+>>> config.PORT = "8000"
+>>> config.PORT
+8000
+>>> config.PORT = "abc"
+Traceback (most recent call last):
+  ...
+```
+
+#### Wrapping interchangeable modules
+
+You can wrap modules outside them with configuration models:
+
+```python
+# setup.py
+from configzen import ConfigModel
+
+class AppConfig(ConfigModel):
+    HOST: str = "localhost"
+    PORT: int = 8000
+
+config_model = AppConfig.wrap_module("config")
+```
+
+```py
+# config.py
+HOST: str = "0.0.0.0"
+PORT: int = 443
+```
+
+```python
+>>> from setup import config_model
+>>> config_model.HOST
+'0.0.0.0'
+>>> config_model.PORT
+443
+>>> config_model.PORT = "8000"
+>>> config_model.PORT
+8000
+>>> import config
+>>> config.HOST
+'0.0.0.0'
+>>> config.PORT
+8000
+```
+
 ## Supported file formats
 
 _configzen_ uses [anyconfig](https://pypi.org/project/anyconfig/) to serialize and deserialize data and does not operate on any protocol-specific entities.
@@ -292,21 +383,27 @@ In order to use _configzen_ in your project, install it with your package manage
 pip install configzen
 ```
 
-If you are willing to contribute to the project, which is awesome, simply clone the repository and install its
+If you are willing to contribute to _configzen_, which is awesome, simply clone this repository and install its
 dependencies with [poetry](https://python-poetry.org/):
 
 ```bash
 poetry install --with dev
 ```
+After that, install the [pre-commit](https://pre-commit.com/) hooks:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+And you are good to go.
+
+Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose) whenever
+you encounter a bug or have a feature request or [submit a pull request](https://github.com/bswck/configzen/compare) with your changes.
 
 ## License
 
 [MIT License](https://choosealicense.com/licenses/mit/)
 
-## Contributing
-
-Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose)
-or [submit a pull request](https://github.com/bswck/configzen/compare).
 
 ## Credits
 
@@ -314,5 +411,4 @@ or [submit a pull request](https://github.com/bswck/configzen/compare).
 
 ## Author
 
-* [bswck](https://github.com/bswck) (contact: bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck#8238`)
-
+* [bswck](https://github.com/bswck) (contact: bswck.dev@gmail.com or via [Discord](https://discord.com/) `bswck`)
