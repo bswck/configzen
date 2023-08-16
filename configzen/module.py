@@ -3,12 +3,9 @@ from __future__ import annotations
 import inspect
 import sys
 import types
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import Any, Generic, cast
 
 from configzen.typedefs import ConfigModelT
-
-if TYPE_CHECKING:
-    from configzen import ConfigModel
 
 __all__ = ("ConfigModule",)
 
@@ -26,8 +23,8 @@ class ConfigModule(types.ModuleType, Generic[ConfigModelT]):
         module_vars: dict[str, Any] | None = None,
         doc: str | None = None,
     ) -> None:
-        object.__setattr__(self, f"_{ConfigModule.__name__}__model", model)
-        object.__setattr__(self, f"_{ConfigModule.__name__}__vars", module_vars)
+        object.__setattr__(self, "_ConfigModule__model", model)
+        object.__setattr__(self, "_ConfigModule__vars", module_vars)
         object.__setattr__(model, MODULE, self)
         super().__init__(name=name, doc=doc)
         parts = name.split(".")
@@ -41,7 +38,7 @@ class ConfigModule(types.ModuleType, Generic[ConfigModelT]):
         sys.modules[name] = self
 
     def __getattribute__(self, name: str) -> Any:
-        if name.startswith(f"_{ConfigModule.__name__}__"):
+        if name.startswith("_ConfigModule__"):
             return object.__getattribute__(self, name)
 
         model = self.__model
@@ -55,10 +52,7 @@ class ConfigModule(types.ModuleType, Generic[ConfigModelT]):
 
     def __setattr__(self, key: str, value: Any) -> None:
         model = self.get_model()
-        if (
-            not key.startswith(f"_{ConfigModule.__name__}__")
-            and key in model.__fields__
-        ):
+        if not key.startswith("_ConfigModule__") and key in model.__fields__:
             setattr(model, key, value)
         self.__vars[key] = value
 
@@ -101,9 +95,7 @@ class ConfigModule(types.ModuleType, Generic[ConfigModelT]):
                 module_values[key] = value
 
         return cls(
-            model=cast("type[ConfigModelT]", model_class).parse_obj(
-                {**module_values, **values},
-            ),
+            model=model_class.parse_obj({**module_values, **values}),
             module_vars=module_vars,
             name=module_vars["__name__"],
             doc=module_vars["__doc__"],
