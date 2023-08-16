@@ -385,12 +385,18 @@ If you are willing to contribute to _configzen_, which is awesome, simply clone 
 dependencies with [poetry](https://python-poetry.org/):
 
 ```bash
-poetry install --with dev
+poetry install --with dev --all-extras
 ```
 After that, install the [pre-commit](https://pre-commit.com/) hooks:
 
 ```bash
 pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+You might also need to install required stubs:
+
+```bash
+mypy configzen/ --strict || (echo y | mypy --install-types)
 ```
 
 And you are good to go.
