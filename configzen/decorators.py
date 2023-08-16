@@ -114,7 +114,6 @@ def with_field_hook(
     -------
     The loading result class.
     """
-
     if cls is None:
         return functools.partial(with_field_hook, func)
 
@@ -134,6 +133,8 @@ def with_exporter(
     ----------
     func
         The exporter function.
+    **predefined_kwargs
+        The default keyword arguments to pass to the exporter function.
     cls
         The type to register the exporter for.
     """
@@ -193,6 +194,8 @@ def with_async_exporter(
     ----------
     func
         The exporter function.
+    **predefined_kwargs
+        The default keyword arguments to pass to the exporter function.
     cls
         The type to register the exporter for.
     """

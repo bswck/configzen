@@ -13,7 +13,7 @@ def detached_context_function(
     func: Callable[P, T],
 ) -> Callable[P, T]:
     """
-    Decorator to copy a function call context automatically (context isolation)
+    Copy a function call context automatically (context isolation)
     to prevent collisions.
 
     This decorator will copy the current context and run the function
@@ -44,7 +44,7 @@ def detached_context_run(
     *args: Any,
     **kwargs: Any,
 ) -> T:
-    """Utility for running a function in an isolated context."""
+    """Run a function in an isolated context."""
     context = contextvars.copy_context()
     return context.run(func, *args, **kwargs)
 
@@ -54,5 +54,5 @@ def detached_context_await(
     *args: Any,
     **kwargs: Any,
 ) -> asyncio.Task[T]:
-    """Utility for awaiting a coroutine in an isolated context."""
+    """Await a coroutine in an isolated context."""
     return asyncio.create_task(func(*args, **kwargs))

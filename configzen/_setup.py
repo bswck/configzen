@@ -28,7 +28,7 @@ for obj_type, obj_encoder in ENCODERS_BY_TYPE.items():
 @export_hook.register(pathlib.PureWindowsPath)
 def _export_windows_path(obj: pathlib.WindowsPath | pathlib.PureWindowsPath) -> str:
     """
-    This hook makes non-absolute paths in configurations cross-platform.
+    Make non-absolute paths in configurations cross-platform by converting to POSIX.
 
     Parameters
     ----------

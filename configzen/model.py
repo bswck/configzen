@@ -197,7 +197,7 @@ def _get_object_state(obj: Any) -> dict[str, Any]:
 @functools.singledispatch
 def export_hook(obj: Any) -> Any:
     """
-    Convert a value to a format that can be safely serialized.
+    Convert a value to a format that can be safely serialized & deserialized.
 
     This function is used to convert values that are not supported by
     `anyconfig` to a format that can be safely serialized. It is used
@@ -221,7 +221,7 @@ def export_hook(obj: Any) -> Any:
 
 
 @functools.singledispatch
-def _export_namedtuple(obj: tuple[Any, ...]) -> Any:
+    """Convert a namedtuple to a format that can be safely serialized & deserialized."""
     # Initially I wanted it to be export_hook(obj._asdict()), but
     # pydantic doesn't seem to be friends with custom NamedTuple-s.
     return export_hook(list(obj))
@@ -311,6 +311,9 @@ def export_model(obj: Any, **kwargs: Any) -> dict[str, Any]:
     Parameters
     ----------
     obj
+        The model to export.
+    **kwargs
+        Additional keyword arguments to pass to `obj.dict()`.
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return obj.export(**kwargs)
@@ -327,6 +330,9 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     Parameters
     ----------
     obj
+        The model to export.
+    **kwargs
+        Additional keyword arguments to pass to `obj.dict()`.
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return await obj.export_async(**kwargs)
@@ -469,7 +475,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         create_if_missing: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Parameters
+        """
+        Parameters
         ----------
         resource
             The URL to the configuration file, or a file-like object.
@@ -486,6 +493,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         uses_binary_data
             Whether to treat the data as binary.
             Defaults to True for formats listed in `ConfigAgent.BINARY_DATA_PARSERS`.
+        processor_class
+            The processor class to use. Defaults to `configzen.Processor`.
         **kwargs
             Additional keyword arguments to pass to
             `anyconfig.loads()` and `anyconfig.dumps()`.
@@ -543,7 +552,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     @resource.setter
     def resource(self, value: NormalizedResourceT) -> None:
         """
-        The resource of the configuration.
+        Get the resource of the configuration.
 
         This can be a file path, a URL, or a file-like object.
 
@@ -704,6 +713,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         parser_name
             The name of the anyconfig parser to use for loading the configuration.
         preprocess
+            Whether to preprocess the configuration (handle ^extend: directives etc.).
         **kwargs
             Additional keyword arguments to pass to `anyconfig.loads()`.
 
@@ -734,6 +744,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         parser_name
             The name of the anyconfig parser to use for loading the configuration.
         preprocess
+            Whether to preprocess the configuration (handle ^extend: directives etc.).
         **kwargs
             Additional keyword arguments to pass to `anyconfig.loads()`.
 
@@ -865,9 +876,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     @property
     def uses_binary_data(self) -> bool:
-        """
-        Whether the resource uses bytes for storing data, not str.
-        """
+        """Whether the resource uses bytes for storing data, not str."""
         return self._uses_binary_data or self.parser_name in self.BINARY_DATA_PARSERS
 
     def open_resource(self, **kwds: Any) -> ConfigIO:
@@ -946,7 +955,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
         """
-        Called by the processor to open a configuration resource
+        Open a configuration resource, while preprocessing,
         with the reading intention.
 
         Parameters
@@ -965,7 +974,7 @@ class ConfigAgent(Generic[ConfigModelT]):
 
     def processor_open_resource_async(self, **kwargs: Any) -> AsyncConfigIO:
         """
-        Called by the processor to open a configuration resource asynchronously
+        Open a configuration resource asynchronously, while preprocessing,
         with the reading intention.
 
         Parameters
@@ -1135,8 +1144,11 @@ class ConfigAgent(Generic[ConfigModelT]):
         Parameters
         ----------
         route_class
+            The class to use for the route.
         route_separator
+            The separator to use for the route.
         ctx
+            The directive context.
 
         Returns
         -------
@@ -1179,10 +1191,10 @@ class ConfigAgent(Generic[ConfigModelT]):
         Parameters
         ----------
         file_extension
+            The file extension to register.
         parser_name
+            The name of the anyconfig parser to use for loading the configuration.
 
-        Returns
-        -------
         """
         cls.EXTRA_FILE_EXTENSIONS[file_extension] = parser_name
 
@@ -1207,7 +1219,9 @@ def at(
     route
         The route to the item.
     converter_func
+        The function to use for converting an object to a dictionary.
     agent
+        The configuration agent.
 
     Returns
     -------
@@ -2111,6 +2125,8 @@ class ConfigModel(
         route
             Route to access the item. If None, the whole configuration is returned.
         default
+            The default value to return if the item is not found.
+            If not specified, an exception is raised (ConfigAccessError).
         """
         if route is None:
             return self
@@ -2157,6 +2173,7 @@ class ConfigModel(
     ) -> ConfigModelT:
         """
         Load the configuration file.
+
         To reload the configuration, use the `reload()` method.
 
         Parameters
@@ -2392,7 +2409,8 @@ class ConfigModel(
 
     async def write_async(self, blob: str | bytes, **kwargs: Any) -> int:
         """
-        Overwrite the configuration file asynchronously with the given string or bytes.
+        Overwrite the configuration file asynchronously
+        with the given string or bytes.
 
         Parameters
         ----------
@@ -2512,7 +2530,7 @@ class ConfigModel(
     @classmethod
     def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
         """
-        Called when this configuration model is being initialized as a field
+        Set up this configuration model as it is being initialized as a field
         of some other configuration model.
         """
         context = current_context.get()

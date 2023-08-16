@@ -113,6 +113,11 @@ def interpolate(
     _closest_ns: dict[str, Any],
     _target_type: type[Any],
 ) -> Any:
+    """
+    Interpolate a value.
+
+    Usually applies to strings, but can be extended to other types.
+    """
     return value
 
 

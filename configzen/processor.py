@@ -36,7 +36,7 @@ def directive(
     asynchronous: bool | None = None,
 ) -> Callable[..., Any]:
     """
-    Decorator for creating processor directives.
+    Create a processor directive (a.k.a. preprocessing directive).
 
     Parameters
     ----------
@@ -239,8 +239,9 @@ class BaseProcessor(Generic[ConfigModelT]):
 
     async def preprocess_async(self) -> dict[str, Any]:
         """
-        Parse the dictionary config and return the parsed config,
-        ready for instantiating the model.
+        Parse the dictionary config and return the parsed config dict.
+
+        The parsed config dict is ready for instantiating the model.
 
         Returns
         -------
@@ -674,7 +675,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata: ExportMetadata[ConfigModelT],
     ) -> None:
         """
-        Exports model state preserving substition directive calls in the model state.
+        Export model state preserving substition directive calls in the model state.
 
         Parameters
         ----------
@@ -749,12 +750,15 @@ class Processor(BaseProcessor[ConfigModelT]):
         metadata: ExportMetadata[ConfigModelT],
     ) -> None:
         """
-        Exports model state preserving substition directive calls in the model state.
+        Export model state preserving substition directive calls in the model state.
 
         Parameters
         ----------
         metadata
+            Metadata for exporting that contains initialloading data,
+            such as the initial key order, agent used, context, route etc.
         state
+            The state to export.
         """
         from configzen.model import CONTEXT, at, export_hook
 

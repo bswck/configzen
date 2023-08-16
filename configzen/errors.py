@@ -1,4 +1,4 @@
-"""This module contains all the custom errors raised by _configzen_."""
+"""All the custom errors raised by _configzen_."""
 
 from __future__ import annotations
 
