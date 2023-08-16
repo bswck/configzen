@@ -93,20 +93,21 @@ class ConfigModule(types.ModuleType, Generic[ConfigModelT]):
                     __ns[key] = module_vars[key]  # type: ignore[index]
                 del __ns
 
-            model_class = cast(type[ConfigModelT], ModuleConfigModel)
+            model_class = cast("type[ConfigModelT]", ModuleConfigModel)
 
         module_values = {}
         for key, value in module_vars.items():
             if key in {field.alias for field in model_class.__fields__.values()}:
                 module_values[key] = value
 
-        config_module = cls(
-            model=cast(ConfigModelT, model_class).parse_obj(module_values | values),
+        return cls(
+            model=cast("type[ConfigModelT]", model_class).parse_obj(
+                {**module_values, **values},
+            ),
             module_vars=module_vars,
             name=module_vars["__name__"],
             doc=module_vars["__doc__"],
         )
-        return config_module
 
     @classmethod
     def wrap_this_module(

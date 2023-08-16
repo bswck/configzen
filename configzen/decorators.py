@@ -148,15 +148,18 @@ def with_exporter(
     if func is None:
 
         def func(obj: Any, **kwargs: Any) -> Any:
-            kwargs |= predefined_kwargs
+            kwargs.update(predefined_kwargs)
             return obj.export(**kwargs)
 
         export_model.register(cls, func)
 
         if export_model_async.dispatch(cls) is export_model_async:
 
-            async def default_async_func(obj: Any, **kwargs: Any) -> Any:
-                kwargs |= predefined_kwargs
+            async def default_async_func(
+                obj: Any,
+                **kwargs: Any,
+            ) -> Any:
+                kwargs.update(predefined_kwargs)
                 return await obj.export_async(**kwargs)
 
             export_model_async.register(cls, default_async_func)
@@ -164,10 +167,13 @@ def with_exporter(
         export_model.register(cls, func)
         if export_model_async.dispatch(cls) is export_model_async:
 
-            async def default_async_func(obj: Any, **kwargs: Any) -> Any:
+            async def default_async_func(
+                obj: Any,
+                **kwargs: Any,
+            ) -> Any:
                 nonlocal func
                 if TYPE_CHECKING:
-                    func = cast(Callable[..., dict[str, Any]], func)
+                    func = cast("Callable[..., dict[str, Any]]", func)
 
                 return func(obj, **kwargs)
 
@@ -201,7 +207,7 @@ def with_async_exporter(
     if func is None:
 
         async def default_async_func(obj: Any, **kwargs: Any) -> Any:
-            kwargs |= predefined_kwargs
+            kwargs.update(predefined_kwargs)
             return await obj.export_async(**kwargs)
 
         export_model_async.register(cls, default_async_func)

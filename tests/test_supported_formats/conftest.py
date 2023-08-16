@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import configparser
 import functools
 import io
 import json
 import os
-from typing import Union
+from typing import Dict, List, Union  # We're 3.8+
 
 import bson
 import cbor
@@ -32,8 +34,8 @@ class SectionModel(ConfigModel):
     integer: int
     incorporated_model: IncorporatedModel = IncorporatedModel(string="Hello world!")
     union_value: Union[bool, float]
-    collection_value: list[str]
-    dict_value: dict[str, str] = {"configzen": "is this"}
+    collection_value: List[str]
+    dict_value: Dict[str, str] = {"configzen": "is this"}
 
 
 class MockModel(ConfigModel):

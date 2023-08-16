@@ -2,8 +2,14 @@ import contextlib
 import os
 import pathlib
 import sys
-from collections.abc import Mapping, Set
-from typing import TYPE_CHECKING, Any, Optional, TextIO, TypeVar, Union
+from typing import TYPE_CHECKING, Any, List, Optional, TextIO, TypeVar, Union
+
+if sys.version_info < (3, 9):
+    from typing import Mapping
+    from typing import Set as AbstractSet
+else:
+    from collections.abc import Mapping
+    from collections.abc import Set as AbstractSet
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec, TypeAlias
@@ -22,15 +28,19 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 ConfigModelT = TypeVar("ConfigModelT", bound="ConfigModel")
-ConfigRouteLike: TypeAlias = Union[str, list[str], "ConfigRoute"]
+ConfigRouteLike: TypeAlias = Union[str, List[str], "ConfigRoute"]
 
-ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
+if sys.version_info >= (3, 9) or TYPE_CHECKING:
+    ConfigIO: TypeAlias = contextlib.AbstractContextManager[TextIO]
+else:
+    ConfigIO: TypeAlias = contextlib.AbstractContextManager
+
 AsyncConfigIO: TypeAlias = "AiofilesContextManager[None, None, AsyncTextIOWrapper]"
 RawResourceT: TypeAlias = Union[ConfigIO, str, int, os.PathLike, pathlib.Path]
 NormalizedResourceT: TypeAlias = Union[ConfigIO, str, int, pathlib.Path]
 IncludeExcludeT: TypeAlias = Optional[
     Union[
-        Set[Union[int, str]],
+        AbstractSet[Union[int, str]],
         Mapping[Union[int, str], Any],
     ]
 ]

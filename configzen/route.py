@@ -36,13 +36,14 @@ class ConfigRoute:
         raise TypeError(f"Invalid route type {type(route)!r}")
 
     @classmethod
-    def _decompose(cls, route: str) -> list[str]:  # noqa: C901, PLR0912
+    def _decompose(cls, route: str) -> list[str]:
         tok_dot = cls.TOK_DOT
         tok_escape = cls.TOK_ESCAPE
         tok_dle_enter = cls.TOK_DOTLISTESC_ENTER
         tok_dle_exit = cls.TOK_DOTLISTESC_EXIT
 
-        route = route.removesuffix(tok_dot) + tok_dot
+        if not route.endswith(tok_dot):
+            route += tok_dot
 
         part = ""
         dle_ctx: int | None = None

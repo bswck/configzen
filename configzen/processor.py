@@ -246,7 +246,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         -------
         The parsed config.
         """
-        return cast(dict[str, Any], await self._preprocess_async(self.dict_config))
+        return cast("dict[str, Any]", await self._preprocess_async(self.dict_config))
 
     def preprocess(self) -> dict[str, Any]:
         """
@@ -257,7 +257,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         -------
         The parsed config.
         """
-        return cast(dict[str, Any], self._preprocess(self.dict_config))
+        return cast("dict[str, Any]", self._preprocess(self.dict_config))
 
     def _preprocess(self, container: Any) -> Any:
         if not is_dict_like(container):
@@ -268,7 +268,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         result: dict[str, Any] = {}
 
         for key, value in sorted(
-            cast(dict[str, Any], container).items(),
+            cast("dict[str, Any]", container).items(),
             key=lambda item: item[0] == self.directive_prefix,
         ):
             if key.startswith(self.extension_prefix):
@@ -280,7 +280,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                         f"dictionary sections but item at {actual_key!r} "
                         f"is not a dictionary"
                     )
-                replacement = overridden | value
+                replacement = {**overridden, **value}
                 result[actual_key] = self._preprocess(replacement)
             elif key.startswith(self.directive_prefix):
                 directive_name = parse_directive_call(self.directive_prefix, key)
@@ -295,7 +295,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                 )
                 self._call_directive(context)
                 new_container = self._preprocess(context.container)
-                result |= new_container
+                result.update(new_container)
             else:
                 result[key] = self._preprocess(value)
         return result
@@ -309,7 +309,7 @@ class BaseProcessor(Generic[ConfigModelT]):
         result: dict[str, Any] = {}
 
         for key, value in sorted(
-            cast(dict[str, Any], container).items(),
+            cast("dict[str, Any]", container).items(),
             key=lambda item: item[0] == self.directive_prefix,
         ):
             if key.startswith(self.extension_prefix):
@@ -336,7 +336,7 @@ class BaseProcessor(Generic[ConfigModelT]):
                 )
                 await self._call_directive_async(context)
                 new_container = await self._preprocess_async(context.container)
-                result |= new_container
+                result.update(new_container)
             else:
                 result[key] = await self._preprocess_async(value)
         return result
@@ -652,18 +652,20 @@ class Processor(BaseProcessor[ConfigModelT]):
                 )
 
         context: Context[ConfigModelT] = Context(agent)
-        ctx.container = source | ctx.container
+        ctx.container = {**source, **ctx.container}
 
         if preserve:
-            ctx.container |= {
-                CONTEXT: context,
-                EXPORT: ExportMetadata(
-                    route=str(route),
-                    context=context,
-                    preprocess=preprocess,
-                    key_order=list(ctx.container),
-                ),
-            }
+            ctx.container.update(
+                {
+                    CONTEXT: context,
+                    EXPORT: ExportMetadata(
+                        route=str(route),
+                        context=context,
+                        preprocess=preprocess,
+                        key_order=list(ctx.container),
+                    ),
+                },
+            )
 
     @classmethod
     def _export(  # noqa: C901
@@ -828,7 +830,7 @@ class Processor(BaseProcessor[ConfigModelT]):
     ) -> None:
         from configzen.model import export_hook
 
-        state |= overrides
+        state.update(overrides)
         extras: dict[str, Any] = {
             key: state.pop(key) for key in set(state) if key not in key_order
         }
@@ -839,12 +841,15 @@ class Processor(BaseProcessor[ConfigModelT]):
             if route:
                 resource = cls.route_separator.join((resource, route))
             # Put the substitution directive at the beginning of the state in-place.
-            state |= {substitution_directive: resource} | {
-                key: state.pop(key) for key in set(state)
-            }
+            state.update(
+                {
+                    substitution_directive: resource,
+                    **{key: state.pop(key) for key in set(state)},
+                },
+            )
 
         # Preserve the order of keys in the original configuration.
         for key in filter(state.__contains__, key_order):
             state[key] = state.pop(key)
 
-        state |= extras
+        state.update(extras)

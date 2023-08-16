@@ -191,7 +191,7 @@ def _get_object_state(obj: Any) -> dict[str, Any]:
     state = obj
     if not isinstance(obj, dict):
         state = obj.__dict__  # avoidance of vars() is intended
-    return cast(dict[str, Any], state)
+    return cast("dict[str, Any]", state)
 
 
 @functools.singledispatch
@@ -314,7 +314,7 @@ def export_model(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return obj.export(**kwargs)
-    return cast(dict[str, Any], obj.dict(**kwargs))
+    return cast("dict[str, Any]", obj.dict(**kwargs))
 
 
 @functools.singledispatch
@@ -330,18 +330,23 @@ async def export_model_async(obj: Any, **kwargs: Any) -> dict[str, Any]:
     """
     if isinstance(obj, ConfigModel) and not _exporting.get():
         return await obj.export_async(**kwargs)
-    return cast(dict[str, Any], await obj.dict_async(**kwargs))
+    return cast("dict[str, Any]", await obj.dict_async(**kwargs))
 
 
 def _delegate_ac_options(
-    load_options: dict[str, Any], dump_options: dict[str, Any], options: dict[str, Any]
+    load_options: dict[str, Any],
+    dump_options: dict[str, Any],
+    options: dict[str, Any],
+    *,
+    dump_prefix: str = "dump_",
+    load_prefix: str = "load_",
 ) -> None:
     for key, value in options.items():
-        if key.startswith("dump_"):
-            actual_key = key.removeprefix("dump_")
+        if key.startswith(dump_prefix):
+            actual_key = key[len(dump_prefix) :]  #  key.removeprefix(dump_prefix)
             targets = [dump_options]
-        elif key.startswith("load_"):
-            actual_key = key.removeprefix("load_")
+        elif key.startswith(load_prefix):
+            actual_key = key[len(load_prefix) :]  #  key.removeprefix(load_prefix)
             targets = [load_options]
         else:
             actual_key = key
@@ -662,7 +667,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         if parser_name is None:
             msg = "Cannot read configuration because `parser_name` was not specified"
             raise UnspecifiedParserError(msg)
-        kwargs = self.load_options | kwargs
+        kwargs = {**self.load_options, **kwargs}
         try:
             loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
                 blob,
@@ -767,8 +772,11 @@ class ConfigAgent(Generic[ConfigModelT]):
             parser_name = self.parser_name
         export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
         if parser_name == "json" and self.use_pydantic_json:
-            export_kwargs |= filter_options(
-                self.JSON_KWARGS, self.dump_options | kwargs
+            export_kwargs.update(
+                filter_options(
+                    self.JSON_KWARGS,
+                    {**self.dump_options, **kwargs},
+                ),
             )
             _exporting.set(True)  # noqa: FBT003
             return detached_context_run(config.json, **export_kwargs)
@@ -801,8 +809,11 @@ class ConfigAgent(Generic[ConfigModelT]):
             parser_name = self.parser_name
         export_kwargs = filter_options(self.EXPORT_KWARGS, kwargs)
         if parser_name == "json" and self.use_pydantic_json:
-            export_kwargs |= filter_options(
-                self.JSON_KWARGS, self.dump_options | kwargs
+            export_kwargs.update(
+                filter_options(
+                    self.JSON_KWARGS,
+                    {**self.dump_options, **kwargs},
+                ),
             )
             _exporting.set(True)  # noqa: FBT003
             return await detached_context_await(config.json_async, **export_kwargs)
@@ -839,7 +850,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 f"for agent {self}"
             )
             raise UnspecifiedParserError(msg)
-        kwargs = self.dump_options | kwargs
+        kwargs = {**self.dump_options, **kwargs}
         return anyconfig.dumps(export_hook(data), ac_parser=parser_name, **kwargs)
 
     @property
@@ -978,7 +989,7 @@ class ConfigAgent(Generic[ConfigModelT]):
     ) -> dict[str, Any]:
         if not kwargs:
             kwargs = self.default_kwargs
-        new_kwargs = cast(dict[str, Any], kwargs).copy()
+        new_kwargs = cast("dict[str, Any]", kwargs).copy()
         if not self.is_url:
             if method == "read":
                 new_kwargs.setdefault("mode", "rb" if self.uses_binary_data else "r")
@@ -1145,7 +1156,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         elif isinstance(ctx.snippet, int):
             args.append(ctx.snippet)
         elif is_dict_like(ctx.snippet):
-            kwargs |= ctx.snippet
+            kwargs.update(ctx.snippet)
         elif is_list_like(ctx.snippet):
             args += list(ctx.snippet)
         else:
@@ -1755,9 +1766,15 @@ class ConfigModelMetaclass(ModelMetaclass):
         namespace: dict[str, Any],
         **kwargs: Any,
     ) -> type:
-        namespace |= dict.fromkeys(
-            (EXPORT, CONTEXT, LOCAL, TOKEN, MODULE), pydantic.PrivateAttr()
-        ) | {INTERPOLATION_TRACKER: pydantic.PrivateAttr(default_factory=dict)}
+        namespace.update(
+            {
+                **dict.fromkeys(
+                    (EXPORT, CONTEXT, LOCAL, TOKEN, MODULE),
+                    pydantic.PrivateAttr(),
+                ),
+                INTERPOLATION_TRACKER: pydantic.PrivateAttr(default_factory=dict),
+            },
+        )
 
         if namespace.get(INTERPOLATION_INCLUSIONS) is None:
             namespace[INTERPOLATION_INCLUSIONS] = {}
@@ -1874,7 +1891,7 @@ class ConfigModel(
         if tok:
             context = current_context.get()
             if context is not None:
-                context.interpolation_namespace |= self.dict()
+                context.interpolation_namespace.update(self.dict())
             current_context.reset(tok)
 
     def export(self, **kwargs: Any) -> dict[str, Any]:
@@ -1940,12 +1957,13 @@ class ConfigModel(
         return self.__config__.json_dumps(data, default=encoder, **dumps_kwargs)
 
     def _iter(  # type: ignore[override]
-        self, **kwargs: Any
+        self,
+        **kwargs: Any,
     ) -> Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                state |= [self._export_iter_hook(key, value)]
+                state.update([self._export_iter_hook(key, value)])
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
@@ -1954,16 +1972,20 @@ class ConfigModel(
         else:
             yield from super()._iter(**kwargs)
 
-    async def _iter_async(self, **kwargs: Any) -> Iterator[tuple[str, Any]]:
+    async def _iter_async(
+        self,
+        **kwargs: Any,
+    ) -> Iterator[tuple[str, Any]]:
         if kwargs.get("to_dict", False) and _exporting.get():
             state: dict[str, Any] = {}
             for key, value in super()._iter(**kwargs):
-                state |= [self._export_iter_hook(key, value)]
+                state.update([self._export_iter_hook(key, value)])
             metadata = getattr(self, EXPORT, None)
             if metadata:
                 context = get_context(self)
                 await context.agent.processor_class.export_async(
-                    state, metadata=metadata
+                    state,
+                    metadata=metadata,
                 )
             return ((key, value) for key, value in state.items())
         return super()._iter(**kwargs)
@@ -2167,7 +2189,7 @@ class ConfigModel(
             cls.update_forward_refs()
         config = local.run(agent.read, config_class=cls, **kwargs)
         object.__setattr__(config, LOCAL, local)
-        context = cast(Context[ConfigModelT], local.get(current_context))
+        context = cast("Context[ConfigModelT]", local.get(current_context))
         context.owner = config
         context.initial_state = config.__dict__
         return config
@@ -2216,7 +2238,7 @@ class ConfigModel(
         )
         config = await reader
         object.__setattr__(config, LOCAL, local)
-        context = cast(Context[ConfigModelT], local.get(current_context))
+        context = cast("Context[ConfigModelT]", local.get(current_context))
         context.owner = config
         return config
 
@@ -2277,7 +2299,7 @@ class ConfigModel(
             changed = await context.agent.read_async(config_class=type(self), **kwargs)
         else:
             changed = await _partial_reload_async(
-                cast(ConfigAt[ConfigModelT], context.at), **kwargs
+                cast("ConfigAt[ConfigModelT]", context.at),
             )
         state = changed.__dict__
         context.initial_state = state
@@ -2310,7 +2332,7 @@ class ConfigModel(
             context.initial_state = self.__dict__
             return result
         return _partial_save(
-            cast(ConfigAt[ConfigModelT], context.at),
+            cast("ConfigAt[ConfigModelT]", context.at),
             write_kwargs=write_kwargs,
             **kwargs,
         )
@@ -2342,7 +2364,7 @@ class ConfigModel(
             context.initial_state = self.__dict__
             return result
         return await _partial_save_async(
-            cast(ConfigAt[ConfigModelT], context.at),
+            cast("ConfigAt[ConfigModelT]", context.at),
             write_kwargs=write_kwargs,
             **kwargs,
         )
@@ -2497,7 +2519,8 @@ class ConfigModel(
         if context is not None:
             subcontext = context.enter(field.name)
             tok = current_context.set(subcontext)
-            return _get_object_state(value) | {
+            return {
+                **_get_object_state(value),
                 TOKEN: tok,
                 LOCAL: contextvars.copy_context(),
             }
