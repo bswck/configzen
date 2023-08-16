@@ -27,6 +27,9 @@ jobs:
     - name: Analyse the code with pylint
       run: >-
         pylint configzen/ --fail-under=9
+    - name: Analyse the code with ruff
+      run: >-
+        ruff configzen/
     - name: Run tests
       run: >-
         export PYTHONPATH=. && pytest -v tests/

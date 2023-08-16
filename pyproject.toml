@@ -62,59 +62,105 @@ mkdocstrings-python = "^1.1.2"
 jinja2 = "<3.1.0"
 
 [tool.ruff]
-target-version = "py39"
-select = [
-    "F",
-    "E",
-    "W",
-    "I",
-    "UP",
-    "N",
-    "S",
-    "C",
-    "B",
-    "A",
-    "T",
-    "Q",
-    "RUF",
-    "YTT",
-    "BLE",
-    "ANN",
-    "FBT",
-    "PL",
-    "TRY",
-    "RSE",
-    "SLF",
-    "DTZ",
-    "EXE",
-    "ISC",
-    "ICN",
-    "G",
-    "INP",
-    "PIE",
-    "RET",
-    "SIM",
-    "TID",
-    "TCH",
-    "ARG",
-    "PTH",
-]
+select = ["ALL"]
+# To discuss the presented rationales, contact the author: @bswck.
 ignore = [
-    "DTZ005",
-    "INP001",
-    "TCH003",
+    # Description: Missing type annotation for self in method
+    # Rationale: It is mostly redundant, as is for ANN102.
     "ANN101",
+
+    # Description: Missing type annotation for cls in method
+    # Rationale: It is mostly redundant, as is for ANN101.
     "ANN102",
+
+    # Description: Dynamically typed expressions (typing.Any) are disallowed
+    # Rationale:
+    #  The library operates on lots of user-end, dynamically typed data structures.
+    #  When it is possible, use object instead of Any when typing only-input values
+    #  whose extra (to the object class) methods are not used.
     "ANN401",
-    "I001",
-    "TID252",
-    "T201",
-    "B905",
+
+    # Description: Function is too complex (14 > 10)
+    # Rationale:
+    #  Too complex functions very often are unimprovable without sacrificing readability.
+    #  This rule is disabled for now, but might be enabled in the future.
+    "C901",
+
+    # Description: 1 blank line required before class docstring
+    # Rationale: D211 (no-blank-line-before-class) preferred.
+    "D203",
+
+    # Description: Multi-line docstring summary should start at the second line
+    # Rationale: D213 (multi-line-summary-second-line) preferred.
+    "D212",
+
+    # Description: Missing docstring in public module
+    # Rationale: To be removed after full-fledged docs are added.
+    "D100",
+
+    # Description: Missing docstring in public class
+    # Rationale: To be removed after full-fledged docs are added.
+    "D101",
+
+    # Description: Missing docstring in public method
+    # Rationale: To be removed after full-fledged docs are added.
+    "D102",
+
+    # Description: Missing docstring in public function
+    # Rationale: To be removed after full-fledged docs are added.
+    "D103",
+
+    # Description: Missing docstring in magic method
+    # Rationale:
+    #   Most undocumented magic methods docstrings
+    #   should default to their super versions.
+    "D105",
+
+    # Description: Missing docstring in public nested class
+    # Rationale: Nested classes can be described in their factory.
+    "D106",
+
+    # Description: Missing docstring in __init__
+    # Rationale: To be removed after full-fledged docs are added.
+    "D107",
+
+    # Description: 1 blank line required between summary line and description
+    # Rationale:
+    #   Some summaries are too long to fit one line and needs to be multiline.
+    #   That triggers this rule.
+    "D205",
+
+    # Description: Use .loc instead of .at.  If speed is important, use numpy.
+    # Rationale: This project does not use pandas (intentionally not ignoring whole PD).
+    "PD008",
+
+    # Description: Too many branches
+    # Rationale: To be removed before releasing 1.0.0.
+    "PLR0912",
+
+    # Description: Too many arguments to function call
+    # Rationale: This is often intentional and improves readability. Disabled for now.
+    "PLR0913",
+
+    # Description: Unnecessary variable assignment before return statement
+    # Rationale:
+    #   This is definitely not an anti-pattern as some may claim.
+    #   Assigning to a variable before returning might be a subtle hint to the reader
+    #   that the function is about to extend its functionality in the future.
+    "RET504",
+
+    # Description: Use of assert detected
+    # Rationale:
+    #   Asserts are not bad per se.
+    #   Just turn them off in production by using the -O flag if performance matters.
     "S101",
-    "TRY003",
-    "PLR2004",
+
+    # Description: Line contains TODO, consider resolving the issue
+    # Rationale: Thanks! I will.
+    "FIX002",
 ]
-fix = true
+# Always be careful. Use with caution.
+fix = false
 exclude = ["examples/", "tests/"]
 
 [tool.isort]
