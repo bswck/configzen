@@ -35,7 +35,8 @@ def with_export_hook(
 
 
 def with_export_hook(
-    func: Callable[[T], Any], cls: type[T] | None = None
+    func: Callable[[T], Any],
+    cls: type[T] | None = None,
 ) -> type[T] | functools.partial[type[T]]:
     """
     Register a pre-serialization converter function for a type.
@@ -96,7 +97,8 @@ def with_field_hook(
 
 
 def with_field_hook(
-    func: Callable[[type[T], Any], T], cls: type[T] | None = None
+    func: Callable[[type[T], Any], T],
+    cls: type[T] | None = None,
 ) -> type[T] | functools.partial[type[T]]:
     """
     Register a field hook for a type.

@@ -552,9 +552,12 @@ class Processor(BaseProcessor[ConfigModelT]):
         await self._substitute_async(ctx, preprocess=False, preserve=False)
 
     def _get_substitution_means(
-        self, ctx: DirectiveContext  # , *, preserve: bool
+        self,
+        ctx: DirectiveContext,  # , *, preserve: bool
     ) -> tuple[
-        ConfigAgent[ConfigModelT], ConfigAgent[ConfigModelT], ConfigRouteLike | None
+        ConfigAgent[ConfigModelT],
+        ConfigAgent[ConfigModelT],
+        ConfigRouteLike | None,
     ]:
         agent_class = type(self.agent)
 
@@ -567,7 +570,8 @@ class Processor(BaseProcessor[ConfigModelT]):
         #     raise ConfigPreprocessingError(msg)
 
         agent, route = agent_class.from_directive_context(
-            ctx, route_separator=self.route_separator
+            ctx,
+            route_separator=self.route_separator,
         )
 
         if agent.resource == self.agent.resource:
@@ -586,7 +590,11 @@ class Processor(BaseProcessor[ConfigModelT]):
         return actual_agent, agent, route
 
     def _substitute(
-        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
+        self,
+        ctx: DirectiveContext,
+        *,
+        preprocess: bool,
+        preserve: bool,
     ) -> None:
         agent, orig_agent, route = self._get_substitution_means(ctx)
 
@@ -603,7 +611,11 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
     async def _substitute_async(
-        self, ctx: DirectiveContext, *, preprocess: bool, preserve: bool
+        self,
+        ctx: DirectiveContext,
+        *,
+        preprocess: bool,
+        preserve: bool,
     ) -> None:
         agent, orig_agent, route = self._get_substitution_means(ctx)
 

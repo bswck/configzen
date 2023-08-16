@@ -66,7 +66,8 @@ class ConfigSyntaxError(ConfigError):
 
 @contextlib.contextmanager
 def formatted_syntax_error(
-    source: str, error_cls: type[ConfigSyntaxError] = ConfigSyntaxError
+    source: str,
+    error_cls: type[ConfigSyntaxError] = ConfigSyntaxError,
 ) -> Iterator[None]:
     """Raise a SyntaxError with a message and a source."""
     try:
@@ -77,7 +78,7 @@ def formatted_syntax_error(
         charlist[idx] = "^"
         indicator = "".join(charlist)
         msg = "\n".join(
-            map(str, (exc, exc.prefix + repr(source) + exc.suffix, indicator))
+            map(str, (exc, exc.prefix + repr(source) + exc.suffix, indicator)),
         )
         raise error_cls(msg) from None
 
@@ -99,12 +100,13 @@ class UnavailableParserError(ConfigError):
 
     def __init__(self, parser_name: str, agent: ConfigAgent[ConfigModelT]) -> None:
         missing_dependency: str = self.MISSING_DEPENDENCIES.get(
-            parser_name, f"<the proper anyconfig backend for {parser_name!r} files>"
+            parser_name,
+            f"<the proper anyconfig backend for {parser_name!r} files>",
         )
         super().__init__(
             f"The {parser_name!r} parser required to load configuration "
             f"for agent {agent} is not available.\n"
-            f"Install it with `pip install {missing_dependency}`."
+            f"Install it with `pip install {missing_dependency}`.",
         )
 
 
@@ -128,7 +130,9 @@ class ResourceLookupError(ConfigError, LookupError):
     """An error occurred while looking up a resource."""
 
     def __init__(
-        self, resource: ConfigAgent[ConfigModelT] | None, route: list[str]
+        self,
+        resource: ConfigAgent[ConfigModelT] | None,
+        route: list[str],
     ) -> None:
         resource_name = resource.resource if resource else "the provided resource"
         self.route = route

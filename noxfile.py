@@ -43,7 +43,8 @@ def release(session: nox.Session) -> None:
     new_version = (
         "v"
         + cast(
-            str, session.run("poetry", "version", "--short", silent=True, external=True)
+            str,
+            session.run("poetry", "version", "--short", silent=True, external=True),
         ).strip()
     )
     session.log(f"Creating {new_version} tag...")
@@ -66,7 +67,7 @@ def release(session: nox.Session) -> None:
     commit_confirm = (
         input(
             "You are about to commit auto-changed files due to version upgrade, "
-            "see the diff view above. Are you sure? [y/n]: "
+            "see the diff view above. Are you sure? [y/n]: ",
         )
         .casefold()
         .strip()
@@ -74,7 +75,12 @@ def release(session: nox.Session) -> None:
 
     if commit_confirm == "y":
         session.run(
-            "git", "commit", "-a", "-m", f"Release {new_version}", external=True
+            "git",
+            "commit",
+            "-a",
+            "-m",
+            f"Release {new_version}",
+            external=True,
         )
         session.run("git", "push", external=True)
     else:

@@ -58,7 +58,10 @@ class ConfigInterpolationTemplate(string.Template):
         raise ValueError(f"Invalid placeholder in string: line {lineno}, col {colno}")
 
     def interpolate(
-        self, mapping: MutableMapping[str, Any] | None = None, /, **kwds: Any
+        self,
+        mapping: MutableMapping[str, Any] | None = None,
+        /,
+        **kwds: Any,
     ) -> str:
         if mapping is None:
             mapping = kwds
@@ -143,7 +146,9 @@ def _try_interpolate_str(
         )
 
     return interpolator.interpolate_many(
-        template=template, namespace=namespace, target_type=target_type
+        template=template,
+        namespace=namespace,
+        target_type=target_type,
     )
 
 
@@ -168,7 +173,9 @@ class BaseInterpolator:
 
     # noinspection PyMethodMayBeStatic
     def bulk_render_any(
-        self, template: ConfigInterpolationTemplate, namespace: dict[str, Any]
+        self,
+        template: ConfigInterpolationTemplate,
+        namespace: dict[str, Any],
     ) -> Any:
         return template.interpolate(namespace)
 

@@ -150,7 +150,7 @@ __all__ = (
 )
 
 ALL_URL_SCHEMES: set[str] = set(
-    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params
+    urllib.parse.uses_relative + urllib.parse.uses_netloc + urllib.parse.uses_params,
 ) - {""}
 
 CONTEXT: str = "__context__"
@@ -169,7 +169,8 @@ current_interpolation_tracker: contextvars.ContextVar[
 ] = contextvars.ContextVar("current_interpolation_tracker", default=None)
 
 _exporting: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_exporting", default=False
+    "_exporting",
+    default=False,
 )
 
 
@@ -277,7 +278,8 @@ else:
             [types.UnionType] if sys.version_info >= (3, 10) else []
         ):
             for result in itertools.starmap(
-                field_hook, zip(get_args(cls), itertools.repeat(value))
+                field_hook,
+                zip(get_args(cls), itertools.repeat(value)),
             ):
                 if result != value:
                     return result
@@ -663,7 +665,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         kwargs = self.load_options | kwargs
         try:
             loaded = anyconfig.loads(  # type: ignore[no-untyped-call]
-                blob, ac_parser=parser_name, **kwargs
+                blob,
+                ac_parser=parser_name,
+                **kwargs,
             )
         except anyconfig.UnknownParserTypeError as exc:
             raise UnavailableParserError(str(exc).split()[-1], self) from exc
@@ -896,7 +900,10 @@ class ConfigAgent(Generic[ConfigModelT]):
                     # from a file descriptor, not supported by Path().
                     open(self.resource, **kwds),  # noqa: PTH123, SIM115
                 )
-            return cast(ConfigIO, pathlib.Path(self.resource).open(**kwds))
+            return cast(
+                ConfigIO,
+                pathlib.Path(self.resource).open(**kwds),
+            )
         return cast(ConfigIO, self.resource)
 
     def open_resource_async(self, **kwds: Any) -> AsyncConfigIO:
@@ -1227,7 +1234,9 @@ class ConfigAt(Generic[ConfigModelT]):
     route: ConfigRouteLike
 
     def get(
-        self, route: ConfigRouteLike | None = None, default: Any = Undefined
+        self,
+        route: ConfigRouteLike | None = None,
+        default: Any = Undefined,
     ) -> Any:
         """
         Get the value of the item.
@@ -1393,7 +1402,8 @@ async def _partial_save_async(
 
 
 def _partial_reload(
-    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    **kwargs: Any,
 ) -> Any:
     if isinstance(section, ConfigModel):
         config = section
@@ -1409,7 +1419,8 @@ def _partial_reload(
 
 
 async def _partial_reload_async(
-    section: ConfigModelT | ConfigAt[ConfigModelT], **kwargs: Any
+    section: ConfigModelT | ConfigAt[ConfigModelT],
+    **kwargs: Any,
 ) -> Any:
     if isinstance(section, ConfigModel):
         config = section
@@ -1461,7 +1472,8 @@ class BaseContext(abc.ABC, Generic[ConfigModelT]):
         ...
 
     def enter(
-        self, part: str | None
+        self,
+        part: str | None,
     ) -> Subcontext[ConfigModelT] | BaseContext[ConfigModelT]:
         """
         Enter a subcontext.
@@ -1677,7 +1689,8 @@ def get_context_or_none(config: ConfigModelT) -> BaseContext[ConfigModelT] | Non
     The context of the configuration model.
     """
     return cast(
-        Optional[BaseContext[ConfigModelT]], getattr(config, LOCAL).get(current_context)
+        Optional[BaseContext[ConfigModelT]],
+        getattr(config, LOCAL).get(current_context),
     )
 
 
@@ -1836,7 +1849,8 @@ class ConfigModel(
         super().__init__(**kwargs)
 
     def __deepcopy__(
-        self: ConfigModelT, memodict: dict[Any, Any] | None = None
+        self: ConfigModelT,
+        memodict: dict[Any, Any] | None = None,
     ) -> ConfigModelT:
         state = dict(self._iter(to_dict=False))
         state.pop(LOCAL, None)
@@ -2063,7 +2077,9 @@ class ConfigModel(
         ...
 
     def get(
-        self, route: ConfigRouteLike | None = None, default: Any = Undefined
+        self,
+        route: ConfigRouteLike | None = None,
+        default: Any = Undefined,
     ) -> Any:
         """
         Get a value from the configuration.
@@ -2419,12 +2435,15 @@ class ConfigModel(
                     assert frame_back is not None
                     package = frame_back.f_globals["__package__"]
                 module_vars = vars(
-                    importlib.import_module(module_name, package=package)
+                    importlib.import_module(module_name, package=package),
                 )
         else:
             module_name = module_name.__name__
         config_module = cls.module_wrapper_class.wrap_module(
-            module_name, cls, module_vars, **values
+            module_name,
+            cls,
+            module_vars,
+            **values,
         )
         return cast(ConfigModelT, config_module.get_model())
 
