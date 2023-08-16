@@ -670,7 +670,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         self,
         blob: str | bytes,
         parser_name: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> dict[str, Any]:
         parser_name = parser_name or self.parser_name or self._guess_parser_name()
         if parser_name is None:
@@ -699,7 +699,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         parser_name: str | None = None,
         *,
         preprocess: bool = True,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> dict[str, Any]:
         """
         Load the configuration into a dictionary. The dictionary is
@@ -732,7 +732,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         parser_name: str | None = None,
         *,
         preprocess: bool = True,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> dict[str, Any]:
         """
         Load the configuration into a dictionary asynchronously.
@@ -761,7 +761,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         self,
         config: ConfigModelT,
         parser_name: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> str:
         """
         Dump the configuration to a string.
@@ -954,7 +954,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         msg = "Cannot open resource asynchronously"
         raise RuntimeError(msg)
 
-    def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
+    def processor_open_resource(self, **kwargs: object) -> ConfigIO:
         """
         Open a configuration resource, while preprocessing,
         with the reading intention.
@@ -973,7 +973,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         kwargs = self._get_default_kwargs("read", kwargs)
         return self.open_resource(**kwargs)
 
-    def processor_open_resource_async(self, **kwargs: Any) -> AsyncConfigIO:
+    def processor_open_resource_async(self, **kwargs: object) -> AsyncConfigIO:
         """
         Open a configuration resource asynchronously, while preprocessing,
         with the reading intention.
@@ -1780,7 +1780,7 @@ class ConfigModelMetaclass(ModelMetaclass):
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
-        **kwargs: Any,
+        **kwargs: object,
     ) -> type:
         namespace.update(
             {
@@ -1896,7 +1896,7 @@ class ConfigModel(
             }
         )
 
-    def __setattr__(self, key: str, value: Any) -> None:
+    def __setattr__(self, key: str, value: object) -> None:
         getattr(self, LOCAL).run(super().__setattr__, key, value)
 
     def _init_private_attributes(self) -> None:

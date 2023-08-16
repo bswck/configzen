@@ -109,7 +109,7 @@ class ConfigInterpolationTemplate(string.Template):
 
 @functools.singledispatch
 def interpolate(
-    value: Any,
+    value: object,
     _cls: type[ConfigModelT],
     _closest_ns: dict[str, Any],
     _target_type: type[Any],

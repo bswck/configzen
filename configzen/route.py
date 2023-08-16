@@ -120,7 +120,7 @@ class ConfigRoute:
     def enter(self, subroute: ConfigRouteLike) -> ConfigRoute:
         return type(self)(self.items + self.parse(subroute))
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, ConfigRoute):
             return self.items == other.items
         if isinstance(other, str):

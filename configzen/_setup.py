@@ -87,7 +87,8 @@ def _eval_literals(cls: type[Any], value: Any) -> Any:
 @field_hook.register(ipaddress.IPv4Address)
 @field_hook.register(ipaddress.IPv6Address)
 def _eval_ipaddress(
-    cls: type[ipaddress.IPv4Address | ipaddress.IPv6Address], value: Any
+    cls: type[ipaddress.IPv4Address | ipaddress.IPv6Address],
+    value: object,
 ) -> ipaddress.IPv4Address | ipaddress.IPv6Address | Any:
     if isinstance(value, str) and value.casefold() == "localhost":
         if issubclass(cls, ipaddress.IPv6Address):
@@ -97,7 +98,7 @@ def _eval_ipaddress(
 
 
 @field_hook.register(ConfigModel)
-def _eval_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
+def _eval_model(cls: type[ConfigModelT], value: object) -> ConfigModelT | Any:
     """
     Load a model using dict literal evaluation.
     Solves nested dictionaries problem in INI files.
@@ -121,7 +122,6 @@ def _eval_model(cls: type[ConfigModelT], value: Any) -> ConfigModelT | Any:
         except (SyntaxError, ValueError):
             # Note: Strings resembling models is probably not intended
             # to be used with automatic pickle/JSON parsing.
-            # return cls.parse_raw(value)
             return data
         else:
             return cls.parse_obj(data)
