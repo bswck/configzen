@@ -357,15 +357,14 @@ The following table shows the supported file formats, their requirements, file e
 | [TOML](https://en.wikipedia.org/wiki/TOML)                                          | -                             | `toml`                       | [toml](https://pypi.python.org/pypi/toml)                                                             |
 | [YAML](https://yaml.org)                                                            | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yml](https://pypi.python.org/pypi/ruamel.yml) |
 | [XML](https://en.wikipedia.org/wiki/XML)                                            | -                             | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                  |
-| [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) | `anyconfig-configobj-backend` | `configobj`                  | [configobj]&#40;https://pypi.org/project/configobj/&#41;                                              |
+| [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) | `anyconfig-configobj-backend` | `configobj`                  | [configobj](https://pypi.org/project/configobj/)                                              |
 | [BSON](https://en.wikipedia.org/wiki/BSON)                                          | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                |
 | [CBOR](https://cbor.io/) ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949))       | `anyconfig-cbor2-backend`     | `cbor`, `cbor2`              | [cbor2](https://pypi.org/project/cbor2/)                                                              |
-| [Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format))              | `anyconfig-ion-backend`       | `ion`                        | [ion]&#40;https://pypi.org/project/amazon.ion/&#41;                                                   |
-<!-- | [MessagePack](https://en.wikipedia.org/wiki/MessagePack)                            | `anyconfig-msgpack-backend`   | `msgpack`, `mpk`             | [msgpack]&#40;https://pypi.org/project/msgpack/&#41;                                                  | -->
+| [Amazon Ion](https://en.wikipedia.org/wiki/Ion_(serialization_format))              | `anyconfig-ion-backend`       | `ion`                        | [ion](https://pypi.org/project/amazon.ion/)                                                           |
 | CBOR (deprecated, [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049))               | `anyconfig-cbor-backend`      | `cbor`                       | [cbor](https://pypi.org/project/cbor/)                                                                |
 | properties                                                                          | -                             | `properties`                 | (native)                                                                                              |
 | shellvars                                                                           | -                             | `shellvars`                  | (native)                                                                                              |
-
+<!-- Add msgpack when it works -->
 If your file extension is not recognized, you can register your own file extension by calling `ConfigAgent.register_file_extension(file_extension, parser_name)`.
 
 If your favorite backend library is not supported, please let me know by reporting it as an issue.
