@@ -167,9 +167,6 @@ exclude = ["examples/", "tests/"]
 [tool.isort]
 profile = "black"
 
-#[tool.poetry.scripts]
-#configzen = "configzen.__main__:main"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
