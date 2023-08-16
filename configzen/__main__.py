@@ -21,13 +21,13 @@ if __name__ == "__main__":
         import asyncio
 
         store = asyncio.run(Store.load_async(opt.source))
-        print(store)
+        print(store)  # noqa: T201
         context = get_context(store)
         context.agent.resource = opt.dest
         asyncio.run(store.save_async())
     else:
         store = Store.load(opt.source)
-        print(store)
+        print(store)  # noqa: T201
         context = get_context(store)
         context.agent.resource = opt.dest
         store.save()
