@@ -37,7 +37,7 @@ all = [
     "anyconfig-cbor2-backend",
     "anyconfig-cbor-backend",
     "anyconfig-configobj-backend",
-#     "anyconfig-msgpack-backend",
+    #     "anyconfig-msgpack-backend",
 ]
 
 [tool.poetry.group.dev.dependencies]
