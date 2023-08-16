@@ -21,7 +21,8 @@ class ConfigRoute:
     def __init__(self, route: ConfigRouteLike, *, allow_empty: bool = False) -> None:
         items = self.parse(route)
         if not (allow_empty or items):
-            raise ValueError("Empty configuration route")
+            msg = "Empty configuration route"
+            raise ValueError(msg)
         self.items = items
 
     @classmethod
@@ -33,7 +34,8 @@ class ConfigRoute:
         if isinstance(route, str):
             with formatted_syntax_error(route):
                 return cls._decompose(route)
-        raise TypeError(f"Invalid route type {type(route)!r}")
+        msg = f"Invalid route type {type(route)!r}"
+        raise TypeError(msg)
 
     @classmethod
     def _decompose(cls, route: str) -> list[str]:

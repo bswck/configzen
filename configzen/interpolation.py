@@ -55,7 +55,8 @@ class ConfigInterpolationTemplate(string.Template):
         else:
             colno = i - len("".join(lines[:-1]))
             lineno = len(lines)
-        raise ValueError(f"Invalid placeholder in string: line {lineno}, col {colno}")
+        msg = f"Invalid placeholder in string: line {lineno}, col {colno}"
+        raise ValueError(msg)
 
     def interpolate(
         self,
@@ -80,7 +81,8 @@ class ConfigInterpolationTemplate(string.Template):
                 return self.delimiter
             if mo.group("invalid") is not None:
                 return mo.group()
-            raise ValueError("Unrecognized named group in pattern", self.pattern)
+            msg = "Unrecognized named group in pattern"
+            raise ValueError(msg, self.pattern)
 
         return self.pattern.sub(convert, self.template)
 
@@ -100,9 +102,8 @@ class ConfigInterpolationTemplate(string.Template):
                 ):
                     # If all the groups are None, there must be
                     # another group we"re not expecting
-                    raise ValueError(
-                        "Unrecognized named group in pattern", self.pattern
-                    )
+                    msg = "Unrecognized named group in pattern"
+                    raise ValueError(msg, self.pattern)
             return ids
 
 
@@ -395,9 +396,8 @@ def include(
     name: str | None = None,  # noqa: ARG001
     **kwargs: Any,  # noqa: ARG001
 ) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
-    raise TypeError(
-        f"Cannot include {namespace} (unexpected type {type(namespace).__name__})"
-    )
+    msg = f"Cannot include {namespace} (unexpected type {type(namespace).__name__})"
+    raise TypeError(msg)
 
 
 @include.register(dict)
@@ -456,16 +456,16 @@ def _include_str(
         try:
             namespace_variable = callers_globals[namespace]
         except KeyError:
-            raise NameError(
-                f"Namespace {namespace!r} not found in {callers_globals['__name__']}"
-            ) from None
+            msg = f"Namespace {namespace!r} not found in {callers_globals['__name__']}"
+            raise NameError(msg) from None
         if isinstance(namespace_variable, dict):
             return namespace_variable
         if isinstance(namespace_variable, ConfigModel):
             return namespace_variable.dict()
-        raise TypeError(
-            f"Cannot include {namespace!r} (unexpected type "
-            f"{type(namespace_variable).__name__})"
+        msg = (
+            f"Cannot include {namespace!r}"
+            f"(unexpected type {type(namespace_variable).__name__})"
         )
+        raise TypeError(msg)
 
     return lambda cls: _include_wrapper(cls, name, namespace_factory)

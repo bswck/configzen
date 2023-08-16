@@ -142,9 +142,8 @@ def with_exporter(
         return functools.partial(with_exporter, func)
 
     if func and predefined_kwargs:
-        raise NotImplementedError(
-            "specifying both a function and predefined kwargs is not supported"
-        )
+        msg = "specifying both a function and predefined kwargs is not supported"
+        raise NotImplementedError(msg)
 
     if func is None:
 
@@ -203,9 +202,8 @@ def with_async_exporter(
         return functools.partial(with_exporter, func)
 
     if func and predefined_kwargs:
-        raise NotImplementedError(
-            "specifying both a function and default kwargs is not supported"
-        )
+        msg = "specifying both a function and default kwargs is not supported"
+        raise NotImplementedError(msg)
 
     if func is None:
 

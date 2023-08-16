@@ -951,7 +951,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         if isinstance(self.resource, (int, pathlib.Path)):
             kwds = filter_options(self.OPEN_KWARGS, kwds)
             return aiofiles.open(self.resource, **kwds)
-        raise RuntimeError("cannot open resource asynchronously")
+        msg = "Cannot open resource asynchronously"
+        raise RuntimeError(msg)
 
     def processor_open_resource(self, **kwargs: Any) -> ConfigIO:
         """
@@ -1693,10 +1694,11 @@ def get_context(config: ConfigModelT) -> BaseContext[ConfigModelT]:
     """
     context = get_context_or_none(config)
     if context is None:
-        raise RuntimeError(
-            "This model is either inside a list "
-            "or was not loaded by a configuration agent."
+        msg = (
+            "This model is either inside a list or was not loaded "
+            "by a configuration agent."
         )
+        raise RuntimeError(msg)
     return context
 
 
@@ -2050,7 +2052,8 @@ class ConfigModel(
         if resource is None:
             resource = getattr(cls.__config__, "resource", None)
         if resource is None:
-            raise ValueError("No resource specified")
+            msg = "No resource specified"
+            raise ValueError(msg)
         if parser_name is None:
             parser_name = getattr(cls.__config__, "parser_name", None)
         agent: ConfigAgent[ConfigModelT]

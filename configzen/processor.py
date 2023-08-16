@@ -276,11 +276,12 @@ class BaseProcessor(Generic[ConfigModelT]):
                 actual_key = key.lstrip(self.extension_prefix)
                 overridden = result.get(actual_key, {})
                 if not is_dict_like(overridden):
-                    raise ConfigPreprocessingError(
+                    msg = (
                         f"{self.extension_prefix} can be used only for overriding "
-                        f"dictionary sections but item at {actual_key!r} "
-                        f"is not a dictionary"
+                        f"dictionary sections but item at {actual_key!r}"
+                        "is not a dictionary"
                     )
+                    raise ConfigPreprocessingError(msg)
                 replacement = {**overridden, **value}
                 result[actual_key] = self._preprocess(replacement)
             elif key.startswith(self.directive_prefix):
@@ -317,12 +318,13 @@ class BaseProcessor(Generic[ConfigModelT]):
                 actual_key = key.lstrip(self.extension_prefix)
                 overridden = result.get(actual_key, {})
                 if not is_dict_like(overridden):
-                    raise ConfigPreprocessingError(
+                    msg = (
                         f"{self.extension_prefix} can be used only for overriding "
                         f"dictionary sections but item at {actual_key!r} "
-                        f"is not a dictionary"
+                        "is not a dictionary"
                     )
-                replacement = overridden | value
+                    raise ConfigPreprocessingError(msg)
+                replacement = {**overridden, **value}
                 result[actual_key] = await self._preprocess_async(replacement)
             elif key.startswith(self.directive_prefix):
                 directive_name = parse_directive_call(self.directive_prefix, key)
@@ -345,17 +347,15 @@ class BaseProcessor(Generic[ConfigModelT]):
     def _call_directive(self, context: DirectiveContext) -> None:
         handler = self._directive_handlers.get(context.directive)
         if handler is None:
-            raise ConfigPreprocessingError(
-                f"unknown preprocessing directive: {context.directive!r}"
-            )
+            msg = f"unknown preprocessing directive: {context.directive!r}"
+            raise ConfigPreprocessingError(msg)
         handler(self, context)
 
     async def _call_directive_async(self, context: DirectiveContext) -> None:
         handler = self._async_directive_handlers.get(context.directive)
         if handler is None:
-            raise ConfigPreprocessingError(
-                f"unknown preprocessing directive: {context.directive!r}"
-            )
+            msg = f"unknown preprocessing directive: {context.directive!r}"
+            raise ConfigPreprocessingError(msg)
         await handler(self, context)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -576,9 +576,8 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
         if agent.resource == self.agent.resource:
-            raise ConfigPreprocessingError(
-                f"{agent.resource} tried to {ctx.directive!r} on itself"
-            )
+            msg = f"{agent.resource} tried to {ctx.directive!r} on itself"
+            raise ConfigPreprocessingError(msg)
 
         actual_agent = agent
         if agent.is_relative:
@@ -647,10 +646,10 @@ class Processor(BaseProcessor[ConfigModelT]):
         if route:
             source = at(source, route, agent=agent)
             if not is_dict_like(source):
-                raise ConfigPreprocessingError(
-                    f"imported item {route!r} "
-                    f"from {agent.resource} is not a dictionary"
+                msg = (
+                    f"imported item {route!r} from {agent.resource} is not a dictionary"
                 )
+                raise ConfigPreprocessingError(msg)
 
         context: Context[ConfigModelT] = Context(agent)
         ctx.container = {**source, **ctx.container}
