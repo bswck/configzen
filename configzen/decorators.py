@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
     from configzen.typedefs import ConfigModelT, T
 
+# pyright: reportGeneralTypeIssues=false
+
 __all__ = (
     "with_exporter",
     "with_async_exporter",
