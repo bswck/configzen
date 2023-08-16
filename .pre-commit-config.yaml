@@ -6,12 +6,12 @@ repos:
         name: Check YAML files
       - id: trailing-whitespace
         name: Trim Trailing Whitespaces
-  - repo: local
-    hooks:
-      - id: isort
-        name: Sort Imports
-        entry: isort
-        language: system
+  # - repo: https://github.com/pycqa/isort
+  #   rev: "5.11.2"
+  #   hooks:
+  #     - id: isort
+  #       name: Sort Imports
+  #       entry: isort
   - repo: https://github.com/psf/black
     rev: "23.7.0"
     hooks:
@@ -26,6 +26,12 @@ repos:
         args: [configzen/]
         language: system
         pass_filenames: false
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.0.284
+    hooks:
+      - id: ruff
+        name: Check Ruff
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.4.1"
     hooks:
@@ -35,17 +41,21 @@ repos:
         args: [configzen/, --strict]
         language: system
         pass_filenames: false
+        stages: [push]
   - repo: https://github.com/python-poetry/poetry
     rev: "1.5.0"
     hooks:
       - id: poetry-check
+        stages: [push]
         name: Check Poetry environment
       - id: poetry-lock
         name: Lock Dependencies with Poetry
+        stages: [push]
       - id: poetry-export
         name: Export Dependencies with Poetry
         args:
           ["--without=dev", "-f", "requirements.txt", "-o", "requirements.txt"]
+        stages: [push]
       - id: poetry-export
         name: Export Dev Dependencies with Poetry
         args:
@@ -57,13 +67,15 @@ repos:
             "-o",
             "requirements-dev.txt",
           ]
-  - repo: local
-    hooks:
-      - id: pytest-check
-        name: PyTest Check
-        entry: pytest
-        args: [tests/]
-        language: system
-        pass_filenames: false
-        always_run: true
         stages: [push]
+  # - repo: local
+  #   hooks:
+  #     - id: pytest-check
+  #       stages: [push]
+  #       name: PyTest Check
+  #       additional_dependencies: "requirements-dev.txt"?
+  #       entry: pytest
+  #       args: [tests/]
+  #       language: python
+  #       pass_filenames: false
+  #       always_run: true
