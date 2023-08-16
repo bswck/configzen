@@ -5,7 +5,6 @@ import copy
 import dataclasses
 import enum
 import pathlib
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast
 
 from anyconfig.utils import is_dict_like, is_list_like
@@ -15,6 +14,8 @@ from configzen.errors import ConfigPreprocessingError
 from configzen.typedefs import ConfigModelT, ConfigRouteLike
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from configzen.model import BaseContext, ConfigAgent
 
 __all__ = (

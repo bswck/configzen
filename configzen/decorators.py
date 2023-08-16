@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import contextlib
 import functools
-from collections.abc import Callable, Coroutine, Iterator
 from typing import TYPE_CHECKING, Any, cast, overload
 
 from configzen.model import export_hook, export_model, export_model_async, field_hook
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Iterator
+
     from configzen.typedefs import ConfigModelT, T
 
 __all__ = (

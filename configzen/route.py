@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from configzen.errors import InternalSyntaxError, formatted_syntax_error
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from configzen.typedefs import ConfigRouteLike
 
 __all__ = ("ConfigRoute",)

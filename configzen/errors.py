@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
-    from configzen.model import ConfigAgent
+    from collections.abc import Iterator
+
+    from configzen.model import ConfigAgent, ConfigModel
     from configzen.typedefs import ConfigModelT
 
 

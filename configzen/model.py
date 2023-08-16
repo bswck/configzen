@@ -93,7 +93,7 @@ from typing import (
 import anyconfig
 import pydantic
 from anyconfig.utils import filter_options, is_dict_like, is_list_like
-from pydantic.fields import make_generic_validator  # type: ignore[attr-defined]
+from pydantic.class_validators import make_generic_validator
 from pydantic.fields import ModelField, Undefined
 from pydantic.main import BaseModel, ModelMetaclass
 from pydantic.utils import ROOT_KEY
