@@ -369,7 +369,7 @@ class BaseProcessor(Generic[ConfigModelT]):
             cls._async_directive_handlers = {}
         else:
             cls._async_directive_handlers = cls._async_directive_handlers.copy()
-        for _name, func in cls.__dict__.items():
+        for func in cls.__dict__.values():
             if hasattr(func, EXECUTES_DIRECTIVES):
                 for directive_name in getattr(func, EXECUTES_DIRECTIVES):
                     cls._directive_handlers[directive_name] = func
@@ -404,6 +404,7 @@ class BaseProcessor(Generic[ConfigModelT]):
 
 
 class Directives(str, enum.Enum):
+    __slots__ = ()  # https://beta.ruff.rs/docs/rules/no-slots-in-str-subclass/
     EXTEND = "extend"
     INCLUDE = "include"
     COPY = "copy"
@@ -563,13 +564,10 @@ class Processor(BaseProcessor[ConfigModelT]):
     ]:
         agent_class = type(self.agent)
 
-        # todo(bswck): raise on include and extend combined
+        # TODO(bswck): raise on include and extend combined  # noqa: TD003
         # if preserve and ???:
-        #     msg = (
         #         "Using more than one ??? directive "
         #         "in the same scope is not allowed"
-        #     )
-        #     raise ConfigPreprocessingError(msg)
 
         agent, route = agent_class.from_directive_context(
             ctx,
@@ -633,7 +631,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
     @staticmethod
-    def _substitute_impl(  # noqa: PLR0913
+    def _substitute_impl(
         ctx: DirectiveContext,
         route: ConfigRouteLike | None,
         *,
@@ -669,7 +667,7 @@ class Processor(BaseProcessor[ConfigModelT]):
             )
 
     @classmethod
-    def _export(  # noqa: C901
+    def _export(  # noqa: D417
         cls,
         state: dict[str, Any],
         metadata: ExportMetadata[ConfigModelT],
@@ -744,7 +742,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
     @classmethod
-    async def _export_async(  # noqa: C901
+    async def _export_async(
         cls,
         state: dict[str, Any],
         metadata: ExportMetadata[ConfigModelT],
@@ -822,7 +820,7 @@ class Processor(BaseProcessor[ConfigModelT]):
         )
 
     @classmethod
-    def _export_finalize(  # noqa: PLR0913
+    def _export_finalize(
         cls,
         context: BaseContext[ConfigModelT],
         *,
