@@ -234,23 +234,24 @@ class BaseEvaluationEngine:
 
         result = Undefined
         final_result = Undefined
-        for identifier in expression.strip().split(OR_TOKEN):
-            identifier = identifier.strip()
-            if identifier:
-                result = self.resolve_identifier(
-                    identifier=identifier,
-                    result_namespace=result_namespace,
-                    namespaces=namespaces,
-                    closest_namespace=closest_namespace,
-                )
+        for identifier in filter(
+            None,
+            map(str.strip, expression.strip().split(OR_TOKEN)),
+        ):
+            result = self.resolve_identifier(
+                identifier=identifier,
+                result_namespace=result_namespace,
+                namespaces=namespaces,
+                closest_namespace=closest_namespace,
+            )
 
-                if result is not Undefined:
-                    result = field_hook(target_type, result)
-                    result_namespace[identifier] = result
+            if result is not Undefined:
+                result = field_hook(target_type, result)
+                result_namespace[identifier] = result
 
-                if result:
-                    final_result = result
-                    break
+            if result:
+                final_result = result
+                break
 
         if final_result is not Undefined:
             result_namespace[expression] = final_result
@@ -277,40 +278,41 @@ class BaseEvaluationEngine:
                 identifier = identifier[1:].strip()
 
         ns_name, uses_ns, ident = identifier.rpartition(NAMESPACE_TOKEN)
-        namespaces_to_use = []
         ns_at_ident = ""
         global_namespace = namespaces[None]
 
         if uses_ns:
             # [namespace[[.member]*@ns_at_ident[.member]*]]::identifier
-
+            namespaces_resolution_order = [
+                global_namespace,
+                closest_namespace,
+                result_namespace,
+            ]
             if ns_name and uses_ns:
                 ns_name, _, ns_at_ident = ns_name.rpartition(AT_TOKEN)
                 if ns_name in namespaces:
-                    namespaces_to_use.append(namespaces[ns_name])
-            namespaces_to_use.append(global_namespace)
-            namespaces_to_use.append(closest_namespace)
-            namespaces_to_use.append(result_namespace)
+                    namespaces_resolution_order.insert(0, namespaces[ns_name])
         else:
             # identifier[.member]*
-
-            namespaces_to_use.append(closest_namespace)
-            namespaces_to_use.append(result_namespace)
-            namespaces_to_use.append(global_namespace)
+            namespaces_resolution_order = [
+                closest_namespace,
+                result_namespace,
+                global_namespace,
+            ]
 
         ident, _, ident_at = ident.partition(AT_TOKEN)
 
         lookup_key = ns_name if uses_ns and ns_name else ident
         lookup_value: dict[str, Any] | UndefinedType = Undefined
 
-        for namespace in namespaces_to_use:
-            try:
+        try:
+            for namespace in namespaces_resolution_order:
                 lookup_value = at(namespace, lookup_key)
-            except ResourceLookupError:
-                if strict:
-                    raise
-            if lookup_value is not Undefined:
-                break
+                if lookup_value is not Undefined:
+                    break
+        except ResourceLookupError:
+            if strict:
+                raise
 
         if lookup_value is Undefined:
             return identifier
