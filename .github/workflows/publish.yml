@@ -30,7 +30,6 @@ jobs:
 
       - name: Publish
         run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
           poetry publish
 
       # NOTE: Make sure you have added PYPI_API_TOKEN repository secret
