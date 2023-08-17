@@ -514,10 +514,12 @@ class ConfigAgent(Generic[ConfigModelT]):
         self.create_if_missing = create_if_missing
         self.use_pydantic_json = kwargs.pop("use_pydantic_json", True)
         self.default_kwargs = kwargs.pop(
-            "default_kwargs", self.predefined_default_kwargs.copy()
+            "default_kwargs",
+            self.predefined_default_kwargs.copy(),
         )
         self.allowed_url_schemes = kwargs.pop(
-            "allowed_url_schemes", self.default_allowed_url_schemes.copy()
+            "allowed_url_schemes",
+            self.default_allowed_url_schemes.copy(),
         )
 
         self.load_options = self.default_load_options.copy()
@@ -649,7 +651,9 @@ class ConfigAgent(Generic[ConfigModelT]):
         The loaded configuration.
         """
         dict_config = await self.load_dict_async(
-            blob, parser_name=parser_name, **kwargs
+            blob,
+            parser_name=parser_name,
+            **kwargs,
         )
         if dict_config is None:
             dict_config = {}
@@ -1153,7 +1157,7 @@ class ConfigAgent(Generic[ConfigModelT]):
         if isinstance(ctx.snippet, str):
             path, _, route = ctx.snippet.partition(route_separator)
             route = ConfigRoute(
-                route.strip().replace(route_separator, route_class.TOK_DOT)
+                route.strip().replace(route_separator, route_class.TOK_DOT),
             )
             args.append(path)
         elif isinstance(ctx.snippet, int):
@@ -1801,7 +1805,7 @@ class ConfigModelMetaclass(ModelMetaclass):
             field.pre_validators[:] = [_common_field_validator, *field.pre_validators]
             if type(field.outer_type_) is ConfigModelMetaclass:
                 validator = make_generic_validator(
-                    field.outer_type_.__field_setup__  # type: ignore[attr-defined]
+                    field.outer_type_.__field_setup__,  # type: ignore[attr-defined]
                 )
                 field.pre_validators[:] = [
                     _common_field_validator,
@@ -1883,7 +1887,7 @@ class ConfigModel(
             {
                 field.alias: clone[field_name]
                 for field_name, field in self.__fields__.items()
-            }
+            },
         )
 
     def __setattr__(self, key: str, value: object) -> None:
@@ -1956,7 +1960,7 @@ class ConfigModel(
                 exclude_unset=exclude_unset,
                 exclude_defaults=exclude_defaults,
                 exclude_none=exclude_none,
-            )
+            ),
         )
         if self.__custom_root_type__:
             data = data[ROOT_KEY]
@@ -2233,7 +2237,9 @@ class ConfigModel(
         self
         """
         agent = cls._resolve_agent(
-            resource, create_if_missing=create_if_missing, parser_name=parser_name
+            resource,
+            create_if_missing=create_if_missing,
+            parser_name=parser_name,
         )
         current_context.set(Context(agent))
         local = contextvars.copy_context()
@@ -2244,7 +2250,8 @@ class ConfigModel(
         ):
             cls.update_forward_refs()
         reader = local.run(
-            asyncio.create_task, agent.read_async(config_class=cls, **kwargs)
+            asyncio.create_task,
+            agent.read_async(config_class=cls, **kwargs),
         )
         config = await reader
         object.__setattr__(config, LOCAL, local)
@@ -2277,7 +2284,7 @@ class ConfigModel(
                     key: value
                     for key, value in vars(wrapped_module).items()
                     if key in {field.alias for field in self.__fields__.values()}
-                }
+                },
             )
             return self
         current_context.set(get_context(context.owner))
@@ -2310,6 +2317,7 @@ class ConfigModel(
         else:
             changed = await _partial_reload_async(
                 cast("ConfigAt[ConfigModelT]", context.at),
+                **kwargs,
             )
         state = changed.__dict__
         context.initial_state = state
@@ -2317,7 +2325,9 @@ class ConfigModel(
         return self
 
     def save(
-        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
+        self: ConfigModelT,
+        write_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> int:
         """
         Save the configuration to the configuration file.
@@ -2348,7 +2358,9 @@ class ConfigModel(
         )
 
     async def save_async(
-        self: ConfigModelT, write_kwargs: dict[str, Any] | None = None, **kwargs: Any
+        self: ConfigModelT,
+        write_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> int:
         """
         Save the configuration to the configuration file asynchronously.
@@ -2505,7 +2517,7 @@ class ConfigModel(
         namespaces = cls._evaluate_interpolation_namespaces()
         if context is not None:
             namespaces.setdefault(None, {}).update(
-                context.toplevel_interpolation_namespace
+                context.toplevel_interpolation_namespace,
             )
 
         for expression in expressions:
@@ -2521,7 +2533,11 @@ class ConfigModel(
         return result_namespace
 
     @classmethod
-    def __field_setup__(cls, value: dict[str, Any], field: ModelField) -> Any:
+    def __field_setup__(
+        cls,
+        value: dict[str, Any],
+        field: ModelField,
+    ) -> Any:
         """
         Set up this configuration model as it is being initialized as a field
         of some other configuration model.

@@ -198,7 +198,10 @@ class BaseInterpolator:
 
     # noinspection PyMethodMayBeStatic
     def single_render_any(
-        self, _template: ConfigInterpolationTemplate, _identifier: str, value: Any
+        self,
+        _template: ConfigInterpolationTemplate,
+        _identifier: str,
+        value: Any,
     ) -> Any:
         return value
 
