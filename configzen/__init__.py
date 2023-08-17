@@ -13,6 +13,9 @@ from .module import *
 from .processor import *
 from .route import *
 
+__author__ = "bswck"
+__copyright__ = "Copyright 2023–present, bswck"
+__credits__ = ["Lunarmagpie", "trag1c"]
 __version__ = "0.7.1"
 
 __all__ = (
