@@ -53,11 +53,6 @@ pre-commit = "^3.3.3"
 nox = "^2023.4.22"
 isort = "^5.12.0"
 
-[[tool.poetry_bumpversion.replacements]]
-files = ["README.md"]
-search = 'configzen `v{current_version}`'
-replace = 'configzen `v{new_version}`'
-
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.4.3"
 mkdocs-material = "^9.1.18"
@@ -174,3 +169,11 @@ profile = "black"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry_bumpversion.file."README.md"]
+search = 'configzen `v{current_version}`'
+replace = 'configzen `v{new_version}`'
+
+[tool.poetry_bumpversion.file."configzen/__init__.py"]
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
