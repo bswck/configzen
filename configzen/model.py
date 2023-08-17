@@ -1116,7 +1116,8 @@ class ConfigAgent(Generic[ConfigModelT]):
         kwargs = self._get_default_kwargs("write", kwargs=kwargs)
         async with self.open_resource_async(**kwargs) as fp:
             # Technically those might be also bytes,
-            # todo(bswck): type hint it properly...
+            # TODO(bswck): type-annotate it properly.
+            # https://github.com/bswck/configzen/issues/11
             return await fp.write(cast(str, blob))
 
     @classmethod

@@ -8,7 +8,7 @@ import string
 import sys
 from collections import ChainMap
 from collections.abc import Callable, MutableMapping
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast, no_type_check
 
 from pydantic.fields import Undefined, UndefinedType
 
@@ -400,17 +400,23 @@ def include(
     raise TypeError(msg)
 
 
+@no_type_check
 @include.register(dict)
 def include_const(
-    namespace: dict[str, Any] | ConfigModelT, /, *, name: str | None = None
+    namespace: dict[str, Any] | ConfigModelT,
+    /,
+    *,
+    name: str | None = None,
 ) -> Callable[[type[ConfigModelT]], type[ConfigModelT]]:
     from configzen import ConfigModel
 
     if isinstance(namespace, ConfigModel):
         return lambda cls: _include_wrapper(
-            cls, name, lambda: namespace.dict()  # type: ignore
+            cls,
+            name,
+            lambda: namespace.dict(),
         )
-    return lambda cls: _include_wrapper(cls, name, lambda: namespace)  # type: ignore
+    return lambda cls: _include_wrapper(cls, name, lambda: namespace)
 
 
 def _include_factory(

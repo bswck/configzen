@@ -114,7 +114,7 @@ class UnavailableParserError(ConfigError):
 class ConfigAccessError(ConfigError, LookupError):
     """An error occurred while accessing configuration part."""
 
-    def __init__(self, config: ConfigModelT, route: str | list[str]) -> None:
+    def __init__(self, config: ConfigModel, route: str | list[str]) -> None:
         if not isinstance(route, str):
             route = ".".join(route)
         self.route = route
