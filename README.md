@@ -2,6 +2,19 @@
 
 _configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
+It's important to keep your configuration safe and consistent. Give a shot to _configzen_ 🚀
+
+⭐ Supports Python 3.8 or above<br>
+⭐ Is fully typed<br>
+⭐ Supports YAML, JSON, TOML, INI, XML, ConfigObj, BSON, CBOR, Amazon Ion, properties and shellvars<br>
+⭐ Supports reading and writing configuration files, fully or partially, with the ability to preserve the original file structure (but without comments[^1])<br>
+⭐ Supports configuration preprocessing (extending, including and copying configuration files without the need to change the code)<br>
+⭐ Supports variable interpolation (runtime value substitution)<br>
+⭐ Supports modular configuration with type validation (wrapping runtime Python modules in-place and outside them)<br>
+⭐ Supports saving and loading configuration files with a convenient API<br>
+⭐ Supports synchronous and asynchronous file operations<br>
+⭐ Supports loading configuration from environment variables and secret files<br>
+
 ## Features
 
 ### Managing content
@@ -146,7 +159,7 @@ and load the `production.yml` configuration file. No explicit changes to the cod
 file are needed.
 
 _Note: Using `+` in front of a key will update the section already defined at that key,
-instead of replacing it._
+instead of overwriting it entirely._
 
 Notice how configuration file formats do not matter in _configzen_: you can
 extend JSON configurations with YAML, but that might be as well any other format
@@ -355,7 +368,7 @@ The following table shows the supported file formats, their requirements, file e
 | [JSON](https://en.wikipedia.org/wiki/JSON)                                          | -                             | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                |
 | [INI](https://en.wikipedia.org/wiki/INI_file)                                       | -                             | `ini`, `cfg`, `conf`         | [configparser](https://docs.python.org/3/library/configparser.html) (standard library)                |
 | [TOML](https://en.wikipedia.org/wiki/TOML)                                          | -                             | `toml`                       | [toml](https://pypi.python.org/pypi/toml)                                                             |
-| [YAML](https://yaml.org)                                                            | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yml](https://pypi.python.org/pypi/ruamel.yml) |
+| [YAML](https://yaml.org)                                                            | -                             | `yaml`, `yml`                | [pyyaml](https://pypi.python.org/pypi/PyYAML) / [ruamel.yaml](https://pypi.python.org/pypi/ruamel.yaml) |
 | [XML](https://en.wikipedia.org/wiki/XML)                                            | -                             | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                  |
 | [ConfigObj](https://configobj.readthedocs.io/en/latest/configobj.html#introduction) | `anyconfig-configobj-backend` | `configobj`                  | [configobj](https://pypi.org/project/configobj/)                                              |
 | [BSON](https://en.wikipedia.org/wiki/BSON)                                          | `anyconfig-bson-backend`      | `bson`                       | [bson](https://pypi.org/project/bson/)                                                                |
@@ -393,13 +406,27 @@ After that, install the [pre-commit](https://pre-commit.com/) hooks:
 pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
-You might also need to install required stubs:
+You might also need to install required stubs. First, activate your virtual environment:
 
 ```bash
-mypy configzen/ --strict || (echo y | mypy --install-types)
+poetry shell
 ```
 
-And you are good to go.
+and run (on Linux or [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/overview?view=powershell-7.3) 7.0+):
+
+```bash
+mypy configzen/ || (echo yes | mypy --install-types)
+```
+
+or, if you are using an older version of PowerShell:
+
+```powershell
+mypy configzen/; if (-not $?) { echo yes | mypy --install-types }
+```
+
+_Note: Using [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) + [pyenv](https://github.com/pyenv/pyenv#readme) (with Python 3.8) for developing configzen is strongly recommended in case you use Windows._
+
+And you are good to go. 🚀
 
 Contributions are welcome! Feel free to [open an issue](https://github.com/bswck/configzen/issues/new/choose) whenever
 you encounter a bug or have a feature request or [submit a pull request](https://github.com/bswck/configzen/compare) with your changes.
