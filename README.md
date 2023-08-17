@@ -14,8 +14,8 @@ It's important to keep your configuration safe and consistent. Give a shot to _c
 ⭐ Supports **synchronous and asynchronous file operations**,<br>
 ⭐ Supports loading configuration from **environment variables and secret files**.<br>
 
-While being built on top of [pydantic](https://docs.pydantic.dev/latest/), _configzen_ inherits most of its features, including
-[data validation](https://pydantic-docs.helpmanual.io/usage/validators/), [schema generation](https://pydantic-docs.helpmanual.io/usage/schema/),
+While being built on top of [pydantic](https://docs.pydantic.dev/1.10/), _configzen_ inherits most of its features, including
+[data validation](https://docs.pydantic.dev/1.10/usage/validators/), [schema generation](https://docs.pydantic.dev/1.10/usage/schema/),
 [custom data types](https://docs.pydantic.dev/1.10/usage/types/#arbitrary-types-allowed), well integration with [Rich](https://docs.pydantic.dev/1.10/usage/rich/), and more.
 
 Learn more below.
