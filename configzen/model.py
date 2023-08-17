@@ -213,18 +213,7 @@ def export_hook(obj: Any) -> Any:
     -------
     Any
     """
-    if dataclasses.is_dataclass(obj):
-        return export_hook(dataclasses.asdict(obj))
-    if isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields"):
-        return _export_namedtuple(obj)
     return obj
-
-
-@functools.singledispatch
-    """Convert a namedtuple to a format that can be safely serialized & deserialized."""
-    # Initially I wanted it to be export_hook(obj._asdict()), but
-    # pydantic doesn't seem to be friends with custom NamedTuple-s.
-    return export_hook(list(obj))
 
 
 field_hook_registrars: Any = functools.singledispatch(lambda _cls, value: value)

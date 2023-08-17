@@ -8,10 +8,11 @@ by setting the environment variable ``CONFIGZEN_SETUP`` to ``0``.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import ipaddress
 import pathlib
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic.json import ENCODERS_BY_TYPE
 
@@ -40,6 +41,31 @@ def _export_windows_path(obj: pathlib.WindowsPath | pathlib.PureWindowsPath) -> 
     The converted path.
     """
     return obj.as_posix()
+
+
+@runtime_checkable
+class _DataclassInstance(Protocol):
+    __dataclass_fields__: dict[str, dataclasses.Field[Any]]
+
+
+@export_hook.register(_DataclassInstance)
+def _export_dataclass(obj: Any) -> Any:
+    return export_hook(dataclasses.asdict(obj))
+
+
+@runtime_checkable
+class _NamedTupleInstance(Protocol):
+    _fields: tuple[str, ...]
+
+    def _asdict(self) -> dict[str, Any]:
+        ...
+
+
+@export_hook.register(_NamedTupleInstance)
+def _export_namedtuple(obj: tuple[Any, ...]) -> Any:
+    # Initially I wanted it to be export_hook(obj._asdict()), but
+    # pydantic doesn't seem to be friends with custom NamedTuple-s.
+    return export_hook(list(obj))
 
 
 @export_hook.register(list)
