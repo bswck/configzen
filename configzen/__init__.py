@@ -1,4 +1,5 @@
 # flake8: noqa
+# pyright: reportUnsupportedDunderAll=false
 from __future__ import annotations
 
 from pydantic import validator as field_validator
@@ -11,6 +12,8 @@ from .model import *
 from .module import *
 from .processor import *
 from .route import *
+
+__version__ = "0.7.0"
 
 __all__ = (
     *model.__all__,
