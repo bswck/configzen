@@ -8,9 +8,8 @@ from nox.command import CommandFailed
 @nox.session
 def release(session: nox.Session) -> None:
     """
-    Kicks off an automated release process by creating and pushing a new tag.
-
-    Invokes bump2version with the posarg setting the version.
+    Kicks off an automated release process by updating local files,
+    creating and pushing a new tag.
 
     Usage:
     $ nox -s release -- [major|minor|patch|<major>.<minor>.<patch>]
@@ -24,15 +23,39 @@ def release(session: nox.Session) -> None:
     args: argparse.Namespace = parser.parse_args(args=session.posargs)
     version: str = args.version.pop()
 
+    files_changed = session.run(
+        *"git diff --name-only HEAD".split(),
+        silent=True,
+        external=True,
+    )
+    if files_changed:
+        continue_confirm = (
+            input(
+                "There are uncommitted changes in the working tree in these files:\n"
+                f"{files_changed}\n"
+                "Continue? They will be included in the release commit. (y/n) [n]: ",
+            )
+            .casefold()
+            .strip()
+            or "n"
+        )[0]
+        if continue_confirm != "y":
+            session.error("Uncommitted changes in the working tree")
+
     # If we get here, we should be good to go
     # Let's do a final check for safety
     release_confirm = (
-        input(f"You are about to release {version!r} version. Are you sure? [y/n]: ")
-        .casefold()
-        .strip()
-    )
+        (
+            input(
+                f"You are about to release {version!r} version. "
+                "Are you sure? (y/n) [y]: ",
+            )
+            .casefold()
+            .strip()
+        )
+        or "y"
+    )[0]
 
-    # Abort on anything other than 'y'
     if release_confirm != "y":
         session.error(f"You said no when prompted to bump the {version!r} version.")
 
@@ -65,23 +88,25 @@ def release(session: nox.Session) -> None:
 
     session.run("git", "diff", external=True)
     commit_confirm = (
-        input(
-            "You are about to commit auto-changed files due to version upgrade, "
-            "see the diff view above. Are you sure? [y/n]: ",
+        (
+            input(
+                "You are about to commit auto-changed files due to version upgrade, "
+                "see the diff view above. Are you sure? (y/n) [y]: ",
+            )
+            .casefold()
+            .strip()
         )
-        .casefold()
-        .strip()
-    )
+        or "y"
+    )[0]
 
     if commit_confirm == "y":
         session.run(
             "git",
             "commit",
-            "-a",
-            "-m",
+            "-am",
             f"Release {new_version}",
             external=True,
         )
         session.run("git", "push", external=True)
     else:
-        session.log("Ok.")
+        session.log("Ok, changed uncommitted.")
