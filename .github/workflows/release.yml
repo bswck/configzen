@@ -1,0 +1,26 @@
+name: Publish to PyPI (via Trusted Publisher, poetry)
+
+on: [push]
+  # release:
+  #   types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    env:
+      POETRY_VIRTUALENVS_CREATE: "false"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install poetry
+        run: |
+          pipx install poetry
+          pipx inject poetry poetry-bumpversion
+      - name: Build with poetry
+        run: |
+          poetry version ${{ github.ref_name }}
+          poetry build
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
