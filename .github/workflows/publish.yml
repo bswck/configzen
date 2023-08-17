@@ -17,13 +17,7 @@ jobs:
       - name: Install poetry
         run: |
           pipx install poetry
-          pipx inject poetry .
-
-      # NOTE: Instead of above step use the following in your workflow
-      # - name: Install poetry
-      #   run: |
-      #     pipx install poetry
-      #     pipx inject poetry poetry-bumpversion
+          pipx inject poetry poetry-bumpversion
 
       - name: Build
         run: |
