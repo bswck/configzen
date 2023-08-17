@@ -13,7 +13,7 @@ def release(session: nox.Session) -> None:
     Invokes bump2version with the posarg setting the version.
 
     Usage:
-    $ nox -s release -- [major|minor|patch]
+    $ nox -s release -- [major|minor|patch|<major>.<minor>.<patch>]
     """
     parser = argparse.ArgumentParser(description="Release a semver version.")
     parser.add_argument(
