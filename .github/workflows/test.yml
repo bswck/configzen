@@ -3,7 +3,7 @@ name: Test & measure coverage
 on: [push]
 
 jobs:
-  ci:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:

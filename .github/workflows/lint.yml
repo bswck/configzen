@@ -3,7 +3,7 @@ name: Lint (black --check, pylint, ruff)
 on: [push]
 
 jobs:
-  ci:
+  lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:

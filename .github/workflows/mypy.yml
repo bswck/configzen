@@ -3,7 +3,7 @@ name: Static type check (mypy)
 on: [push]
 
 jobs:
-  ci:
+  typecheck:
     runs-on: ubuntu-latest
     strategy:
       matrix:
