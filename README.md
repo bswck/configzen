@@ -16,7 +16,7 @@ It's important to keep your configuration safe and consistent. Give a shot to _c
 
 While being built on top of [pydantic](https://docs.pydantic.dev/1.10/), _configzen_ inherits most of its features, including
 [data validation](https://docs.pydantic.dev/1.10/usage/validators/), [schema generation](https://docs.pydantic.dev/1.10/usage/schema/),
-[custom data types](https://docs.pydantic.dev/1.10/usage/types/#arbitrary-types-allowed), well integration with [Rich](https://docs.pydantic.dev/1.10/usage/rich/), and more.
+[custom data types](https://docs.pydantic.dev/1.10/usage/types/#arbitrary-types-allowed), good integration with [Rich](https://docs.pydantic.dev/1.10/usage/rich/), and more.
 
 Learn more below.
 
