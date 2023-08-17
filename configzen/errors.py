@@ -89,7 +89,7 @@ class UnspecifiedParserError(ConfigError):
 
 
 class UnavailableParserError(ConfigError):
-    MISSING_DEPENDENCIES: dict[str, str] = {
+    MISSING_DEPENDENCIES: ClassVar[dict[str, str]] = {
         "yaml": "pyyaml (or ruamel.yaml)",
         "toml": "toml",
         "ion": "anyconfig-ion-backend",
