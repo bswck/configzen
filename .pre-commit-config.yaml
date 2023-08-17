@@ -22,10 +22,6 @@ repos:
     hooks:
       - id: pylint
         name: Check Pylint
-        entry: pylint
-        args: [configzen/]
-        language: system
-        pass_filenames: false
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.0.284
