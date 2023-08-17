@@ -915,7 +915,7 @@ class ConfigAgent(Generic[ConfigModelT]):
                 )
             return cast(
                 ConfigIO,
-                pathlib.Path(self.resource).open(**kwds),
+                pathlib.Path(self.resource).open(**kwds),  # noqa: SIM115, RUF100
             )
         return cast(ConfigIO, self.resource)
 
@@ -1937,7 +1937,7 @@ class ConfigModel(
         return dict(await self._iter_async(to_dict=True, **kwargs))
 
     # noinspection PyShadowingNames
-    async def json_async(  # noqa: PLR0913
+    async def json_async(
         self,
         include: IncludeExcludeT = None,
         exclude: IncludeExcludeT = None,
@@ -2012,11 +2012,12 @@ class ConfigModel(
             interpolation_track = interpolation_tracker.get(actual_key)
             if interpolation_track:
                 old_value, new_value = interpolation_track
+
                 # if value != new_value:
-                #     raise InterpolationError(
-                #         f"Cannot restore the value of {actual_key!r} "
-                #         "before interpolation."
-                #     )
+                #     InterpolationError:
+                #         Cannot restore the value of {actual_key!r}
+                #         before interpolation
+
                 value = old_value
         return actual_key, value
 
@@ -2471,7 +2472,6 @@ class ConfigModel(
     ) -> ConfigModelT:
         module_vars = None
         if isinstance(module_name, str):
-            module_name = module_name
             if module_name not in sys.modules:
                 if package is None and module_name.startswith("."):
                     current_frame = inspect.currentframe()
