@@ -365,7 +365,7 @@ class BaseEvaluationEngine:
             cls.evaluators_by_name = {}
 
         if register_evaluators:
-            # TODO: Replace with `inspect.getmembers_static()` by 2026-10.
+            # Suggestion: Replace with `inspect.getmembers_static()` by 2026-10.
             for _, func in inspect.getmembers(cls, inspect.isfunction):
                 name = getattr(func, EVALUATES, None)
                 if name is not None:
