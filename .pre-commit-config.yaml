@@ -6,38 +6,16 @@ repos:
         name: Check YAML files
       - id: trailing-whitespace
         name: Trim Trailing Whitespaces
-  # - repo: https://github.com/pycqa/isort
-  #   rev: "5.11.2"
-  #   hooks:
-  #     - id: isort
-  #       name: Sort Imports
-  #       entry: isort
   - repo: https://github.com/psf/black
     rev: "23.7.0"
     hooks:
       - id: black
         name: Reformatting with Black
-  - repo: https://github.com/pylint-dev/pylint/
-    rev: "v3.0.0a6"
-    hooks:
-      - id: pylint
-        name: Check Pylint
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
     rev: v0.0.284
     hooks:
       - id: ruff
         name: Check Ruff
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.4.1"
-    hooks:
-      - id: mypy
-        name: Check Mypy
-        entry: mypy
-        args: [configzen/, --strict]
-        language: system
-        pass_filenames: false
-        stages: [push]
   - repo: https://github.com/python-poetry/poetry
     rev: "1.5.0"
     hooks:
@@ -64,14 +42,3 @@ repos:
             "requirements-dev.txt",
           ]
         stages: [push]
-  # - repo: local
-  #   hooks:
-  #     - id: pytest-check
-  #       stages: [push]
-  #       name: PyTest Check
-  #       additional_dependencies: "requirements-dev.txt"?
-  #       entry: pytest
-  #       args: [tests/]
-  #       language: python
-  #       pass_filenames: false
-  #       always_run: true
