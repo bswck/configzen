@@ -59,12 +59,11 @@ def with_export_hook(
 
     Usage
     -----
-    .. code-block:: python
-
-        @with_export_hook(converter_func)
-        class MyClass:
-            ...
-
+    ```python
+    @with_export_hook(converter_func)
+    class MyClass:
+        ...
+    ```
     """
     if cls is None:
         return functools.partial(with_export_hook, func)
