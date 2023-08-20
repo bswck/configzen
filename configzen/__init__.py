@@ -28,5 +28,3 @@ __all__ = (
     *module.__all__,
     "field_validator",
 )
-
-del annotations
