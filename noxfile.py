@@ -70,21 +70,6 @@ def release(session: nox.Session) -> None:
             session.run("poetry", "version", "--short", silent=True, external=True),
         ).strip()
     )
-    session.log(f"Creating {new_version} tag...")
-    try:
-        session.run(
-            "git",
-            "tag",
-            "-a",
-            new_version,
-            "-m",
-            f"Release {new_version}",
-            external=True,
-        )
-    except CommandFailed:
-        session.log(f"Failed to create {new_version} tag, probably already exists.")
-    session.log("Pushing local tags...")
-    session.run("git", "push", "--tags", external=True)
 
     session.run("git", "diff", external=True)
     commit_confirm = (
@@ -109,4 +94,23 @@ def release(session: nox.Session) -> None:
         )
         session.run("git", "push", external=True)
     else:
-        session.log("Ok, changed uncommitted.")
+        session.error(
+            "Changes made uncommitted. Commit your unrelated changes and try again.",
+        )
+
+    session.log(f"Creating {new_version} tag...")
+    try:
+        session.run(
+            "git",
+            "tag",
+            "-a",
+            new_version,
+            "-m",
+            f"Release `{new_version}`",
+            external=True,
+        )
+    except CommandFailed:
+        session.log(f"Failed to create {new_version} tag, probably already exists.")
+    else:
+        session.log("Pushing local tags...")
+        session.run("git", "push", "--tags", external=True)
