@@ -17,10 +17,8 @@ jobs:
       - name: Install poetry
         run: |
           pipx install poetry
-          pipx inject poetry poetry-bumpversion
       - name: Build with poetry
         run: |
-          poetry version ${{ github.ref_name }}
           poetry build
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
