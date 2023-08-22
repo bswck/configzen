@@ -89,7 +89,7 @@ def release(session: nox.Session) -> None:
             "git",
             "commit",
             "-am",
-            f"Release {new_version}",
+            f"Release `{new_version}`",
             external=True,
         )
         session.run("git", "push", external=True)
