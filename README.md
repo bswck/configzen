@@ -1,4 +1,4 @@
-# configzen `v0.8.0`
+# configzen `v0.8.1`
 
 _configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
