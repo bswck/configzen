@@ -16,7 +16,7 @@ from .route import *
 __author__ = "bswck"
 __copyright__ = "Copyright 2023–present, bswck"
 __credits__ = ["Lunarmagpie", "trag1c"]
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 __all__ = (
     *model.__all__,
