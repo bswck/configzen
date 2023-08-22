@@ -17,8 +17,12 @@ jobs:
       - name: Install poetry
         run: |
           pipx install poetry
+          pipx inject poetry-bumpversion
       - name: Build with poetry
         run: |
+          export TAG_PREFIX="v"
+          export TAG_NAME=${{ github.ref_name }}
+          poetry version $(echo ${TAG_NAME#$TAG_PREFIX})
           poetry build
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
