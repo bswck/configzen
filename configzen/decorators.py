@@ -4,7 +4,13 @@ import contextlib
 import functools
 from typing import TYPE_CHECKING, Any, cast, overload
 
-from configzen.model import export_hook, export_model, export_model_async, field_hook
+from configzen.model import (
+    ConfigModel,
+    export_hook,
+    export_model,
+    export_model_async,
+    field_hook,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Iterator
@@ -18,6 +24,7 @@ __all__ = (
     "with_async_exporter",
     "with_field_hook",
     "with_export_hook",
+    "with_export_options",
 )
 
 
@@ -216,4 +223,60 @@ def with_async_exporter(
         export_model_async.register(cls, default_async_func)
     else:
         export_model_async.register(cls, func)
+    return cls
+
+
+def _export_with_options(
+    options: dict[str, Any],
+    config_model: ConfigModel,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    return config_model.dict(**{**kwargs, **options})
+
+
+async def _export_with_options_async(
+    options: dict[str, Any],
+    config_model: ConfigModel,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    return await config_model.dict_async(**{**kwargs, **options})
+
+
+@overload
+def with_export_options(
+    cls: None = None,
+    **options: Any,
+) -> functools.partial[type[ConfigModelT]]:
+    ...
+
+
+@overload
+def with_export_options(
+    cls: type[ConfigModelT],
+    **options: Any,
+) -> type[ConfigModelT]:
+    ...
+
+
+def with_export_options(
+    cls: type[ConfigModelT] | None = None,
+    **options: Any,
+) -> type[ConfigModelT] | functools.partial[type[ConfigModelT]]:
+    """
+    Register default options for a configuration model class dictionary exporter.
+
+    Parameters
+    ----------
+    cls
+        The configuration model class to register the options for.
+    **options
+        The default keyword arguments to pass to the exporter function.
+    """
+    if cls is None:
+        return functools.partial(with_export_options, **options)
+    export_model.register(cls, functools.partial(_export_with_options, options))
+    export_model_async.register(
+        cls,
+        functools.partial(_export_with_options_async, options),
+    )
     return cls
