@@ -1879,7 +1879,7 @@ class ConfigModel(
         self: ConfigModelT,
         memodict: dict[Any, Any] | None = None,
     ) -> ConfigModelT:
-        state = dict(self._iter(to_dict=False))
+        state = self.__dict__.copy()
         state.pop(LOCAL, None)
         state.pop(TOKEN, None)
         clone = copy.deepcopy(state)
