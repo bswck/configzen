@@ -70,33 +70,37 @@ def release(session: nox.Session) -> None:
             session.run("poetry", "version", "--short", silent=True, external=True),
         ).strip()
     )
+    diff = session.run("git", "diff", external=True, silent=True)
 
-    session.run("git", "diff", external=True)
-    commit_confirm = (
-        (
-            input(
-                "You are about to commit auto-changed files due to version upgrade, "
-                "see the diff view above. Are you sure? (y/n) [y]: ",
+    if diff:
+        session.run("git", "diff", external=True)
+        commit_confirm = (
+            (
+                input(
+                    "You are about to commit auto-changed files "
+                    "due to version upgrade, see the diff view above. "
+                    "Are you sure? (y/n) [y]: ",
+                )
+                .casefold()
+                .strip()
             )
-            .casefold()
-            .strip()
-        )
-        or "y"
-    )[0]
+            or "y"
+        )[0]
 
-    if commit_confirm == "y":
-        session.run(
-            "git",
-            "commit",
-            "-am",
-            f"Release `{new_version}`",
-            external=True,
-        )
-        session.run("git", "push", external=True)
-    else:
-        session.error(
-            "Changes made uncommitted. Commit your unrelated changes and try again.",
-        )
+        if commit_confirm == "y":
+            session.run(
+                "git",
+                "commit",
+                "-am",
+                f"Release `{new_version}`",
+                external=True,
+            )
+            session.run("git", "push", external=True)
+        else:
+            session.error(
+                "Changes made uncommitted. "
+                "Commit your unrelated changes and try again.",
+            )
 
     session.log(f"Creating {new_version} tag...")
     try:
@@ -106,7 +110,7 @@ def release(session: nox.Session) -> None:
             "-a",
             new_version,
             "-m",
-            f"Release `{new_version}`",
+            f"Release {new_version}",
             external=True,
         )
     except CommandFailed:
