@@ -7,12 +7,12 @@ repos:
       - id: trailing-whitespace
         name: Trim Trailing Whitespaces
   - repo: https://github.com/psf/black
-    rev: "23.7.0"
+    rev: "23.9.1"
     hooks:
       - id: black
         name: Reformatting with Black
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.287
+    rev: v0.0.288
     hooks:
       - id: ruff
         name: Check Ruff
