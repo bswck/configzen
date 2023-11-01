@@ -24,14 +24,12 @@ anyconfig-configobj-backend = { version = "^0.2.0", optional = true }
 
 [tool.poetry.extras]
 cli = ["click"]
-ion = ["anyconfig-ion-backend"]
 bson = ["anyconfig-bson-backend"]
 cbor2 = ["anyconfig-cbor2-backend"]
 cbor = ["anyconfig-cbor-backend"]
 configobj = ["anyconfig-configobj-backend"]
 # msgpack = ["anyconfig-msgpack-backend"]
 all = [
-    "anyconfig-ion-backend",
     "anyconfig-bson-backend",
     "anyconfig-cbor2-backend",
     "anyconfig-cbor-backend",

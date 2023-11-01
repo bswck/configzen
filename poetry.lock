@@ -1793,9 +1793,8 @@ cbor = ["anyconfig-cbor-backend"]
 cbor2 = ["anyconfig-cbor2-backend"]
 cli = ["click"]
 configobj = ["anyconfig-configobj-backend"]
-ion = []
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "4f6aec68215508066f1a6915c9778863863e68f5616d48ba346d2df4364640e5"
+content-hash = "7bb4dbe9e7119d6fd714d408ebbd5d87f6f6ce2a3dbba6dd2c30c94241a1d9ed"
