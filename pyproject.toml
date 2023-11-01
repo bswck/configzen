@@ -15,9 +15,7 @@ typing-extensions = { version = "^4.5.0", python = ">=3.9,<3.11" }
 aiofiles = { version = "^23.1.0" }
 pyyaml = { version = "^6.0" }
 toml = { version = "^0.10.2" }
-click = "^8.1.3"
-pytest = "^7.4.0"
-anyconfig-ion-backend = { version = "^0.2.0", optional = true }
+click = { version = "^8.1.3", optional = true }
 anyconfig-bson-backend = { version = "^0.2.0", optional = true }
 anyconfig-cbor2-backend = { version = "^0.2.0", optional = true }
 anyconfig-cbor-backend = { version = "^0.2.0", optional = true }
@@ -25,6 +23,7 @@ anyconfig-configobj-backend = { version = "^0.2.0", optional = true }
 # anyconfig-msgpack-backend = { version = "^0.2.0", optional = true }
 
 [tool.poetry.extras]
+cli = ["click"]
 ion = ["anyconfig-ion-backend"]
 bson = ["anyconfig-bson-backend"]
 cbor2 = ["anyconfig-cbor2-backend"]
@@ -48,9 +47,7 @@ pytest = "^7.3.1"
 mkdocs = "^1.4.3"
 mkdocstrings = "^0.22.0"
 pylint = "^2.17.4"
-
 pre-commit = "^3.3.3"
-nox = "^2023.4.22"
 isort = "^5.12.0"
 coverage = "^7.3.0"
 
