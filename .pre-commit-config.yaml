@@ -22,23 +22,3 @@ repos:
       - id: poetry-check
         stages: [push]
         name: Check Poetry environment
-      - id: poetry-lock
-        name: Lock Dependencies with Poetry
-        stages: [push]
-      - id: poetry-export
-        name: Export Dependencies with Poetry
-        args:
-          ["--without=dev", "-f", "requirements.txt", "-o", "requirements.txt"]
-        stages: [push]
-      - id: poetry-export
-        name: Export Dev Dependencies with Poetry
-        args:
-          [
-            "--with=dev",
-            "--extras=all",
-            "-f",
-            "requirements.txt",
-            "-o",
-            "requirements-dev.txt",
-          ]
-        stages: [push]
