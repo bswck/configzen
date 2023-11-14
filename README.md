@@ -1,5 +1,9 @@
 # configzen `v0.10.0`
 
+> [!WARNING]  
+> This project is currently under an intense rewriting process to be compatible with pydantic v2 and work more reliably, compared to its initial version.
+> Please hang on for a little! 🚀
+
 _configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
 It's important to keep your configuration safe and consistent. Give a shot to _configzen_ 🚀
