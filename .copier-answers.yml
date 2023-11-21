@@ -7,8 +7,7 @@ github_username: bswck
 license_name: MIT
 main_branch: master
 package_name: configzen
-project_description: Easily create and maintain complex, statically-typed configurations
-    with validation in Python.
+project_description: An advanced configuration library for Python.
 project_version: 0.10.0
 publish_on_pypi: true
 pypi_project_description: Easily create and maintain complex, statically-typed configurations

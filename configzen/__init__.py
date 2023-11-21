@@ -1,7 +1,7 @@
 """
 configzen.
 
-Easily create and maintain complex, statically-typed configurations with validation in Python.
+An advanced configuration library for Python.
 
 (C) 2023-present Bartosz Sławecki (bswck)
 """

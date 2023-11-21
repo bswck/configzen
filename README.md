@@ -5,9 +5,13 @@
 [![Code style](https://img.shields.io/badge/code%20style-black-000000.svg?label=Code%20style)](https://github.com/psf/black)
 [![License](https://img.shields.io/github/license/bswck/configzen.svg?label=License)](https://github.com/bswck/configzen/blob/master/LICENSE)
 
+<<<<<<< before updating
 > [!Warning]
 > _configzen_ is currently under huge refactoring to work with pydantic v2.
 > The API is subject to change.
+=======
+An advanced configuration library for Python.
+>>>>>>> after updating
 
 _configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
 
