@@ -1,6 +1,6 @@
 _commit: 338b77f
 _src_path: gh:bswck/skeleton
-add_description_to_readme: true
+add_description_to_readme: false
 author_full_name: Bartosz Sławecki
 email_address: bswck.dev@gmail.com
 github_username: bswck
