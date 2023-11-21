@@ -2,13 +2,13 @@
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
 # Sync with bswck/skeleton.
-# This script was adopted from https://github.com/bswck/skeleton/tree/338b77f/project/scripts/sync.sh.jinja
+# This script was adopted from https://github.com/bswck/skeleton/tree/7a92e41/project/scripts/sync.sh.jinja
 #
 # Usage:
 # $ poe sync
 
 
-# Automatically copied from https://github.com/bswck/skeleton/tree/338b77f/handle-task-event.sh
+# Automatically copied from https://github.com/bswck/skeleton/tree/7a92e41/handle-task-event.sh
 
 toggle_workflows() {
     # Toggle workflows depending on the project's settings
@@ -31,8 +31,6 @@ ensure_github_environment() {
 
 supply_smokeshow_key() {
     # Supply smokeshow key to the repository
-    # This is not sufficient and will become a GitHub action:
-    # https://github.com/bswck/supply-smokeshow-key
     echo "Checking if smokeshow secret needs to be created..."
     ensure_github_environment "Smokeshow"
     if test "$(gh secret list -e Smokeshow | grep -o SMOKESHOW_AUTH_KEY)"
@@ -99,6 +97,13 @@ after_update_algorithm() {
             local COMMIT_MSG="Upgrade to bswck/skeleton of unknown revision"
         fi
     fi
+    while test "$(git diff --check > /dev/null 2>&1)"
+    do
+        echo "Cannot commit with the following conflicts:"
+        git diff --check
+        echo "Please resolve the conflicts and press Enter to continue."
+        read -r
+    done
     git commit --no-verify -m "$COMMIT_MSG" -m "$REVISION_PARAGRAPH"
     git push --no-verify
     toggle_workflows
@@ -110,7 +115,7 @@ after_update_algorithm() {
 }
 
 main() {
-    export LAST_REF="338b77f"
+    export LAST_REF="7a92e41"
     export PROJECT_PATH_KEY="$$_skeleton_project_path"
     export NEW_REF_KEY="$$_skeleton_new_ref"
     export LAST_LICENSE_NAME="MIT"
