@@ -5,7 +5,7 @@ author_full_name: Bartosz Sławecki
 email_address: bswck.dev@gmail.com
 github_username: bswck
 license_name: MIT
-main_branch: pydantic-v2
+main_branch: master
 package_name: configzen
 project_description: Easily create and maintain complex, statically-typed configurations
     with validation in Python.
