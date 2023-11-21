@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from typing import IO, TYPE_CHECKING, ClassVar
+
+from tomlkit.api import dump, load, register_encoder, unregister_encoder
+
+from configzen.data import Data, DataFormatOptions, TextDataFormat
+
+if TYPE_CHECKING:
+    from tomlkit.items import Encoder
+    from typing_extensions import Unpack
+
+
+__all__ = (
+    "TOMLDataFormat",
+    "TOMLOptions",
+)
+
+
+class TOMLOptions(DataFormatOptions, total=False):
+    """Prototype of the allowed options for the TOML data format."""
+
+    encoders: list[Encoder]
+    """List of encoders to perform automatic tomlkit.register_encoder() calls on."""
+
+    unregister_old_encoders: bool
+    """
+    Whether to unregister all previously registered encoders
+    before registering the new ones.
+    """
+
+    sort_keys: bool
+    """
+    Whether to sort keys in the output.
+    """
+
+
+class TOMLDataFormat(TextDataFormat[TOMLOptions]):
+    option_name: ClassVar[str] = "toml"
+    toml_options: TOMLOptions
+
+    default_extension: ClassVar[str] = "toml"
+    file_extensions: ClassVar[set[str]] = {"ini", "conf"}
+
+    def __init__(self, options: TOMLOptions) -> None:
+        self.toml_options = options
+        super().__init__(options)
+
+    def configure(self, **options: Unpack[TOMLOptions]) -> None:
+        """For the documentation of the options, see the TOMLOptions class."""
+        old_options = self.toml_options
+        toml_encoders = options.get("encoders") or old_options.get("encoders") or []
+        cleanup_old_encoders = options.get("cleanup_old_encoders", False)
+
+        if cleanup_old_encoders:
+            for encoder in self.toml_options.get("encoders") or []:
+                unregister_encoder(encoder)
+
+        for encoder in toml_encoders:
+            register_encoder(encoder)
+
+    def load(self, stream: IO[str]) -> Data:
+        return load(stream)
+
+    def dump(self, data: Data, stream: IO[str]) -> None:
+        dump(
+            data,
+            stream,
+            sort_keys=self.toml_options.get("sort_keys", False),
+        )

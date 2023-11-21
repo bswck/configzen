@@ -1,30 +1,24 @@
-# flake8: noqa
-# pyright: reportUnsupportedDunderAll=false
-from __future__ import annotations
+"""
+configzen.
 
-from pydantic import validator as field_validator
+An advanced configuration library for Python.
 
-from . import decorators, field, interpolation, model, module, processor, route
-from .decorators import *
-from .field import *
-from .interpolation import *
-from .model import *
-from .module import *
-from .processor import *
-from .route import *
+(C) 2023, bswck
+"""
 
-__author__ = "bswck"
-__copyright__ = "Copyright 2023–present, bswck"
-__credits__ = ["Lunarmagpie", "trag1c"]
-__version__ = "0.10.0"
+from . import configuration, errors, formats, module_proxy, route, sources
+from .configuration import *  # noqa: F403
+from .errors import *  # noqa: F403
+from .formats import *  # noqa: F403
+from .module_proxy import *  # noqa: F403
+from .route import *  # noqa: F403
+from .sources import *  # noqa: F403
 
 __all__ = (
-    *model.__all__,
-    *field.__all__,
-    *interpolation.__all__,
-    *processor.__all__,
-    *decorators.__all__,
-    *route.__all__,
-    *module.__all__,
-    "field_validator",
+    configuration.__all__
+    + errors.__all__
+    + formats.__all__
+    + module_proxy.__all__
+    + route.__all__
+    + sources.__all__
 )
