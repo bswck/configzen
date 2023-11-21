@@ -1,0 +1,19 @@
+_commit: 338b77f
+_src_path: gh:bswck/skeleton
+add_description_to_readme: true
+author_full_name: Bartosz Sławecki
+email_address: bswck.dev@gmail.com
+github_username: bswck
+license_name: MIT
+main_branch: pydantic-v2
+package_name: configzen
+project_description: Easily create and maintain complex, statically-typed configurations
+    with validation in Python.
+project_version: 0.10.0
+publish_on_pypi: true
+pypi_project_description: Easily create and maintain complex, statically-typed configurations
+    with validation in Python.
+pypi_project_name: configzen
+python_version: '3.8'
+repo_name: configzen
+visibility: public

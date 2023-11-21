@@ -9,11 +9,11 @@ body:
       value: "
 **GUIDELINES FOR REPORTING BUGS**
 
-1. A **brief description of the problem** - typically a line or two at most.
+1. A **brief description of the problem**—typically a line or two at most.
 
 2. **Concise, dependency-free code which reproduces the problem**, otherwise known as a [Minimal, Complete, and Verifiable](https://stackoverflow.com/help/mcve) example.
 
-3. **Complete stack traces for all errors - please use formatted text inside issues, not screenshots**.
+3. **Complete stack traces for all errors—please use formatted text inside issues, not screenshots**.
 
 4. Other things as applicable: **operating system**, **comparative performance timings** for performance issues.
 "
@@ -70,4 +70,4 @@ If the message is a warning, run your program with the ``-Werror`` flag:   ``pyt
 
   - type: markdown
     attributes:
-      value: "**Have a great day!**"
+      value: "**Have a great day!** 🌞"
