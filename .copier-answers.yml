@@ -10,8 +10,7 @@ package_name: configzen
 project_description: An advanced configuration library for Python.
 project_version: 0.10.0
 publish_on_pypi: true
-pypi_project_description: Easily create and maintain complex, statically-typed configurations
-    with validation in Python.
+pypi_project_description: An advanced configuration library for Python.
 pypi_project_name: configzen
 python_version: '3.8'
 repo_name: configzen
