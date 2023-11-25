@@ -523,6 +523,17 @@ files = [
 ]
 
 [[package]]
+name = "runtime-generics"
+version = "1.1.0"
+description = "Reuse type arguments explicitly passed at runtime to a generic class before instantiating."
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "runtime_generics-1.1.0-py3-none-any.whl", hash = "sha256:4b543f4ff141a27b7152f43dba50173742e43346746fa6ae3f4d92e3ef093d30"},
+    {file = "runtime_generics-1.1.0.tar.gz", hash = "sha256:8163ebad3d386cf1b94d2b04e7a7cb52b6f1385c64dd32cec41f3325f6c75494"},
+]
+
+[[package]]
 name = "setuptools"
 version = "69.0.2"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
@@ -630,4 +641,4 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "bcfe46423e8378535bbc5cd508a28dcec5b42589b0e8c8100cfbcfd61c4892f0"
+content-hash = "66a62feb3dd66ac2bb3865c4241907f4c34422ecdb260d523eea7bf5769457fb"
