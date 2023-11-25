@@ -1,17 +1,15 @@
-_commit: 7a92e41
+_commit: 1e36d1d
 _src_path: gh:bswck/skeleton
-add_description_to_readme: false
 author_full_name: Bartosz Sławecki
 email_address: bswck.dev@gmail.com
 github_username: bswck
 license_name: MIT
-main_branch: master
 package_name: configzen
 project_description: An advanced configuration library for Python.
-project_version: 0.10.0
 publish_on_pypi: true
 pypi_project_description: An advanced configuration library for Python.
 pypi_project_name: configzen
 python_version: '3.8'
 repo_name: configzen
+use_precommit: true
 visibility: public

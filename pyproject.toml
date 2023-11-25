@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "configzen"
-version = "0.10.0"
+version = "0.0.1"
 description = "An advanced configuration library for Python."
 authors = ["bswck <bswck.dev@gmail.com>"]
 license = "MIT"
@@ -15,17 +15,14 @@ mypy = "^1.7.0"
 ruff = "^0.1.2"
 pytest = "^7.4.3"
 coverage = "^7.3.2"
-pre-commit = "^3.5.0"
 poethepoet = "^0.24.3"
-
+pre-commit = "^3.5.0"
 smokeshow = "^0.4.0"
-
 
 [tool.poe.tasks]
 test = "pytest -v"
 lock = "scripts/lock.sh"
 sync = "scripts/sync.sh"
-skeleton.script = "scripts.skeleton:main"
 release.script = "scripts.release:main"
 
 [tool.ruff]
@@ -64,13 +61,10 @@ strict = true
 [tool.isort]
 profile = "black"
 
-[[tool.poetry_bumpversion.replacements]]
-files = ["./README.md"]
-
 [tool.coverage.report]
 omit = ["tests/*"]
 # fail_under = 96
-exclude_lines = [
+exclude_also = [
     # Be sure to include lines that are not meant to be covered
     # by tests or encountered by the users at runtime.
     "raise NotImplementedError",          # Do not cover abstract methods.
