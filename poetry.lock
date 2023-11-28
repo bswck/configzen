@@ -1145,6 +1145,21 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pydantic-settings"
+version = "2.1.0"
+description = "Settings management using Pydantic"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pydantic_settings-2.1.0-py3-none-any.whl", hash = "sha256:7621c0cb5d90d1140d2f0ef557bdf03573aac7035948109adf2574770b77605a"},
+    {file = "pydantic_settings-2.1.0.tar.gz", hash = "sha256:26b1492e0a24755626ac5e6d715e9077ab7ad4fb5f19a8b7ed7011d52f36141c"},
+]
+
+[package.dependencies]
+pydantic = ">=2.3.0"
+python-dotenv = ">=0.21.0"
+
+[[package]]
 name = "pygments"
 version = "2.17.2"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -1212,6 +1227,20 @@ files = [
 
 [package.dependencies]
 six = ">=1.5"
+
+[[package]]
+name = "python-dotenv"
+version = "1.0.0"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "python-dotenv-1.0.0.tar.gz", hash = "sha256:a8df96034aae6d2d50a4ebe8216326c61c3eb64836776504fcca410e5937a3ba"},
+    {file = "python_dotenv-1.0.0-py3-none-any.whl", hash = "sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
 
 [[package]]
 name = "pytz"
@@ -1486,6 +1515,17 @@ files = [
 ]
 
 [[package]]
+name = "runtime-generics"
+version = "1.1.0"
+description = "Reuse type arguments explicitly passed at runtime to a generic class before instantiating."
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "runtime_generics-1.1.0-py3-none-any.whl", hash = "sha256:4b543f4ff141a27b7152f43dba50173742e43346746fa6ae3f4d92e3ef093d30"},
+    {file = "runtime_generics-1.1.0.tar.gz", hash = "sha256:8163ebad3d386cf1b94d2b04e7a7cb52b6f1385c64dd32cec41f3325f6c75494"},
+]
+
+[[package]]
 name = "setuptools"
 version = "69.0.2"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
@@ -1685,4 +1725,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "d8423c4b1ea6363121754700fcccf8299a341d9dc1771175a4fc9264e141ef39"
+content-hash = "7532ec1884f824ad38d9d7b197fdccb011a183a5024441c10113f2b55008489a"
