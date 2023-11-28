@@ -1,53 +1,65 @@
-site_name: configzen
-repo_url: https://github.com/bswck/configzen
-repo_name: bswck/configzen
-copyright: Copyright &copy; 2023 bswck
+site_name: "configzen"
+site_description: "An advanced configuration library for Python."
+site_url: "https://configzen.readthedocs.io/en/latest/"
+repo_url: "https://github.com/bswck/configzen"
+repo_name: "bswck/configzen"
+watch:
+- "configzen"
+
 nav:
-- Home: index.md
-- API Reference:
-  - 'configzen.model': 'api/model.md'
-  - 'configzen.decorators': 'api/decorators.md'
-  - 'configzen.errors': 'api/errors.md'
-  - 'configzen.field': 'api/field.md'
-  - 'configzen.interpolation': 'api/interpolation.md'
-  - 'configzen.processor': 'api/processor.md'
-  - 'configzen.route': 'api/route.md'
-#- Examples: examples.md
+- "Overview": "index.md"
+- "Contributing": "contributing.md"
+# - "API Reference":
+#   - module.py: "reference/module.md"
+#   - etc.
+- "Changelog": "changelog.md"
+
 theme:
-  name: material
+  name: "material"
+  features:
+  - "content.code.annotate"
+  - "navigation.top"
+  - "navigation.tracking"
   palette:
-
-  # Palette toggle for light mode
+  - media: "(prefers-color-scheme)"
+    toggle:
+      icon: "material/brightness-auto"
+      name: "Switch to light mode"
   - media: "(prefers-color-scheme: light)"
-    scheme: default
-    primary: pink
-    accent: pink
+    scheme: "default"
+    primary: "teal"
+    accent: "purple"
     toggle:
-      icon: material/toggle-switch
-      name: Switch to dark mode
-
-  # Palette toggle for dark mode
+      icon: "material/weather-sunny"
+      name: "Switch to dark mode"
   - media: "(prefers-color-scheme: dark)"
-    scheme: slate
-    primary: pink
-    accent: pink
+    scheme: "slate"
+    primary: "black"
+    accent: "lime"
     toggle:
-      icon: material/toggle-switch-off-outline
-      name: Switch to light mode
-plugins:
-- search
-- mkdocstrings:
-    handlers:
-      python:
-        options:
-          docstring_style: numpy
+      icon: "material/weather-night"
+      name: "Switch to system preference"
+
+extra_css:
+- "css/mkdocstrings.css"
+
 markdown_extensions:
-- admonition
-- footnotes
-- pymdownx.highlight:
-    anchor_linenums: true
-- pymdownx.inlinehilite
-- pymdownx.snippets
-- pymdownx.superfences
-- pymdownx.tabbed:
-    alternate_style: true
+- "pymdownx.highlight":
+    use_pygments: true
+- "pymdownx.superfences":
+    custom_fences:
+      - name: "mermaid"
+        class: "mermaid"
+        format: !!python/name:pymdownx.superfences.fence_code_format
+- "toc":
+    permalink: true
+- "admonition"
+- "pymdownx.emoji"
+- "pymdownx.magiclink"
+- "footnotes"
+
+plugins:
+- "autorefs"
+- "search"
+- "markdown-exec"
+- "mkdocstrings"

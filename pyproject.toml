@@ -1,11 +1,18 @@
 [tool.poetry]
 name = "configzen"
-version = "0.0.1"
+version = "0.0.0"
 description = "An advanced configuration library for Python."
 authors = ["bswck <bswck.dev@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [{ include = "configzen/" }]
+homepage = "https://github.com/bswck/configzen"
+
+[tool.poetry.urls]
+Documentation = "https://configzen.readthedocs.io/en/latest/"
+Issues = "https://github.com/bswck/configzen/issues"
+Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
+Distribution = "https://pypi.org/project/configzen/"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -16,16 +23,31 @@ pydantic-settings = "^2.1.0"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.7.0"
 ruff = "^0.1.2"
+copier-templates-extensions = "^0.3.0"
 pytest = "^7.4.3"
 coverage = "^7.3.2"
 poethepoet = "^0.24.3"
 pre-commit = "^3.5.0"
 smokeshow = "^0.4.0"
 
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+markdown-exec = ">=1.3.0"
+mkdocs-material = ">=8.2,<10.0.0"
+mkdocstrings = { version = ">=0.19.0", extras = ["python"] }
+
 [tool.poe.tasks]
 test = "pytest -v"
+lint = "ruff check ."
 lock = "scripts/lock.sh"
-sync = "scripts/sync.sh"
+bump = "scripts/bump.sh"
+check = [
+    { ref="test" },
+    { ref="lint" },
+    { ref="lock" }
+]
 release.script = "scripts.release:main"
 
 [tool.ruff]

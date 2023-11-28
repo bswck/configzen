@@ -1,0 +1,91 @@
+# Contributing to [configzen](https://github.com/bswck/configzen) 🎉
+Contributions are very welcome. 🚀
+
+There are many ways to contribute, ranging from **writing tutorials and improving the documentation**, to **submitting bug reports and feature requests or writing code** which can be incorporated into **configzen**.
+
+## Report bugs and request features 🐛
+Report these in the [issue tracker](https://github.com/bswck/configzen/issues).
+Relevant forms provide guidance on how to write a good bug report or feature request.
+
+## Implement new features ⭐
+[Look here](https://github.com/bswck/configzen/issues?q=is%3Aopen+label%3Aenhancement+sort%3Aupdated-desc).
+Anything tagged with "enhancement" is open to whoever wants to implement it.
+
+## Write documentation 📖
+The project could always use more documentation, whether as part of the official project
+docs. If you're interested in helping out, check the [docs/](https://github.com/bswck/configzen/tree/HEAD/docs) folder in the repository.
+
+## Share your feedback 🌍
+The best way to send feedback is to file an issue in the [issue tracker](https://github.com/bswck/configzen).
+
+If you are proposing a feature:
+-   Explain in detail how it would work.
+-   Keep the scope as narrow as possible, to make it easier to implement.
+-   Remember that this is a volunteer-driven project, and that contributions are
+    welcome! ✨
+
+## Get started! 🕹️
+
+Ready to contribute? Here's a quick guide on how to set up configzen and make a change.
+
+
+> [!Note]
+> If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+1.  Fork the [configzen repository](https://github.com/bswck/configzen) on GitHub.
+
+2.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
+    Poetry is an amazing tool for managing dependencies & virtual environments, building packages and publishing them.
+
+    ```shell
+    pipx install poetry
+    ```
+
+    <sub>If you encounter any problems, refer to [the official documentation](https://python-poetry.org/docs/#installation) for the most up-to-date installation instructions.</sub>
+
+    Be sure to have Python 3.8 installed—if you use [pyenv](https://github.com/pyenv/pyenv#readme), simply run:
+
+    ```shell
+    pyenv install 3.8
+    ```
+
+3.  Clone your fork locally and install dependencies.
+
+    ```shell
+    git clone https://github.com/your-username/configzen path/to/configzen
+    cd path/to/configzen
+    poetry env use $(cat .python-version)
+    poetry install
+    poetry shell
+    pre-commit install --hook-type pre-commit --hook-type pre-push
+    ```
+4.  Create a branch for local development:
+
+    ```shell
+    git checkout -b name-of-your-bugfix-or-feature
+    ```
+
+    Now you can make your changes locally.
+
+5.  When you're done making changes, check that your changes pass all tests:
+
+    ```shell
+    poe check
+    ```
+
+6.  Commit your changes and push your branch to GitHub:
+
+    ```shell
+    git add .
+    git commit -m "Short description of changes (50 chars max)" -m "Optional extended description"
+    git push origin name-of-your-bugfix-or-feature
+    ```
+
+7.  Submit a pull request through the GitHub website.
+
+
+## Pull Request guidelines 📝
+1. Initially mark the PR as a draft, so that the maintainers know that you are making final touches.
+2. Ensure that the [test coverage](https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen) is not decreased. If you add a new feature, please add tests for it. [Read more about coverage](https://coverage.readthedocs.io/en/latest/index.html).
+3. Ensure that all GitHub checks pass. If they are disabled in your PR, ping the maintainers to request enabling them.
+4. Don't forget to link the relevant issue(s) in the PR description and describe the changes you made.
