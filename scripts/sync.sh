@@ -5,7 +5,7 @@
 # This script was adopted from https://github.com/bswck/skeleton/tree/1e36d1d/project/scripts/sync.sh.jinja
 #
 # Usage:
-# $ poe sync
+# $ poe bump
 
 # shellcheck disable=SC2005
 
@@ -26,7 +26,7 @@ determine_project_path() {
 
 ensure_github_environment() {
     # Ensure that the GitHub environment exists
-    echo "$(jq -n '{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}' | gh api -H "Accept: application/vnd.github+json" -X PUT "/repos/bswck/configzen/environments/$1" --input -)" > /dev/null 2>&1 || return 1
+    echo "$(jq -n '{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}' | gh api -H "Accept: application/vnd.github+json" -X PUT "/repos/bswck/uncover/environments/$1" --input -)" > /dev/null 2>&1 || return 1
 }
 
 supply_smokeshow_key() {
@@ -47,8 +47,8 @@ supply_smokeshow_key() {
         echo "Failed to create smokeshow secret." 1>&2
     fi
 }
-
 # End of copied code
+
 
 determine_new_ref() {
     # Determine the new skeleton revision set by the child process
@@ -101,6 +101,9 @@ after_update_algorithm() {
     redis-cli del "$NEW_REF_KEY" > /dev/null 2>&1
     echo "Press ENTER to commit the changes or CTRL+C to abort."
     read -r || exit 1
+
+    poetry run pre-commit install --hook-type pre-commit --hook-type pre-push
+
     git commit --no-verify -m "$COMMIT_MSG" -m "$REVISION_PARAGRAPH"
     git push --no-verify
     toggle_workflows
