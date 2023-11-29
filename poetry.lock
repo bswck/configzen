@@ -1516,13 +1516,13 @@ files = [
 
 [[package]]
 name = "runtime-generics"
-version = "1.1.0"
+version = "1.2.0"
 description = "Reuse type arguments explicitly passed at runtime to a generic class before instantiating."
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "runtime_generics-1.1.0-py3-none-any.whl", hash = "sha256:4b543f4ff141a27b7152f43dba50173742e43346746fa6ae3f4d92e3ef093d30"},
-    {file = "runtime_generics-1.1.0.tar.gz", hash = "sha256:8163ebad3d386cf1b94d2b04e7a7cb52b6f1385c64dd32cec41f3325f6c75494"},
+    {file = "runtime_generics-1.2.0-py3-none-any.whl", hash = "sha256:120eb530cc16a1527a2889c90279259d79d6a6bdd21bada5ec857e2649e56176"},
+    {file = "runtime_generics-1.2.0.tar.gz", hash = "sha256:daa76e5849a1d39a3c3ffb321092bd34683c63b076cb49f8fa94a8e6fc85039a"},
 ]
 
 [[package]]
@@ -1725,4 +1725,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "7532ec1884f824ad38d9d7b197fdccb011a183a5024441c10113f2b55008489a"
+content-hash = "1dc24b1b34a8c20c2769a69076431e05b7cd376ed0e100b254acd0a11850c5ef"

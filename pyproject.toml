@@ -16,7 +16,7 @@ Distribution = "https://pypi.org/project/configzen/"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-runtime-generics = "^1.1.0"
+runtime-generics = "^1.2.0"
 pydantic = "^2.5.2"
 pydantic-settings = "^2.1.0"
 
@@ -55,6 +55,16 @@ exclude = ["tests/", "scripts/"]
 # To discuss the presented rationales, contact the author (bswck).
 select = ["ALL"]
 ignore = [
+    # From bswck/configzen
+    # --------------------
+
+    # Description: Missing docstring in `__init__`
+    # Rationale: The `__init__` docstring is mostly redundant to the class docstring.
+    "D107",
+
+    # From bswck/skeleton
+    # -------------------
+
     # Description: Missing type annotation for self in method
     # Rationale: It is mostly redundant, as is for ANN102.
     "ANN101",
