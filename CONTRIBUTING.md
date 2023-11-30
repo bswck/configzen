@@ -31,10 +31,9 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
 
 > [!Note]
 > If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
-
 1.  Fork the [configzen repository](https://github.com/bswck/configzen) on GitHub.
 
-2.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
+1.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
     Poetry is an amazing tool for managing dependencies & virtual environments, building packages and publishing them.
 
     ```shell
@@ -48,8 +47,7 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
     ```shell
     pyenv install 3.8
     ```
-
-3.  Clone your fork locally and install dependencies.
+1.  Clone your fork locally and install dependencies.
 
     ```shell
     git clone https://github.com/your-username/configzen path/to/configzen
@@ -59,7 +57,7 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
     poetry shell
     pre-commit install --hook-type pre-commit --hook-type pre-push
     ```
-4.  Create a branch for local development:
+1.  Create a branch for local development:
 
     ```shell
     git checkout -b name-of-your-bugfix-or-feature
@@ -67,13 +65,13 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
 
     Now you can make your changes locally.
 
-5.  When you're done making changes, check that your changes pass all tests:
+1.  When you're done making changes, check that your changes pass all tests:
 
     ```shell
     poe check
     ```
 
-6.  Commit your changes and push your branch to GitHub:
+1.  Commit your changes and push your branch to GitHub:
 
     ```shell
     git add .
@@ -81,7 +79,7 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
     git push origin name-of-your-bugfix-or-feature
     ```
 
-7.  Submit a pull request through the GitHub website.
+1.  Submit a pull request through the GitHub website.
 
 
 ## Pull Request guidelines 📝

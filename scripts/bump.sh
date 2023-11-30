@@ -2,7 +2,7 @@
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
 # Sync with bswck/skeleton.
-# This script was adopted from https://github.com/bswck/skeleton/tree/de6442b/project/scripts/sync.sh.jinja
+# This script was adopted from https://github.com/bswck/skeleton/tree/cb1abb7/project/scripts/sync.sh.jinja
 #
 # Usage:
 # $ poe bump
@@ -10,11 +10,25 @@
 # shellcheck disable=SC2005
 
 
-# Automatically copied from https://github.com/bswck/skeleton/tree/de6442b/handle-task-event.sh
+# Automatically copied from https://github.com/bswck/skeleton/tree/cb1abb7/handle-task-event.sh
+make_token() {
+    export TOKEN
+    TOKEN="$(echo "$(date +%s%N)" | sha256sum | head -c "${1:-10}")"
+}
 
-toggle_workflows() {
-    # Toggle workflows depending on the project's settings
-    echo "Toggling workflows..."
+stash() {
+    make_token 32
+    export STASH_TOKEN="$TOKEN"
+    git stash push -m "$STASH_TOKEN"
+}
+
+unstash() {
+    STASH_ID="$("$(git stash list)" | grep "${1:-STASH_TOKEN}" | grep -oP "^stash@{\K(\d)+")"
+    git stash pop "stash@{$STASH_ID}"
+}
+
+setup_gh() {
+    echo "Calling GitHub setup hooks..."
     supply_smokeshow_key
 }
 
@@ -24,7 +38,7 @@ determine_project_path() {
     PROJECT_PATH=$(redis-cli get "$PROJECT_PATH_KEY")
 }
 
-ensure_github_environment() {
+ensure_gh_environment() {
     # Ensure that the GitHub environment exists
     echo "$(jq -n '{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}' | gh api -H "Accept: application/vnd.github+json" -X PUT "/repos/bswck/configzen/environments/$1" --input -)" > /dev/null 2>&1 || return 1
 }
@@ -32,7 +46,7 @@ ensure_github_environment() {
 supply_smokeshow_key() {
     # Supply smokeshow key to the repository
     echo "Checking if smokeshow secret needs to be created..."
-    ensure_github_environment "Smokeshow" || echo "Failed to create smokeshow environment." 1>&2 && return 1
+    ensure_gh_environment "Smokeshow" || echo "Failed to create smokeshow environment." 1>&2 && return 1
     if test "$(gh secret list -e Smokeshow | grep -o SMOKESHOW_AUTH_KEY)"
     then
         echo "Smokeshow secret already exists, aborting." && return 0
@@ -61,8 +75,7 @@ before_update_algorithm() {
     if test "$(echo "$(git diff --name-only)")"
     then
         echo "There are uncommitted changes in the project."
-        git stash push --message "Stash before syncing with gh:bswck/skeleton"
-        DID_STASH=1
+        stash
     else
         echo "Working tree clean, no need to stash."
     fi
@@ -101,21 +114,18 @@ after_update_algorithm() {
     redis-cli del "$NEW_REF_KEY" > /dev/null 2>&1
     echo "Press ENTER to commit the changes or CTRL+C to abort."
     read -r || exit 1
-    
-    poetry run pre-commit install --hook-type pre-commit --hook-type pre-push
-    
     git commit --no-verify -m "$COMMIT_MSG" -m "$REVISION_PARAGRAPH"
     git push --no-verify
-    toggle_workflows
-    if test "$DID_STASH"
+    setup_gh
+    if test "$STASH_TOKEN"
     then
         echo "Unstashing changes..."
-        git stash pop && echo "Done!"
+        unstash && echo "Done!"
     fi
 }
 
 main() {
-    export LAST_REF="de6442b"
+    export LAST_REF="cb1abb7"
     export PROJECT_PATH_KEY="$$_skeleton_project_path"
     export NEW_REF_KEY="$$_skeleton_new_ref"
     export LAST_LICENSE_NAME="MIT"

@@ -426,10 +426,9 @@ poetry add configzen
 
 > [!Note]
 > If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
-
 1.  Fork the [configzen repository](https://github.com/bswck/configzen) on GitHub.
 
-2.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
+1.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
     Poetry is an amazing tool for managing dependencies & virtual environments, building packages and publishing them.
 
     ```shell
@@ -443,8 +442,7 @@ poetry add configzen
     ```shell
     pyenv install 3.8
     ```
-
-3.  Clone your fork locally and install dependencies.
+1.  Clone your fork locally and install dependencies.
 
     ```shell
     git clone https://github.com/your-username/configzen path/to/configzen
@@ -454,10 +452,10 @@ poetry add configzen
     poetry shell
     pre-commit install --hook-type pre-commit --hook-type pre-push
     ```
-
 For more information on how to contribute, check out [CONTRIBUTING.md](https://github.com/bswck/configzen/blob/HEAD/CONTRIBUTING.md).<br/>
 Always happy to accept contributions! ❤️
 
-# Legal info
-© Copyright by Bartosz Sławecki ([@bswck](https://github.com/bswck)).<br />This software is licensed under the [MIT License](https://github.com/bswck/configzen/blob/HEAD/LICENSE).
 
+# Legal info
+© Copyright by Bartosz Sławecki ([@bswck](https://github.com/bswck)).
+<br />This software is licensed under the terms of [MIT License](https://github.com/bswck/configzen/blob/HEAD/LICENSE).
