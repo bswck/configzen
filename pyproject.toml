@@ -16,9 +16,11 @@ Distribution = "https://pypi.org/project/configzen/"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-runtime-generics = "^1.2.0"
+runtime-generics = "^2.0.1"
 pydantic = "^2.5.2"
 pydantic-settings = "^2.1.0"
+tomlkit = "^0.12.3"
+ruamel-yaml = "^0.18.5"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.7.0"
