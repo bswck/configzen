@@ -1,3 +1,5 @@
+"""Route creation and parsing."""
+
 from __future__ import annotations
 
 from functools import reduce
@@ -45,15 +47,19 @@ class Step:
         self.key = argument
 
     def get(self, _: Any, /) -> object:
+        """Perform a get operation."""
         raise NotImplementedError
 
     def set(self, _: Any, __: object, /) -> None:  # noqa: A003
+        """Perform a set operation."""
         raise NotImplementedError
 
     def __call__(self, obj: Any, /) -> object:
+        """Perform a get operation."""
         return self.get(obj)
 
     def __repr__(self) -> str:
+        """Represent this step in a string."""
         return f"{type(self).__name__}({self.key!r})"
 
 
@@ -67,12 +73,15 @@ class GetAttr(Step):
     key: str
 
     def get(self, target: Any, /) -> object:
+        """Get an attribute from an object."""
         return getattr(target, self.key)
 
     def set(self, target: Any, value: object, /) -> None:  # noqa: A003
+        """Set an attribute in an object."""
         setattr(target, self.key, value)
 
     def __str__(self) -> str:
+        """Compose this step into a string."""
         return str(self.key).replace(Route.TOKEN_DOT, r"\.")
 
 
@@ -95,12 +104,15 @@ class GetItem(Step):
         super().__init__(argument)
 
     def get(self, target: Any, /) -> object:
+        """Get an item from an object."""
         return target[self.key]
 
     def set(self, target: Any, value: object, /) -> None:  # noqa: A003
+        """Set an item in an object."""
         target[self.key] = value
 
     def __str__(self) -> str:
+        """Compose this step into a string."""
         argument = str(self.key)
         if self.escape:
             argument = Route.TOKEN_ESCAPE + argument
@@ -112,6 +124,7 @@ class GetItem(Step):
 class Route:
     r"""
     Routes are used to access values in a configuration tree.
+
     They are, basically, lists of steps that are used to access values in a
     configuration tree. Each step is either a key or an index.
 
@@ -161,6 +174,7 @@ class Route:
         return list(self.__steps)
 
     def __hash__(self) -> int:
+        """Get a hash of this route."""
         return hash(self.__steps)
 
     @classmethod
@@ -201,7 +215,7 @@ class Route:
         raise TypeError(msg)
 
     @classmethod
-    def decompose(cls, route: str) -> list[Step]:  # noqa: PLR0915
+    def decompose(cls, route: str) -> list[Step]:  # noqa: C901,PLR0915,PLR0912
         """
         Decompose a route into a list of steps.
 

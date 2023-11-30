@@ -1,3 +1,4 @@
+"""Core interface of configzen -- the base configuration model, `BaseConfiguration`."""
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
@@ -14,13 +15,12 @@ from pydantic_settings.main import SettingsConfigDict
 
 from configzen.copy_context import copy_context_on_await, copy_context_on_call
 from configzen.data import roundtrip_update_mapping
-from configzen.parser import Parser
+from configzen.replacements import ReplacementParser
 from configzen.route import EMPTY_ROUTE, GetAttr, GetItem, Route, RouteLike
 from configzen.sources import ConfigurationSource, get_configuration_source
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Literal
 
     from pydantic import ConfigDict as BaseConfigDict
     from typing_extensions import Self, Unpack
@@ -29,16 +29,18 @@ if TYPE_CHECKING:
     from configzen.typedefs import Configuration
 
 
-__all__ = ("BaseConfiguration", "ConfigDict")
+__all__ = ("BaseConfiguration", "ConfigzenConfigDict")
 
 
-class ConfigDict(SettingsConfigDict, total=False):
+class ConfigzenConfigDict(SettingsConfigDict, total=False):
+    """Meta-configuration for configzen models."""
+
     configuration_source: ConfigurationSource[Any, Any]
     rebuild_on_load: bool
-    parser_factory: Callable[..., Parser]
+    parser_factory: Callable[..., ReplacementParser]
 
 
-pydantic_config_keys |= set(ConfigDict.__annotations__.keys())
+pydantic_config_keys |= set(ConfigzenConfigDict.__annotations__.keys())
 owner_lookup: ContextVar[BaseConfiguration] = ContextVar("owner")
 
 
@@ -48,7 +50,7 @@ def _locate(
     route: Route,
     subconfiguration: BaseConfiguration,
 ) -> Iterator[Route]:
-    # Complex case. We have a subconfiguration in a subkey.
+    # Complex case: a subconfiguration in a subkey.
     if value is owner:
         return
     attribute_access = False
@@ -61,7 +63,7 @@ def _locate(
             subconfiguration,
             route,
             attribute_access=attribute_access,
-        )  # Complex case. We have a subconfiguration in an iterable.
+        )  # Complex case: a subconfiguration in an iterable.
     elif isinstance(value, Iterable):
         yield from _locate_in_iterable(value, subconfiguration, route)
 
@@ -74,7 +76,7 @@ def _locate_in_mapping(
     attribute_access: bool = False,
 ) -> Iterator[Route]:
     for key, value in data.items():
-        # Simple case. We have a subconfiguration at the current key.
+        # Simple case: a subconfiguration at the current key.
         route = base_route.enter(GetAttr(key) if attribute_access else GetItem(key))
         if value is subconfiguration:
             yield route
@@ -94,7 +96,7 @@ def _locate_in_iterable(
     base_route: Route = EMPTY_ROUTE,
 ) -> Iterator[Route]:
     for idx, value in enumerate(data):
-        # Simple case. We have a subconfiguration at the current index.
+        # Simple case: a subconfiguration at the current index.
         route = base_route.enter(GetItem(idx))
         if value is subconfiguration:
             yield route
@@ -109,7 +111,7 @@ def _locate_in_iterable(
 
 
 class BaseConfigurationMetaclass(ModelMetaclass):
-    model_config: ConfigDict
+    model_config: ConfigzenConfigDict
 
     if not TYPE_CHECKING:
         # Allow type-safe route declaration instead of using strings.
@@ -133,7 +135,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     _configuration_source: ConfigurationSource[Any, Any] = PrivateAttr()
     _configuration_data: Data = PrivateAttr(default_factory=dict)
-    _configuration_parser: Parser = PrivateAttr()
+    _configuration_parser: ReplacementParser = PrivateAttr()
     _configuration_root: Union[BaseConfiguration, None] = PrivateAttr()  # noqa: UP007
 
     def __init__(self, **data: Any) -> None:
@@ -150,10 +152,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     @property
     def configuration_root(self) -> BaseConfiguration:
-        """
-        Return the root configuration -- the configuration that was used to load
-        the entire configuration data.
-        """
+        """Return the root configuration that was used to load the entire data."""
         return self._configuration_root or self
 
     @property
@@ -176,10 +175,12 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self._configuration_root.configuration_data
 
     @property
-    def configuration_parser(self) -> Parser:
+    def configuration_parser(self) -> ReplacementParser:
         """
-        Current state of the configuration: stores the initial data used
-        when loading the configuration and resolves commands etc.
+        Current state of the configuration.
+
+        Stores the initial data used when loading the configuration,
+        resolves macros etc.
         """
         if self._configuration_root is None:
             return self._configuration_parser
@@ -191,6 +192,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     ) -> set[Route]:
         """
         Locate all occurrences of a subconfiguration in the current configuration.
+
         Return a set of routes to the located subconfiguration.
         """
         if not isinstance(subconfiguration, BaseConfiguration):
@@ -225,7 +227,6 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     def _validate_configuration_source(
         cls,
         source: object | None = None,
-        format_type: Literal["text", "binary"] = "text",
     ) -> ConfigurationSource[Any, Any]:
         if source is None:
             source = cls.model_config.get("configuration_source")
@@ -235,7 +236,6 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         if not isinstance(source, ConfigurationSource):
             source = get_configuration_source(
                 source,
-                format_type=format_type,
             )
             if source is None:
                 msg = (
@@ -248,15 +248,15 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     @classmethod
     def _validate_parser_factory(
         cls,
-        parser_factory: Callable[..., Parser] | None = None,
-    ) -> Callable[..., Parser]:
+        parser_factory: Callable[..., ReplacementParser] | None = None,
+    ) -> Callable[..., ReplacementParser]:
         return (
             parser_factory
             or cast(
-                "Callable[..., Parser] | None",
+                "Callable[..., ReplacementParser] | None",
                 cls.model_config.get("configuration_parser_factory"),
             )
-            or Parser
+            or ReplacementParser
         )
 
     @classmethod
@@ -265,7 +265,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         cls: type[Configuration],
         source: object | None = None,
         *,
-        parser_factory: Callable[..., Parser] | None = None,
+        parser_factory: Callable[..., ReplacementParser] | None = None,
     ) -> Configuration:
         """
         Load this configuration from a given source.
@@ -277,9 +277,8 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
             to `confizen.sources.get_configuration_source()` which will resolve
             the intended configuration source: for example, "abc.ini" will be resolved
             to a TOML text file source. Keep in mind, however, that for binary formats
-            such as Plist you must specify its format type to "binary", so in that case
-            just create `BinaryFileConfigurationSource("plist_file.plist")` either
-            manually or within `get_configuration_source(..., format_type="binary")`.
+            such as non-XML Plist you must specify its format type to binary, so in
+            that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
         context
             The context to use during model validation.
             See also https://docs.pydantic.dev/latest/api/base_model @ `model_validate`.
@@ -340,9 +339,27 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         cls: type[Configuration],
         source: object | None = None,
         *,
-        parser_factory: Callable[..., Parser] | None = None,
+        parser_factory: Callable[..., ReplacementParser] | None = None,
     ) -> Configuration:
-        """Do the same as `configuration_load`, but asynchronously (no I/O blocking)."""
+        """
+        Do the same as `configuration_load`, but asynchronously (no I/O blocking).
+
+        Parameters
+        ----------
+        source
+            Where to load the configuration from. The argument passed is forwarded
+            to `confizen.sources.get_configuration_source()` which will resolve
+            the intended configuration source: for example, "abc.ini" will be resolved
+            to a TOML text file source. Keep in mind, however, that for binary formats
+            such as non-XML Plist you must specify its format type to binary, so in
+            that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
+        parser_factory
+            The state factory to use to parse the newly loaded configuration data.
+
+        Returns
+        -------
+        self
+        """
         # Intentionally not using `run_sync(configuration_load)` here.
         # We want to keep every user-end object handled by the same thread.
 
@@ -375,6 +392,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return await cls.configuration_load_async(source, **kwargs)
 
     def configuration_reload(self: Self) -> Self:
+        """Reload the configuration from the same source."""
         source = self.configuration_source
 
         if source is None:
@@ -407,6 +425,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self.configuration_reload()
 
     async def configuration_reload_async(self: Self) -> Self:
+        """Do the same as `configuration_reload` asynchronously (no I/O blocking)."""
         source = self.configuration_source
 
         if source is None:
@@ -478,6 +497,19 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return configuration_destination, data
 
     def configuration_save(self: Self, destination: object | None = None) -> Self:
+        """
+        Save the configuration to a given destination.
+
+        Parameters
+        ----------
+        destination
+            Where to save the configuration to. The argument passed is forwarded
+            to `confizen.sources.get_configuration_source()` which will resolve
+            the intended configuration source: for example, "abc.ini" will be resolved
+            to a TOML text file source. Keep in mind, however, that for binary formats
+            such as non-XML Plist you must specify its format type to binary, so in
+            that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
+        """
         configuration_source, data = self._configuration_data_save(destination)
         configuration_source.dump(data)
         return self
@@ -490,6 +522,19 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         self: Self,
         destination: object | None = None,
     ) -> Self:
+        """
+        Do the same as `configuration_save`, but asynchronously (no I/O blocking).
+
+        Parameters
+        ----------
+        destination
+            Where to save the configuration to. The argument passed is forwarded
+            to `confizen.sources.get_configuration_source()` which will resolve
+            the intended configuration source: for example, "abc.ini" will be resolved
+            to a TOML text file source. Keep in mind, however, that for binary formats
+            such as non-XML Plist you must specify its format type to binary, so in
+            that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
+        """
         configuration_source, data = self._configuration_data_save(destination)
         await configuration_source.dump_async(data)
         return self
@@ -499,6 +544,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return await self.configuration_save_async(destination)
 
     def configuration_at(self, *routes: RouteLike) -> Item:
+        """Return a configuration item at the given set of routes."""
         return Item(
             routes=set(map(Route, routes)),
             configuration=self,
@@ -520,17 +566,20 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         self,
         routes: RouteLike | tuple[RouteLike, ...],
     ) -> Item:
+        """Return a configuration item at the given set of routes."""
         if isinstance(routes, tuple):
             return self.configuration_at(*routes)
         return self.configuration_at(routes)
 
     def __setitem__(self, item: RouteLike, value: Any) -> None:
+        """Set a configuration item at the given set of routes."""
         self.configuration_at(item).configuration = value
 
-    def __init_subclass__(cls, **kwargs: Unpack[ConfigDict]) -> None:
+    def __init_subclass__(cls, **kwargs: Unpack[ConfigzenConfigDict]) -> None:
+        """Initialize the configuration subclass."""
         super().__init_subclass__(**cast("BaseConfigDict", kwargs))
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(
+    model_config: ClassVar[ConfigzenConfigDict] = ConfigzenConfigDict(
         rebuild_on_load=True,
         validate_assignment=True,
         extra="forbid",

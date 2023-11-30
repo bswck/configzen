@@ -1,4 +1,5 @@
-# Never import `Configuration` outside of TYPE_CHECKING blocks.
+"""Miscellaneous type definitions for configzen."""
+from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 

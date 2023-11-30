@@ -1,3 +1,4 @@
+"""An internal module to isolate the library context from the user context."""
 from __future__ import annotations
 
 import asyncio
@@ -27,10 +28,11 @@ def copy_context_on_call(
     func: Callable[P, T],
 ) -> Callable[P, T]:
     """
-    Copy the context automatically on function call to isolate library context
-    from the user context.
+    Copy the context automatically on function call.
 
-    Use as a decorator.
+    Allows to isolate the library context from the user context.
+
+    Used as a decorator.
     """
     if isinstance(func, (classmethod, staticmethod)):
         return type(func)(copy_context_on_call(func.__func__))
@@ -46,10 +48,11 @@ def copy_context_on_await(
     func: Callable[P, Coroutine[object, object, T]],
 ) -> Callable[P, Coroutine[object, object, T]]:
     """
-    Copy the context automatically on coroutine execution to isolate library context
-    from the user context.
+    Copy the context automatically on coroutine execution.
 
-    Use as a decorator.
+    Allows to isolate library context from the user context.
+
+    Used as a decorator.
     """
     if isinstance(func, (classmethod, staticmethod)):
         return type(func)(copy_context_on_await(func.__func__))

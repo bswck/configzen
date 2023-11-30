@@ -1,3 +1,10 @@
+"""
+Replacement API parser for configuration data.
+
+Allows to tweak the configuration data programmatically before it is given
+to the model config and revert the changes back to the original data structure
+when the configuration managed by that model is saved.
+"""
 from __future__ import annotations
 
 from collections import UserDict
@@ -19,13 +26,15 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "Parser",
+    "ReplacementParser",
     "ReplacementOptions",
     "Replacement",
 )
 
 
 class ReplacementOptions(TypedDict):
+    """Prototype of the allowed options for the ReplacementParser class."""
+
     macro_prefix: Char
     update_prefix: Char
     macros_on_top: bool
@@ -43,7 +52,7 @@ class _ReplacementDict:
         replacements.update(substitute)
 
 
-# TODO(bswck): add generic type params, 3.9+  # noqa: TD003
+# Note: add generic type params for 3.9+
 class _ParsedData(UserDict):  # type: ignore[type-arg]
     def __init__(
         self,
@@ -71,10 +80,10 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
         value: object,
     ) -> Replacement | None:
         """
-        Find a replacement for a single item in the configuration data
-        for programmatic use. Return None if not found.
+        Find a replacement for a single item, for programmatic use.
+
+        Return None if not found.
         """
-        # TODO(bswck): Use str.removeprefix() for 3.9+  # noqa: TD003
         macro_prefix = self.options["macro_prefix"]
         update_prefix = self.options["update_prefix"]
 
@@ -82,6 +91,7 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
             return Replacement(
                 key=key,
                 value=value,
+                # Note: Use str.removeprefix() for 3.9+
                 content=self.macros[key[len(macro_prefix) :].rstrip()](value),
             )
 
@@ -118,10 +128,11 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
         return {}
 
 
-class Parser:
+class ReplacementParser:
     """
-    Parser is a class that takes in configuration data and evaluates it (recursively
-    resolves & executes macros, applies updates etc.) for programmatic use.
+    A class that takes in configuration data and evaluates it.
+
+    Recursively resolves & applies replacements for programmatic use.
     """
 
     _get_parsed_data: Callable[..., _ParsedData] = _ParsedData
@@ -150,11 +161,8 @@ class Parser:
         """The initial configuration data that the parser was fed with."""
         return self.__feed
 
-    def create_parser(self, data: Data) -> Parser:
-        """
-        Create a new configuration parser for some other data,
-        but with identical options applicable.
-        """
+    def create_parser(self, data: Data) -> ReplacementParser:
+        """Create a new configuration parser, but with identical options applicable."""
         return type(self)(data, **self.options)
 
     def get_parsed_data(
@@ -163,8 +171,7 @@ class Parser:
         force: bool = False,
     ) -> _ParsedData:
         """
-        Process the configuration data for programmatic use
-        or return the one already cached.
+        Process the configuration data or return the one already cached.
 
         Parameters
         ----------

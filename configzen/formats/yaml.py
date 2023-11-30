@@ -1,3 +1,4 @@
+"""The YAML data format."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Literal
@@ -48,6 +49,8 @@ class YAMLOptions(DataFormatOptions, total=False):
 
 
 class YAMLDataFormat(TextDataFormat[YAMLOptions]):
+    """The YAML data format."""
+
     option_name: ClassVar[str] = "yaml"
     yaml: YAML
 
@@ -66,7 +69,7 @@ class YAMLDataFormat(TextDataFormat[YAMLOptions]):
         )
 
         yaml = YAML(**options)  # type: ignore[arg-type,misc]
-        yaml.version = yaml_version
+        yaml.version = yaml_version  # type: ignore[assignment]
         yaml.indent = yaml_indent
         yaml.block_seq_indent = yaml_block_seq_indent
 
@@ -77,8 +80,10 @@ class YAMLDataFormat(TextDataFormat[YAMLOptions]):
 
     def load(self, stream: IO[str]) -> Data:
         """
-        Load the data from a stream. Return a mutable mapping representing
-        the loaded data which is mutation-sensitive (for round-trip processing).
+        Load the data from a stream.
+
+        Return a mutable mapping representing the loaded data
+        which is mutation-sensitive (for round-trip processing).
 
         Every configuration source transforms the input data into a stream
         to be processed by the data format, because most data format libraries

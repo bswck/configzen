@@ -1,3 +1,5 @@
+"""Module proxy object that extends a runtime module with type validation."""
+
 from __future__ import annotations
 
 import inspect
@@ -16,8 +18,9 @@ def _is_dunder(name: str) -> bool:
 
 class ModuleProxy(types.ModuleType, Generic[Configuration]):
     """
-    Proxy object that extends runtime module with type validation triggered
-    via a config instance (initialization and assignment).
+    Proxy object that extends a runtime module with type validation.
+
+    Triggered via a config instance (initialization and assignment).
 
     Parameters
     ----------
@@ -55,6 +58,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         sys.modules[name] = self
 
     def __getattribute__(self, name: str) -> Any:
+        """Get an attribute of the underlying model."""
         if _is_dunder(name):
             return object.__getattribute__(self, name)
 
@@ -68,15 +72,22 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
                 return object.__getattribute__(self, name)
 
     def __setattr__(self, key: str, value: Any) -> None:
+        """Set an attribute on the underlying model."""
         config = self.get_config()
         if not _is_dunder(key) and key in config.model_fields:
             setattr(config, key, value)
         self.__locals__[key] = value
 
     def __repr__(self) -> str:
+        """
+        Get the string representation of the module proxy.
+
+        Inform the user that this is a configuration module.
+        """
         return super().__repr__().replace("module", "configuration module", 1)
 
     def get_config(self) -> Configuration:
+        """Get the configuration model."""
         return self.__configuration__
 
     @classmethod
@@ -156,6 +167,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
     ) -> ModuleProxy[Configuration]:
         """
         Wrap the module calling this function.
+
         For more information on wrapping modules, see `ModuleProxy.wrap_module()`.
 
         Parameters
@@ -166,9 +178,13 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             Values used to initialize the config.
         """
         current_frame = inspect.currentframe()
-        assert current_frame is not None
+        if current_frame is None:
+            msg = "Could not get the current frame"
+            raise RuntimeError(msg)
         frame_back = current_frame.f_back
-        assert frame_back is not None
+        if frame_back is None:
+            msg = "Could not get the frame back"
+            raise RuntimeError(msg)
         return cls.wrap_module(
             frame_back.f_globals["__name__"],
             configuration_class,

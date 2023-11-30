@@ -1,3 +1,4 @@
+"""The TOML data format."""
 from __future__ import annotations
 
 from typing import IO, TYPE_CHECKING, ClassVar
@@ -36,6 +37,8 @@ class TOMLOptions(DataFormatOptions, total=False):
 
 
 class TOMLDataFormat(TextDataFormat[TOMLOptions]):
+    """The TOML data format."""
+
     option_name: ClassVar[str] = "toml"
     toml_options: TOMLOptions
 
@@ -60,9 +63,11 @@ class TOMLDataFormat(TextDataFormat[TOMLOptions]):
             register_encoder(encoder)
 
     def load(self, stream: IO[str]) -> Data:
+        """Load the data from the given stream."""
         return load(stream)
 
     def dump(self, data: Data, stream: IO[str]) -> None:
+        """Dump the data to the given stream."""
         dump(
             data,
             stream,

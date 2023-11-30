@@ -1,12 +1,22 @@
+"""Core interface for configuring and using data formats through within configzen."""
+
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Mapping, MutableMapping, MutableSequence, Sequence
 from functools import partial
 from itertools import zip_longest
-from typing import TYPE_CHECKING, Any, AnyStr, Generic, TypedDict, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AnyStr,
+    Generic,
+    TypedDict,
+    TypeVar,
+    cast,
+)
 
-from runtime_generics import get_arg, runtime_generic
+from runtime_generics import generic_isinstance, runtime_generic
 
 if TYPE_CHECKING:
     from typing import IO, ClassVar
@@ -59,9 +69,9 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     @property
     def is_binary(self) -> bool:
         """Return whether the data format is bitwise."""
-        return issubclass(get_arg(self, AnyStr), bytes)
+        return generic_isinstance(self, BinaryDataFormat)
 
-    # We cannot use Unpack[DataFormatOptionsType] here,
+    # Unpack[DataFormatOptionsType] cannot be used here,
     # because this functionality is not supported by mypy yet.
     # Override the **options annotation in your subclass of DataFormat with
     # the subclass of DataFormatOptions corresponding to your subclass of DataFormat.
@@ -76,8 +86,10 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     @abstractmethod
     def load(self, stream: IO[AnyStr]) -> Data:
         """
-        Load the data from a stream. Return a mutable mapping representing
-        the loaded data which is mutation-sensitive (for round-trip processing).
+        Load the data from a stream.
+
+        Return a mutable mapping representing the loaded data
+        which is mutation-sensitive (for round-trip processing).
 
         Every configuration source transforms the input data into a stream
         to be processed by the data format, because most data format libraries
@@ -104,18 +116,19 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         for file_extension in cls.file_extensions:
             cls.extension_registry[file_extension] = cls
 
-    def __init_subclass__(cls, *, root: bool = False) -> None:
-        if getattr(cls, "option_name", None) is not None:
+    def __init_subclass__(cls, *, skip_hook: bool = False) -> None:
+        """Subclass hook. Pass skip_hook=True to skip it."""
+        if not skip_hook:
+            if getattr(cls, "option_name", None) is None:
+                msg = (
+                    f"{cls.__name__} must have an option_name attribute "
+                    "if it is not a class with skip_hook=True parameter"
+                )
+                raise TypeError(msg)
             if getattr(cls, "file_extensions", None) is None:
                 cls.file_extensions = set()
             cls.file_extensions.add(cls.default_extension)
             cls.register_file_extensions()
-        elif not root:
-            msg = (
-                f"{cls.__name__} must have an option_name attribute "
-                "if it is not a class with root=True parameter"
-            )
-            raise TypeError(msg)
 
     def validate_source(self, source: ConfigurationSource[Any, AnyStr]) -> None:
         """Validate the config source."""
@@ -126,9 +139,10 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         mergeable_data: MutableMapping[str, object],
     ) -> None:
         """
-        Update the loaded data in a round-trip manner with values from the configuration
-        altered programmatically in runtime, while keeping the structure and comments
-        of the original data.
+        Update the loaded data in a round-trip manner.
+
+        Use values from the configuration altered programmatically in runtime,
+        while keeping the structure and comments of the original data.
 
         Parameters
         ----------

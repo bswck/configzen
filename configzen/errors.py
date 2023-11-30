@@ -1,3 +1,5 @@
+"""Specialized exceptions raised by configzen."""
+
 __all__ = (
     "ConfigurationError",
     "ConfigurationLoadError",
@@ -40,4 +42,5 @@ class RouteError(ConfigurationError, ValueError):
         self.index = index
 
     def __str__(self) -> str:
+        """Return a string representation of the route error."""
         return f"{self.message} ({self.route}:{self.index})"

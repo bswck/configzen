@@ -1,3 +1,4 @@
+"""The JSON data format."""
 from __future__ import annotations
 
 from json import JSONDecoder, JSONEncoder, dump, load
@@ -41,6 +42,8 @@ class JSONOptions(DataFormatOptions, total=False):
 
 
 class JSONDataFormat(TextDataFormat[JSONOptions]):
+    """The JSON data format."""
+
     option_name: ClassVar[str] = "json"
     json_encoder: JSONEncoder
     json_decoder: JSONDecoder
@@ -80,6 +83,7 @@ class JSONDataFormat(TextDataFormat[JSONOptions]):
         )
 
     def load(self, stream: IO[str]) -> Data:
+        """Load the JSON data from the given stream."""
         document = load(
             stream,
             cls=cast("type[JSONDecoder]", lambda **_: self.json_decoder),
@@ -93,6 +97,7 @@ class JSONDataFormat(TextDataFormat[JSONOptions]):
         return document
 
     def dump(self, data: Data, stream: IO[str]) -> None:
+        """Dump the given JSON data to the given stream."""
         dump(
             data,
             stream,

@@ -1,3 +1,4 @@
+"""The Plist data format."""
 from __future__ import annotations
 
 from plistlib import PlistFormat, dump, load
@@ -27,6 +28,8 @@ class PlistOptions(DataFormatOptions, total=False):
 
 
 class PlistDataFormat(BinaryDataFormat[PlistOptions]):
+    """The Plist data format."""
+
     option_name: ClassVar[str] = "plist"
     plist_options: PlistOptions
 
@@ -50,6 +53,7 @@ class PlistDataFormat(BinaryDataFormat[PlistOptions]):
         self.plist_options = options
 
     def load(self, stream: IO[bytes]) -> Data:
+        """Load the data from the given stream."""
         dict_class: type[MutableMapping[str, Any]] = self.plist_options["dict_type"]
         document = load(
             stream,
@@ -65,6 +69,7 @@ class PlistDataFormat(BinaryDataFormat[PlistOptions]):
         return document
 
     def dump(self, data: Data, stream: IO[bytes]) -> None:
+        """Dump the given data to the stream."""
         dump(
             data,
             stream,
