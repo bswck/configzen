@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from annotated_types import Len
     from typing_extensions import Annotated, TypeAlias
@@ -40,11 +40,14 @@ class ReplacementOptions(TypedDict):
     macros_on_top: bool
 
 
-class _ReplacementDict:
+class _Replacements:
     def __init__(self) -> None:
-        self.__replacements: dict[str, object] = {}
+        self.__replacements: dict[str, Replacement] = {}
 
-    def update(self, substitute: dict[str, object]) -> None:
+    def items(self) -> Iterator[tuple[str, Replacement]]:
+        yield from self.__replacements.items()
+
+    def update(self, substitute: dict[str, Replacement]) -> None:
         replacements = self.__replacements
         if set(replacements) & set(substitute):  # what then?
             msg = "Replacement collision"
@@ -53,7 +56,7 @@ class _ReplacementDict:
 
 
 # Note: add generic type params for 3.9+
-class _ParsedData(UserDict):  # type: ignore[type-arg]
+class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
     def __init__(
         self,
         *,
@@ -63,7 +66,7 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
     ) -> None:
         self.macros = macros
         self.options = options
-        self.__replacements = _ReplacementDict()
+        self.__replacements = _Replacements()
         super().__init__()
         for key, value in data.items():
             replacement = self.find_replacement(key, value)
@@ -71,6 +74,7 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
                 self.data[key] = value
                 continue
             substitute = replacement.content
+            self.data.pop(key)
             self.data.update(substitute)
             self.__replacements.update(dict.fromkeys(substitute, replacement))
 
@@ -123,9 +127,17 @@ class _ParsedData(UserDict):  # type: ignore[type-arg]
         msg = f"Cannot update {type(existent)} with {type(value)}"
         raise TypeError(msg)
 
-    @property
-    def unparsed(self) -> Data:
-        return {}
+    def revert_replacements(self) -> Data:
+        """Revert all replacements and return the original data structure."""
+        before_replacements = {}
+        skip_keys = []
+        for key, replacement in self.__replacements.items():
+            before_replacements[replacement.key] = replacement.value
+            skip_keys.append(key)
+        for key, value in self.data.items():
+            if key not in skip_keys:
+                before_replacements[key] = value
+        return before_replacements
 
 
 class ReplacementParser:
@@ -135,20 +147,23 @@ class ReplacementParser:
     Recursively resolves & applies replacements for programmatic use.
     """
 
-    _get_parsed_data: Callable[..., _ParsedData] = _ParsedData
+    _get_data_with_replacements: Callable[
+        ...,
+        _DataWithReplacements,
+    ] = _DataWithReplacements
 
     macros: ClassVar[MacroDict] = {}
 
     def __init__(
         self,
-        feed: Data,
+        initial: Data,
         *,
         macro_prefix: Char = "^",
         update_prefix: Char = "+",
         macros_on_top: bool = False,
     ) -> None:
-        self.__feed = feed
-        self.__data: _ParsedData = None  # type: ignore[assignment]
+        self.__initial = initial
+        self.__data: _DataWithReplacements = None  # type: ignore[assignment]
 
         self.options = ReplacementOptions(
             macro_prefix=macro_prefix,
@@ -157,21 +172,21 @@ class ReplacementParser:
         )
 
     @property
-    def feed(self) -> Data:
-        """The initial configuration data that the parser was fed with."""
-        return self.__feed
+    def roundtrip_initial(self) -> Data:
+        """The initial configuration data that the parser was given."""
+        return self.__initial
 
     def create_parser(self, data: Data) -> ReplacementParser:
         """Create a new configuration parser, but with identical options applicable."""
         return type(self)(data, **self.options)
 
-    def get_parsed_data(
+    def get_data_with_replacements(
         self,
         *,
         force: bool = False,
-    ) -> _ParsedData:
+    ) -> _DataWithReplacements:
         """
-        Process the configuration data or return the one already cached.
+        Create the data with replacements or return the one already cached.
 
         Parameters
         ----------
@@ -180,8 +195,8 @@ class ReplacementParser:
             Default is False.
         """
         if force or self.__data is None:
-            self.__data = self._get_parsed_data(
-                data=self.__feed,
+            self.__data = self._get_data_with_replacements(
+                data=self.__initial,
                 options=self.options,
                 macros=self.macros,
             )

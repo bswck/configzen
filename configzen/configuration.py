@@ -290,10 +290,10 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         self
         """
         if cls.model_config["rebuild_on_load"]:
-            # Frame 1: copy_context_and_call.<locals>.copy
-            # Frame 2: copy_and_run
-            # Frame 3: <class>.configuration_load
-            # Frame 4: <class>.model_rebuild
+            # Frame 1: copy_context_and_call.<locals>.copy()
+            # Frame 2: copy_and_run()
+            # Frame 3: <class>.configuration_load()
+            # Frame 4: <class>.model_rebuild()
             cls.model_rebuild(_parent_namespace_depth=4)
 
         # Validate the source we load our configuration from.
@@ -317,7 +317,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         # want to keep in the configuration data.
         # They will be added back to the exported data when the configuration
         # is saved (`parser.revert_parser_changes()`).
-        self = cls(**parser.get_parsed_data())
+        self = cls(**parser.get_data_with_replacements())
 
         # Quick setup and we're done.
         self._configuration_source = configuration_source
@@ -364,10 +364,10 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         # We want to keep every user-end object handled by the same thread.
 
         if cls.model_config["rebuild_on_load"]:
-            # Frame 1: copy_context_on_await.<locals>.copy_async
-            # Frame 2: copy_and_await
-            # Frame 3: <class>.configuration_load_async
-            # Frame 4: <class>.model_rebuild
+            # Frame 1: copy_context_on_await.<locals>.copy_async()
+            # Frame 2: copy_and_await()
+            # Frame 3: <class>.configuration_load_async()
+            # Frame 4: <class>.model_rebuild()
             cls.model_rebuild(_parent_namespace_depth=4)
 
         configuration_source = cls._validate_configuration_source(source)
@@ -376,7 +376,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
         # Since `parser.get_processed_data()` operates on primitive data types,
         # we can safely use run_sync here to run in a separate worker thread.
-        self = cls(**await run_sync(parser.get_parsed_data))
+        self = cls(**await run_sync(parser.get_data_with_replacements))
 
         self._configuration_parser = parser
         self._configuration_source = configuration_source
@@ -406,7 +406,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
         # Construct a new configuration instance.
         # Respect __class__ attribute in cse root might be a proxy (from proxyvars).
-        new_root = root.__class__(**parser.get_parsed_data())
+        new_root = root.__class__(**parser.get_data_with_replacements())
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -438,7 +438,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         parser = root.configuration_parser.create_parser(source.load())
 
         # Construct a new configuration instance.
-        new_root = root.__class__(**await run_sync(parser.get_parsed_data))
+        new_root = root.__class__(**await run_sync(parser.get_data_with_replacements))
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -477,7 +477,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         else:
             # Construct a new configuration instance.
             # Respect __class__ attribute since root might be a proxy (from proxyvars).
-            new_root = root.__class__(**parser.get_parsed_data())
+            new_root = root.__class__(**parser.get_data_with_replacements())
             routes = root.configuration_find_routes(self)
 
             for route in routes:
@@ -485,14 +485,14 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
             new_data = new_root.configuration_dump()
 
-        parsed_data = parser.get_parsed_data()
+        parsed_data = parser.get_data_with_replacements()
         roundtrip_update_mapping(roundtrip_data=parsed_data, mergeable_data=new_data)
-        unparsed_new_data = parsed_data.unparsed
+        flat_new_data = parsed_data.revert_replacements()
 
-        data = parser.feed
+        data = parser.roundtrip_initial
         configuration_destination.data_format.roundtrip_update_mapping(
             roundtrip_data=data,
-            mergeable_data=unparsed_new_data,
+            mergeable_data=flat_new_data,
         )
         return configuration_destination, data
 
