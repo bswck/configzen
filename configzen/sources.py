@@ -180,6 +180,8 @@ class FileConfigurationSource(
             source = source.decode()
         return Path(source)
 
+    # This is not a property for type safety reasons.
+    # https://github.com/python/mypy/issues/9937
     @overload
     def _is_binary(self: FileConfigurationSource[str]) -> Literal[False]:
         ...
