@@ -6,15 +6,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Mapping, MutableMapping, MutableSequence, Sequence
 from functools import partial
 from itertools import zip_longest
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AnyStr,
-    Generic,
-    TypedDict,
-    TypeVar,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, AnyStr, Generic, TypedDict, TypeVar, cast
 
 from runtime_generics import generic_isinstance, runtime_generic
 
