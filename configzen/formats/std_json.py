@@ -4,12 +4,14 @@ from __future__ import annotations
 from json import JSONDecoder, JSONEncoder, dump, load
 from typing import IO, TYPE_CHECKING, ClassVar, cast
 
-from configzen.data import Data, DataFormatOptions, TextDataFormat
+from configzen.data import DataFormatOptions, TextDataFormat
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from typing_extensions import Unpack
+
+    from configzen.data import Data
 
 
 __all__ = (

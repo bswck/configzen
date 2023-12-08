@@ -4,12 +4,14 @@ from __future__ import annotations
 from plistlib import PlistFormat, dump, load
 from typing import IO, TYPE_CHECKING, Any, ClassVar
 
-from configzen.data import BinaryDataFormat, Data, DataFormatOptions
+from configzen.data import BinaryDataFormat, DataFormatOptions
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
 
     from typing_extensions import Unpack
+
+    from configzen.data import Data
 
 
 __all__ = (

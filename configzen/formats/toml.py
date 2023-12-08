@@ -5,11 +5,13 @@ from typing import IO, TYPE_CHECKING, ClassVar
 
 from tomlkit.api import dump, load, register_encoder, unregister_encoder
 
-from configzen.data import Data, DataFormatOptions, TextDataFormat
+from configzen.data import DataFormatOptions, TextDataFormat
 
 if TYPE_CHECKING:
     from tomlkit.items import Encoder
     from typing_extensions import Unpack
+
+    from configzen.data import Data
 
 
 __all__ = (

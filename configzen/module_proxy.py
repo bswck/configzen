@@ -13,7 +13,13 @@ __all__ = ("ModuleProxy",)
 
 
 def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
+    return (
+        len(name) > 4  # noqa: PLR2004
+        # and name.isidentifier() -- used internally, so we don't need to check
+        and name.startswith("__")
+        and name[2] != "_"
+        and name.endswith("__")
+    )
 
 
 class ModuleProxy(types.ModuleType, Generic[Configuration]):

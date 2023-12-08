@@ -24,9 +24,7 @@ __all__ = (
 )
 
 
-def copy_context_on_call(
-    func: Callable[P, T],
-) -> Callable[P, T]:
+def copy_context_on_call(func: Callable[P, T]) -> Callable[P, T]:
     """
     Copy the context automatically on function call.
 
@@ -64,11 +62,7 @@ def copy_context_on_await(
     return copy_async
 
 
-def copy_and_run(
-    func: Callable[..., T],
-    *args: object,
-    **kwargs: object,
-) -> T:
+def copy_and_run(func: Callable[..., T], *args: object, **kwargs: object) -> T:
     """Run a function in an isolated context."""
     context = contextvars.copy_context()
     return context.run(func, *args, **kwargs)

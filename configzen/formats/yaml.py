@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from configzen.data import Data, DataFormatOptions, TextDataFormat
+from configzen.data import DataFormatOptions, TextDataFormat
 
 if TYPE_CHECKING:
     from typing import IO
 
     from typing_extensions import TypeAlias, Unpack
 
+    from configzen.data import Data
 
 __all__ = (
     "YAMLDataFormat",

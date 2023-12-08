@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
     from configzen.sources import ConfigurationSource
 
+    Data: TypeAlias = MutableMapping[str, object]
+
 
 __all__ = (
     "Data",
@@ -26,9 +28,6 @@ __all__ = (
     "BinaryDataFormat",
     "TextDataFormat",
 )
-
-
-Data: TypeAlias = "MutableMapping[str, object]"
 
 
 class DataFormatOptions(TypedDict, total=False):
@@ -108,20 +107,6 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         for file_extension in cls.file_extensions:
             cls.extension_registry[file_extension] = cls
 
-    def __init_subclass__(cls, *, skip_hook: bool = False) -> None:
-        """Subclass hook. Pass skip_hook=True to skip it."""
-        if not skip_hook:
-            if getattr(cls, "option_name", None) is None:
-                msg = (
-                    f"{cls.__name__} must have an option_name attribute "
-                    "if it is not a class with skip_hook=True parameter"
-                )
-                raise TypeError(msg)
-            if getattr(cls, "file_extensions", None) is None:
-                cls.file_extensions = set()
-            cls.file_extensions.add(cls.default_extension)
-            cls.register_file_extensions()
-
     def validate_source(self, source: ConfigurationSource[Any, AnyStr]) -> None:
         """Validate the config source."""
 
@@ -162,6 +147,20 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
             _recursive_update_mapping=self.roundtrip_update_mapping,
             _recursive_update_sequence=self.roundtrip_update_sequence,
         )
+
+    def __init_subclass__(cls, *, skip_hook: bool = False) -> None:
+        """Subclass hook. Pass skip_hook=True to skip it."""
+        if not skip_hook:
+            if getattr(cls, "option_name", None) is None:
+                msg = (
+                    f"{cls.__name__} must have an option_name attribute "
+                    "if it is not a class with skip_hook=True parameter"
+                )
+                raise TypeError(msg)
+            if getattr(cls, "file_extensions", None) is None:
+                cls.file_extensions = set()
+            cls.file_extensions.add(cls.default_extension)
+            cls.register_file_extensions()
 
 
 BinaryDataFormat = DataFormat[DataFormatOptionsType, bytes]

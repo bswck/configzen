@@ -496,7 +496,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         )
         return configuration_destination, data
 
-    def configuration_save(self: Self, destination: object | None = None) -> Self:
+    def configuration_save(self, destination: object | None = None) -> Self:
         """
         Save the configuration to a given destination.
 
@@ -514,12 +514,12 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         configuration_source.dump(data)
         return self
 
-    def save(self: Self, destination: object | None = None) -> Self:
+    def save(self, destination: object | None = None) -> Self:
         """Do the same as `configuration_save`."""
         return self.configuration_save(destination)
 
     async def configuration_save_async(
-        self: Self,
+        self,
         destination: object | None = None,
     ) -> Self:
         """
@@ -539,7 +539,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         await configuration_source.dump_async(data)
         return self
 
-    async def save_async(self: Self, destination: object | None = None) -> Self:
+    async def save_async(self, destination: object | None = None) -> Self:
         """Do the same as `configuration_save_async`."""
         return await self.configuration_save_async(destination)
 
