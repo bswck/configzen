@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@20196db.
+# This file was generated from bswck/skeleton@e4343ae.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/20196db/project/%23%25%20if%20use_precommit%20%25%23.pre-commit-config.yaml%23%25%20endif%20%25%23.jinja
+# https://github.com/bswck/skeleton/tree/e4343ae/project/%23%25%20if%20use_precommit%20%25%23.pre-commit-config.yaml%23%25%20endif%20%25%23.jinja
 
 repos:
 - repo: "https://github.com/astral-sh/ruff-pre-commit"

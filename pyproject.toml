@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@20196db.
+# This file was generated from bswck/skeleton@e4343ae.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/20196db/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/e4343ae/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
@@ -28,6 +28,8 @@ tomlkit = "^0.12.3"
 ruamel-yaml = "^0.18.5"
 
 [tool.poetry.group.dev.dependencies]
+
+[tool.poetry.group.dev-skeleton.dependencies]
 mypy = "^1.7.0"
 ruff = "^0.1.2"
 towncrier = "^23.11.0"
