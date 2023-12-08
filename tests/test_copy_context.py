@@ -20,6 +20,19 @@ def test_copy_context_on_call() -> None:
     assert func() == 2
     assert cv.get() == 1
 
+    cv.set(5)
+
+    class Foo:
+        @copy_context_on_call
+        @staticmethod
+        def func() -> int:
+            cv.set(3)
+            return cv.get()
+
+    foo = Foo()
+    assert foo.func() == 3
+    assert cv.get() == 5
+
 
 @pytest.mark.asyncio
 async def test_copy_context_on_await() -> None:
@@ -33,6 +46,19 @@ async def test_copy_context_on_await() -> None:
 
     assert await func() == 2
     assert cv.get() == 1
+
+    cv.set(5)
+
+    class Foo:
+        @copy_context_on_await
+        @staticmethod
+        async def func() -> int:
+            cv.set(3)
+            return cv.get()
+
+    foo = Foo()
+    assert await foo.func() == 3
+    assert cv.get() == 5
 
 
 def test_copy_and_run() -> None:
