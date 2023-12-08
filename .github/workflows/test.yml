@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@3e18832.
+# This file was generated from bswck/skeleton@9e323d4.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/3e18832/project/.github/workflows/%23%25%20if%20test_suite%20%25%23test.yml%23%25%20endif%20%25%23.jinja
+# https://github.com/bswck/skeleton/tree/9e323d4/project/.github/workflows/%23%25%20if%20test_suite%20%25%23test.yml%23%25%20endif%20%25%23.jinja
 
 name: "Tests"
 

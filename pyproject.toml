@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@3e18832.
+# This file was generated from bswck/skeleton@9e323d4.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/3e18832/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/9e323d4/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
@@ -49,7 +49,6 @@ mkdocstrings = { version = ">=0.19.0", extras = ["python"] }
 [tool.poe.tasks]
 test = "pytest -v"
 lint = "ruff check ."
-lock = "scripts/lock.sh"
 reanswer = "scripts/skeleton.sh reanswer"
 bump = "scripts/skeleton.sh bump"
 check = [

@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@3e18832.
+# This file was generated from bswck/skeleton@9e323d4.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/3e18832/project/%23%25%20if%20use_precommit%20%25%23.pre-commit-config.yaml%23%25%20endif%20%25%23.jinja
+# https://github.com/bswck/skeleton/tree/9e323d4/project/%23%25%20if%20use_precommit%20%25%23.pre-commit-config.yaml%23%25%20endif%20%25%23.jinja
 
 repos:
 - repo: "https://github.com/astral-sh/ruff-pre-commit"
@@ -16,6 +16,10 @@ repos:
 - repo: "https://github.com/python-poetry/poetry"
   rev: "1.7.0"
   hooks:
+  - id: "poetry-lock"
+    stages: ["push"]
+    name: "Run Poetry lock hook"
+    args: ["--no-update"]
   - id: "poetry-check"
     stages: ["push"]
     name: "Run Poetry check hook"
