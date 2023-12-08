@@ -29,10 +29,10 @@ if TYPE_CHECKING:
     from configzen.typedefs import Configuration
 
 
-__all__ = ("BaseConfiguration", "ConfigzenConfigDict")
+__all__ = ("BaseConfiguration", "ModelConfig")
 
 
-class ConfigzenConfigDict(SettingsConfigDict, total=False):
+class ModelConfig(SettingsConfigDict, total=False):
     """Meta-configuration for configzen models."""
 
     configuration_source: ConfigurationSource[Any, Any]
@@ -40,7 +40,7 @@ class ConfigzenConfigDict(SettingsConfigDict, total=False):
     parser_factory: Callable[..., ReplacementParser]
 
 
-pydantic_config_keys |= set(ConfigzenConfigDict.__annotations__.keys())
+pydantic_config_keys |= set(ModelConfig.__annotations__.keys())
 owner_lookup: ContextVar[BaseConfiguration] = ContextVar("owner")
 
 
@@ -111,7 +111,7 @@ def _locate_in_iterable(
 
 
 class BaseConfigurationMetaclass(ModelMetaclass):
-    model_config: ConfigzenConfigDict
+    model_config: ModelConfig
 
     if not TYPE_CHECKING:
         # Allow type-safe route declaration instead of using strings.
@@ -575,11 +575,11 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         """Set a configuration item at the given set of routes."""
         self.configuration_at(item).configuration = value
 
-    def __init_subclass__(cls, **kwargs: Unpack[ConfigzenConfigDict]) -> None:
+    def __init_subclass__(cls, **kwargs: Unpack[ModelConfig]) -> None:
         """Initialize the configuration subclass."""
         super().__init_subclass__(**cast("BaseConfigDict", kwargs))
 
-    model_config: ClassVar[ConfigzenConfigDict] = ConfigzenConfigDict(
+    model_config: ClassVar[ModelConfig] = ModelConfig(
         rebuild_on_load=True,
         validate_assignment=True,
         extra="forbid",
