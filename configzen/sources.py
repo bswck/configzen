@@ -148,6 +148,16 @@ def get_configuration_source(
     raise NotImplementedError(msg)
 
 
+def _make_path(
+    source: str | bytes | PathLike[str] | PathLike[bytes],
+) -> Path:
+    if isinstance(source, PathLike):
+        source = source.__fspath__()
+    if isinstance(source, bytes):
+        source = source.decode()
+    return Path(source)
+
+
 @runtime_generic
 class FileConfigurationSource(
     ConfigurationSource[Path, AnyStr],
@@ -163,7 +173,7 @@ class FileConfigurationSource(
     """
 
     def __init__(self, source: str | bytes | PathLike[str] | PathLike[bytes]) -> None:
-        super().__init__(self._make_path(source))
+        super().__init__(_make_path(source))
         self._stream_class: Callable[..., IO[AnyStr]] = (
             BytesIO if self.is_binary() else StringIO
         )
@@ -184,16 +194,6 @@ class FileConfigurationSource(
             f"with extension {suffix!r}"
         )
         raise NotImplementedError(msg)
-
-    def _make_path(
-        self,
-        source: str | bytes | PathLike[str] | PathLike[bytes],
-    ) -> Path:
-        if isinstance(source, PathLike):
-            source = source.__fspath__()
-        if isinstance(source, bytes):
-            source = source.decode()
-        return Path(source)
 
     def load(self) -> Data:
         """
