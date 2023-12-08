@@ -1,4 +1,6 @@
 from contextvars import ContextVar
+
+import pytest
 from configzen.copy_context import (
     copy_context_on_call,
     copy_context_on_await,
@@ -19,6 +21,7 @@ def test_copy_context_on_call() -> None:
     assert cv.get() == 1
 
 
+@pytest.mark.asyncio
 async def test_copy_context_on_await() -> None:
     cv = ContextVar("cv")
     cv.set(1)
@@ -44,6 +47,7 @@ def test_copy_and_run() -> None:
     assert cv.get() == 1
 
 
+@pytest.mark.asyncio
 async def test_copy_and_await() -> None:
     cv = ContextVar("cv")
     cv.set(1)
