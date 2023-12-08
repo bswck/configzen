@@ -8,6 +8,7 @@ from configzen.copy_context import (
     copy_and_await,
 )
 
+
 def test_copy_context_on_call() -> None:
     cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)

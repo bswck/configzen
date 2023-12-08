@@ -46,6 +46,15 @@ class Step:
     def __init__(self, argument: object, /) -> None:
         self.key = argument
 
+    def __eq__(self, other: object) -> bool:
+        """Compare this step to another step."""
+        if isinstance(other, Step):
+            return (
+                issubclass(type(other), type(self))
+                or issubclass(type(self), type(other))
+            ) or self.key == other.key
+        return NotImplemented
+
     def get(self, _: Any, /) -> object:
         """Perform a get operation."""
         raise NotImplementedError
