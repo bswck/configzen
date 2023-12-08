@@ -123,10 +123,9 @@ class GetItem(Step):
 
 class Route:
     r"""
-    Routes are used to access values in a configuration tree.
+    Routes are, lists of steps that are used to access values in a configuration.
 
-    They are, basically, lists of steps that are used to access values in a
-    configuration tree. Each step is either a key or an index.
+    Each step is either a key or an index.
 
     A route can be created from a string, a list of steps, or another route.
 
