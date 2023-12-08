@@ -181,7 +181,7 @@ class FileConfigurationSource(
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
         suffix = self.source.suffix
         if suffix:
-            extension = suffix[1:]
+            extension = suffix.replace(".", "", 1)
             from configzen.data import DataFormat
 
             data_format_class = DataFormat.extension_registry.get(extension)
