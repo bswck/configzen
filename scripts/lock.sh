@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# A manual alias for long poetry commands ✨
+# Run this before pushing to ensure that the package lock is up-to-date.
 #
-# Run this before pushing to ensure that package locks are up-to-date.
-# We update requirements-dev.txt in order to make sure that the CI environment
-# can install the dev dependencies without Poetry.
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/scripts/lock.sh.jinja
 #
 # Usage:
 # $ poe lock

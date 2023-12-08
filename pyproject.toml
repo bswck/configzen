@@ -1,3 +1,7 @@
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/pyproject.toml.jinja
+
 [tool.poetry]
 name = "configzen"
 version = "0.0.0"
@@ -11,11 +15,12 @@ homepage = "https://github.com/bswck/configzen"
 [tool.poetry.urls]
 Documentation = "https://configzen.readthedocs.io/en/latest/"
 Issues = "https://github.com/bswck/configzen/issues"
-Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
 Distribution = "https://pypi.org/project/configzen/"
+Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
+
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<=3.12"
 runtime-generics = "^2.0.2"
 pydantic = "^2.5.2"
 pydantic-settings = "^2.1.0"
@@ -25,12 +30,14 @@ ruamel-yaml = "^0.18.5"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.7.0"
 ruff = "^0.1.2"
-copier-templates-extensions = "^0.3.0"
+towncrier = "^23.11.0"
 pytest = "^7.4.3"
 coverage = "^7.3.2"
 poethepoet = "^0.24.3"
 pre-commit = "^3.5.0"
 smokeshow = "^0.4.0"
+
+
 [tool.poetry.group.docs]
 optional = true
 
@@ -43,13 +50,38 @@ mkdocstrings = { version = ">=0.19.0", extras = ["python"] }
 test = "pytest -v"
 lint = "ruff check ."
 lock = "scripts/lock.sh"
-bump = "scripts/bump.sh"
+reanswer = "scripts/skeleton.sh reanswer"
+bump = "scripts/skeleton.sh bump"
 check = [
     { ref="test" },
     { ref="lint" },
-    { ref="lock" }
+    { ref="lock" },
 ]
 release.script = "scripts.release:main"
+
+[tool.poe.tasks.added]
+shell = "towncrier create $TICKET.added.md --edit"
+args = [{name = "TICKET", positional = true}]
+
+[tool.poe.tasks.changed]
+shell = "towncrier create $TICKET.changed.md --edit"
+args = [{name = "TICKET", positional = true}]
+
+[tool.poe.tasks.fixed]
+shell = "towncrier create $TICKET.fixed.md --edit"
+args = [{name = "TICKET", positional = true}]
+
+[tool.poe.tasks.deprecated]
+shell = "towncrier create $TICKET.deprecated.md --edit"
+args = [{name = "TICKET", positional = true}]
+
+[tool.poe.tasks.removed]
+shell = "towncrier create $TICKET.removed.md --edit"
+args = [{name = "TICKET", positional = true}]
+
+[tool.poe.tasks.security]
+shell = "towncrier create $TICKET.security.md --edit"
+args = [{name = "TICKET", positional = true}]
 
 [tool.ruff]
 exclude = ["tests/", "scripts/"]
@@ -100,6 +132,45 @@ strict = true
 
 [tool.isort]
 profile = "black"
+
+[tool.towncrier]
+directory = "changes"
+package = "configzen"
+filename = "CHANGELOG.md"
+start_string = "<!-- insertion marker -->\n"
+underlines = ["", "", ""]  # We use Markdown
+title_format = "## [{version}](https://github.com/bswck/configzen/tree/{version}) ({project_date})"
+issue_format = "[#{issue}](https://github.com/bswck/configzen/issues/{issue})"
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
 
 [tool.coverage.report]
 omit = ["tests/*"]

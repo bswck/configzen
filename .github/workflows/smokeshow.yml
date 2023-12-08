@@ -1,3 +1,7 @@
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/.github/workflows/%23%25%20if%20public%20%25%23smokeshow.yml%23%25%20endif%20%25%23.jinja
+
 name: "Smokeshow"
 
 on:
@@ -14,20 +18,20 @@ jobs:
     runs-on: "ubuntu-latest"
     environment: "Smokeshow"
     steps:
-      - uses: "actions/setup-python@v4"
-        with:
-          python-version: "3.8"
-      - run: "pip install smokeshow"
-      - uses: "dawidd6/action-download-artifact@v2"
-        with:
-          workflow: "test.yml"
-          commit: "${{github.event.workflow_run.head_sha}}"
-      - run: "smokeshow upload coverage-html"
-        env:
-            SMOKESHOW_GITHUB_STATUS_DESCRIPTION: "Coverage {coverage-percentage}"
-            # 5 is set here while V2 is in development and coverage is far from complete
-            SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 91
-            SMOKESHOW_GITHUB_CONTEXT: "coverage"
-            SMOKESHOW_GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
-            SMOKESHOW_GITHUB_PR_HEAD_SHA: "${{github.event.workflow_run.head_sha}}"
-            SMOKESHOW_AUTH_KEY: "${{secrets.SMOKESHOW_AUTH_KEY}}"
+    - uses: "actions/setup-python@v5"
+      with:
+        python-version: "3.8"
+    - run: "pip install smokeshow"
+    - uses: "dawidd6/action-download-artifact@v2"
+      with:
+        workflow: "test.yml"
+        commit: "${{github.event.workflow_run.head_sha}}"
+    - run: "smokeshow upload coverage-html"
+      env:
+          SMOKESHOW_GITHUB_STATUS_DESCRIPTION: "Coverage {coverage-percentage}"
+          # 5 is set here while V2 is in development and coverage is far from complete
+          SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 91
+          SMOKESHOW_GITHUB_CONTEXT: "coverage"
+          SMOKESHOW_GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
+          SMOKESHOW_GITHUB_PR_HEAD_SHA: "${{github.event.workflow_run.head_sha}}"
+          SMOKESHOW_AUTH_KEY: "${{secrets.SMOKESHOW_AUTH_KEY}}"

@@ -1,7 +1,8 @@
-_commit: cb1abb7
+_commit: 3e18832
 _src_path: gh:bswck/skeleton
 author_username: bswck
 docs: true
+docs_slug: configzen
 email_address: bswck.dev@gmail.com
 github_username: bswck
 license_name: MIT

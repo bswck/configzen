@@ -1,3 +1,7 @@
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/.github/workflows/%23%25%20if%20publish_on_pypi%20%25%23release.yml%23%25%20endif%20%25%23.jinja
+
 name: "PyPI"
 
 on:
@@ -13,12 +17,12 @@ jobs:
     env:
       POETRY_VIRTUALENVS_CREATE: "false"
     steps:
-      - uses: "actions/checkout@v4"
-      - name: "Install poetry"
-        run: |
-          pipx install poetry
-      - name: "Build with poetry"
-        run: |
-          poetry build
-      - name: "Publish package distributions to PyPI"
-        uses: "pypa/gh-action-pypi-publish@release/v1"
+    - uses: "actions/checkout@v4"
+    - name: "Install poetry"
+      run: |
+        pipx install poetry
+    - name: "Build with poetry"
+      run: |
+        poetry build
+    - name: "Publish package distributions to PyPI"
+      uses: "pypa/gh-action-pypi-publish@release/v1"

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# Note:
-# If you want to change this file, you might want to do it at the infrastructure
-# level. See https://github.com/bswck/skeleton.
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/scripts/release.py.jinja
+#
 """
 Automate the release process by updating local files, creating and pushing a new tag.
 
@@ -19,9 +20,11 @@ import argparse
 import functools
 import logging
 import os
-import pathlib
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
+
 
 _LOGGER = logging.getLogger("release")
 _EDITOR = os.environ.get("EDITOR", "vim")
@@ -65,13 +68,13 @@ def _setup_logging() -> None:
     _LOGGER.addHandler(_logger_handler)
 
 
-def release(version: str, /) -> None:
+def release(*, version: str) -> None:
     """Release a semver version."""
     cmd, shell = str.split, functools.partial(subprocess.run, check=True)
 
     changed_files = _decode_if_bytes(
         shell(
-            cmd("git diff --name-only HEAD"),
+            cmd("git status --porcelain"),
             capture_output=True,
         ).stdout
     )
@@ -109,9 +112,17 @@ def release(version: str, /) -> None:
         ).strip()
     )
 
+    default_release_notes = _decode_if_bytes(
+        shell(
+            cmd(f"towncrier build --draft --yes --version={new_version}"),
+            capture_output=True,
+        ).stdout
+    )
+    shell(cmd(f"towncrier build --yes --version={new_version}"))
+
     changed_for_release = _decode_if_bytes(
         shell(
-            cmd("git diff --name-only HEAD"),
+            cmd("git status --porcelain"),
             capture_output=True,
         ).stdout
     )
@@ -157,10 +168,14 @@ def release(version: str, /) -> None:
 
         if do_write_notes:
             notes_complete = False
+            release_notes = default_release_notes
+            temp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+            temp_file.write(release_notes)
+            temp_file.close()
+
             while not notes_complete:
-                tmp_file = pathlib.Path(f".release-notes-{new_version}.txt")
-                shell(cmd(f"{_EDITOR} {tmp_file}"))
-                release_notes = tmp_file.read_text()
+                shell(cmd(f"{_EDITOR} {temp_file.name}"))
+                release_notes = Path(temp_file.name).read_text()
                 print("Release notes:")
                 print(release_notes)
                 print()
@@ -172,9 +187,10 @@ def release(version: str, /) -> None:
             shell(
                 cmd(
                     f"gh release create {new_version} --generate-notes "
-                    f"--notes-file {tmp_file}",
+                    f"--notes-file {temp_file.name}",
                 )
             )
+            os.unlink(temp_file.name)
         else:
             shell(cmd(f"gh release create {new_version} --generate-notes"))
 
@@ -184,13 +200,8 @@ def main(argv: list[str] | None = None) -> None:
     _setup_logging()
 
     parser = argparse.ArgumentParser(description="Release a semver version.")
-    parser.add_argument(
-        "version",
-        type=str,
-        nargs=1,
-    )
-    args: argparse.Namespace = parser.parse_args(argv)
-    release(args.version.pop())
+    parser.add_argument("version", type=str, required=True)
+    release(**vars(parser.parse_args(argv)))
 
 
 if __name__ == "__main__":

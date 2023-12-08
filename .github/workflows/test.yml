@@ -1,3 +1,7 @@
+# This file was generated from bswck/skeleton@3e18832.
+# Instead of changing this particular file, you might want to alter the template:
+# https://github.com/bswck/skeleton/tree/3e18832/project/.github/workflows/%23%25%20if%20test_suite%20%25%23test.yml%23%25%20endif%20%25%23.jinja
+
 name: "Tests"
 
 on: ["push"]
@@ -12,7 +16,7 @@ jobs:
     steps:
     - uses: "actions/checkout@v4"
     - name: "Set up Python ${{matrix.python-version}}"
-      uses: "actions/setup-python@v3"
+      uses: "actions/setup-python@v5"
       with:
         python-version: "${{matrix.python-version}}"
     - name: "Install the project"
@@ -22,9 +26,10 @@ jobs:
     - name: "Run tests"
       run: "poetry run coverage run -m pytest -v ."
     - name: "Report coverage"
-      run: |
+      run: >
         poetry run coverage report
-        poetry run coverage html --show-contexts --title "configzen coverage for ${{github.sha}}"
+        && poetry run coverage html --show-contexts
+        --title "configzen coverage for ${{github.sha}}"
     - name: "Store coverage html"
       uses: "actions/upload-artifact@v3"
       with:
