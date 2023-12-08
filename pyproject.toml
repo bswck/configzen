@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@9e323d4.
+# This file was generated from bswck/skeleton@0c3d361.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/9e323d4/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/0c3d361/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
@@ -54,7 +54,6 @@ bump = "scripts/skeleton.sh bump"
 check = [
     { ref="test" },
     { ref="lint" },
-    { ref="lock" },
 ]
 release.script = "scripts.release:main"
 
