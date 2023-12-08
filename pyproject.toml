@@ -1,6 +1,6 @@
-# This file was generated from bswck/skeleton@3a798c1.
+# This file was generated from bswck/skeleton@20196db.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/3a798c1/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/20196db/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
@@ -36,13 +36,6 @@ coverage = "^7.3.2"
 poethepoet = "^0.24.3"
 pre-commit = "^3.5.0"
 smokeshow = "^0.4.0"
-
-[tool.poetry.group.dev-async]
-optional = false
-
-[tool.poetry.group.dev-async.dependencies]
-pytest-asyncio = "^0.23.2"
-
 
 [tool.poetry.group.docs]
 optional = true

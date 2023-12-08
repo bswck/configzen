@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# Interact with bswck/skeleton (current version: https://github.com/bswck/skeleton/tree/3a798c1).
+# Interact with bswck/skeleton (current version: https://github.com/bswck/skeleton/tree/20196db).
 #
-# This file was generated from bswck/skeleton@3a798c1.
+# This file was generated from bswck/skeleton@20196db.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/3a798c1/project/scripts/skeleton.sh.jinja
+# https://github.com/bswck/skeleton/tree/20196db/project/scripts/skeleton.sh.jinja
 #
 # Usage:
 #
@@ -22,7 +22,7 @@
 # at the same time.
 
 # shellcheck disable=SC2005
-# Automatically copied from https://github.com/bswck/skeleton/tree/3a798c1/handle-task-event.sh
+# Automatically copied from https://github.com/bswck/skeleton/tree/20196db/handle-task-event.sh
 setup_gh() {
     echo "Calling GitHub setup hooks..."
     supply_smokeshow_key
@@ -124,7 +124,7 @@ after_update_algorithm() {
 }
 
 main() {
-    export LAST_REF="3a798c1"
+    export LAST_REF="20196db"
     export PROJECT_PATH_KEY="$$_skeleton_project_path"
     export NEW_REF_KEY="$$_skeleton_new_ref"
     export LAST_LICENSE_NAME="MIT"

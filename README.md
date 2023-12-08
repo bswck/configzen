@@ -427,9 +427,9 @@ poetry add configzen
 ## …contribute to [configzen](https://github.com/bswck/configzen) 🚀
 
 <!--
-This section was generated from bswck/skeleton@3a798c1.
+This section was generated from bswck/skeleton@20196db.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/3a798c1/fragments/guide.md
+https://github.com/bswck/skeleton/tree/20196db/fragments/guide.md
 -->
 
 > [!Note]
