@@ -1,6 +1,8 @@
+
 # configzen [![Package version](https://img.shields.io/pypi/v/configzen?label=PyPI)](https://pypi.org/project/configzen/) [![Supported Python versions](https://img.shields.io/pypi/pyversions/configzen.svg?logo=python&label=Python)](https://pypi.org/project/configzen/)
 [![Tests](https://github.com/bswck/configzen/actions/workflows/test.yml/badge.svg)](https://github.com/bswck/configzen/actions/workflows/test.yml)
 [![Coverage](https://coverage-badge.samuelcolvin.workers.dev/bswck/configzen.svg)](https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen)
+[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Code style](https://img.shields.io/badge/code%20style-black-000000.svg?label=Code%20style)](https://github.com/psf/black)
 [![License](https://img.shields.io/github/license/bswck/configzen.svg?label=License)](https://github.com/bswck/configzen/blob/HEAD/LICENSE)
@@ -424,12 +426,22 @@ poetry add configzen
 
 ## …contribute to [configzen](https://github.com/bswck/configzen) 🚀
 
+<!--
+This section was generated from bswck/skeleton@3e18832.
+Instead of changing this particular file, you might want to alter the template:
+https://github.com/bswck/skeleton/tree/3e18832/fragments/guide.md
+-->
+
 > [!Note]
 > If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+
+
 1.  Fork the [configzen repository](https://github.com/bswck/configzen) on GitHub.
 
 1.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
     Poetry is an amazing tool for managing dependencies & virtual environments, building packages and publishing them.
+    You might use [pipx](https://github.com/pypa/pipx#readme) to install it globally (recommended):
 
     ```shell
     pipx install poetry
@@ -442,6 +454,7 @@ poetry add configzen
     ```shell
     pyenv install 3.8
     ```
+
 1.  Clone your fork locally and install dependencies.
 
     ```shell
@@ -449,9 +462,15 @@ poetry add configzen
     cd path/to/configzen
     poetry env use $(cat .python-version)
     poetry install
+    ```
+
+    Next up, simply activate the virtual environment and install pre-commit hooks:
+
+    ```shell
     poetry shell
     pre-commit install --hook-type pre-commit --hook-type pre-push
     ```
+
 For more information on how to contribute, check out [CONTRIBUTING.md](https://github.com/bswck/configzen/blob/HEAD/CONTRIBUTING.md).<br/>
 Always happy to accept contributions! ❤️
 
