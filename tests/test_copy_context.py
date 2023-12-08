@@ -9,7 +9,7 @@ from configzen.copy_context import (
 )
 
 def test_copy_context_on_call() -> None:
-    cv = ContextVar("cv")
+    cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
     @copy_context_on_call
@@ -43,7 +43,7 @@ def test_copy_context_on_call() -> None:
 
 @pytest.mark.asyncio
 async def test_copy_context_on_await() -> None:
-    cv = ContextVar("cv")
+    cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
     @copy_context_on_await
@@ -76,7 +76,7 @@ async def test_copy_context_on_await() -> None:
 
 
 def test_copy_and_run() -> None:
-    cv = ContextVar("cv")
+    cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
     def func() -> int:
@@ -89,7 +89,7 @@ def test_copy_and_run() -> None:
 
 @pytest.mark.asyncio
 async def test_copy_and_await() -> None:
-    cv = ContextVar("cv")
+    cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
     async def func() -> int:
