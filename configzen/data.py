@@ -6,7 +6,17 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Mapping, MutableMapping, MutableSequence, Sequence
 from functools import partial
 from itertools import zip_longest
-from typing import TYPE_CHECKING, Any, AnyStr, Generic, TypedDict, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AnyStr,
+    Generic,
+    Literal,
+    TypedDict,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from runtime_generics import generic_isinstance, runtime_generic
 
@@ -57,7 +67,14 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     def __init__(self, options: DataFormatOptionsType) -> None:
         self.configure(**options)
 
-    @property
+    @overload
+    def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]:
+        ...
+
+    @overload
+    def is_binary(self: DataFormat[DataFormatOptionsType, str]) -> Literal[False]:
+        ...
+
     def is_binary(self) -> bool:
         """Return whether the data format is bitwise."""
         return generic_isinstance(self, BinaryDataFormat)
@@ -109,6 +126,12 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
 
     def validate_source(self, source: ConfigurationSource[Any, AnyStr]) -> None:
         """Validate the config source."""
+        if self.is_binary() and not source.is_binary():
+            msg = (
+                f"{source} is not a binary source, "
+                f"but {self.__class__.__name__} is a binary data format",
+            )
+            raise TypeError(msg)
 
     def roundtrip_update_mapping(
         self,

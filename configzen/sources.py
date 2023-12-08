@@ -20,7 +20,7 @@ from typing import (
 )
 
 from anyio import Path as AsyncPath
-from runtime_generics import generic_isinstance, runtime_generic
+from runtime_generics import get_type_arguments, runtime_generic
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -82,6 +82,21 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
         msg = "Cannot guess the data format of the configuration source"
         raise NotImplementedError(msg)
+
+    # This is not a property for type safety reasons.
+    # https://github.com/python/mypy/issues/9937
+    @overload
+    def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]:
+        ...
+
+    @overload
+    def is_binary(self: ConfigurationSource[SourceType, bytes]) -> Literal[True]:
+        ...
+
+    def is_binary(self: ConfigurationSource[SourceType, AnyStr]) -> bool:
+        """Determine whether the configuration source is binary."""
+        (_source_type, data_type) = get_type_arguments(self)
+        return issubclass(data_type, bytes)
 
     @abstractmethod
     def load(self) -> Data:
@@ -150,7 +165,7 @@ class FileConfigurationSource(
     def __init__(self, source: str | bytes | PathLike[str] | PathLike[bytes]) -> None:
         super().__init__(self._make_path(source))
         self._stream_class: Callable[..., IO[AnyStr]] = (
-            BytesIO if self._is_binary() else StringIO
+            BytesIO if self.is_binary() else StringIO
         )
 
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
@@ -179,19 +194,6 @@ class FileConfigurationSource(
         if isinstance(source, bytes):
             source = source.decode()
         return Path(source)
-
-    # This is not a property for type safety reasons.
-    # https://github.com/python/mypy/issues/9937
-    @overload
-    def _is_binary(self: FileConfigurationSource[str]) -> Literal[False]:
-        ...
-
-    @overload
-    def _is_binary(self: FileConfigurationSource[bytes]) -> Literal[True]:
-        ...
-
-    def _is_binary(self: FileConfigurationSource[AnyStr]) -> bool:
-        return generic_isinstance(self, FileConfigurationSource[bytes])
 
     def load(self) -> Data:
         """
@@ -253,13 +255,13 @@ class FileConfigurationSource(
 
     def read(self) -> AnyStr:
         """Read the configuration source and return its contents."""
-        if self._is_binary():
+        if self.is_binary():
             return self.source.read_bytes()
         return self.source.read_text()
 
     async def read_async(self) -> AnyStr:
         """Read the configuration source file asynchronously and return its contents."""
-        if self._is_binary():
+        if self.is_binary():
             return await AsyncPath(self.source).read_bytes()
         return await AsyncPath(self.source).read_text()
 
@@ -272,7 +274,7 @@ class FileConfigurationSource(
         content
             The content to write to the configuration source.
         """
-        if self._is_binary():
+        if self.is_binary():
             return self.source.write_bytes(content)
         return self.source.write_text(content)
 
@@ -287,7 +289,7 @@ class FileConfigurationSource(
         content
             The content to write to the configuration source.
         """
-        if self._is_binary():
+        if self.is_binary():
             return await AsyncPath(self.source).write_bytes(content)
         return await AsyncPath(self.source).write_text(content)
 
