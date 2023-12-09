@@ -4,7 +4,7 @@ from configzen.route import Route, RouteError, Step, GetItem, GetAttr
 
 
 @pytest.mark.parametrize(
-    "route, expected",
+    "route_string, expected",
     [
         ("", []),
         ("foo", [GetAttr("foo")]),
@@ -12,9 +12,16 @@ from configzen.route import Route, RouteError, Step, GetItem, GetAttr
         ("foo.bar[baz]", [GetAttr("foo"), GetAttr("bar"), GetItem("baz")]),
     ],
 )
-def test_route_decompose(route: str, expected: list[Step]) -> None:
-    assert Route.decompose(route) == expected
+def test_route_decompose(route_string: str, expected: list[Step]) -> None:
+    assert Route.decompose(route_string) == expected
 
 
-def test_route_compose() -> None:
-    pass
+@pytest.mark.parametrize(
+    "route, expected",
+    [
+        (Route("foo.bar[baz]"), "foo.bar[baz]"),
+        (Route("foo.bar[0][baz\\.bar]"), "foo.bar[0][baz\\.bar]"),
+    ],
+)
+def test_route_compose(route: Route, expected: str) -> None:
+    assert route.compose() == expected

@@ -127,7 +127,7 @@ class GetItem(Step):
             argument = Route.TOKEN_ESCAPE + argument
         return argument.join(
             Route.TOKEN_GETITEM_ENTER + Route.TOKEN_GETITEM_EXIT,
-        )
+        ).replace(Route.TOKEN_DOT, r"\.")
 
 
 class Route:
