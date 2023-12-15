@@ -1,11 +1,12 @@
 from contextvars import ContextVar
 
 import pytest
+
 from configzen.copy_context import (
-    copy_context_on_call,
-    copy_context_on_await,
-    copy_and_run,
     copy_and_await,
+    copy_and_run,
+    copy_context_on_await,
+    copy_context_on_call,
 )
 
 

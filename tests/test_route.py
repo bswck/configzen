@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import pytest
-from configzen.route import Route, RouteError, Step, GetItem, GetAttr
+
+from configzen.route import GetAttr, GetItem, Route, RouteError, Step
 
 
 @pytest.mark.parametrize(
