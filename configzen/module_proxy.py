@@ -1,4 +1,4 @@
-"""Module proxy object that extends a runtime module with type validation."""
+"""`configzen.module_proxy`: Runtime modules wrapping with attribute type validation."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Subpackage for data formats."""
+"""`configzen.formats`: Data formats supported natively by _configzen_."""
 
 from . import std_json, std_plist, toml, yaml
 from .std_json import *  # noqa: F403

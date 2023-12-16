@@ -1,4 +1,4 @@
-"""Specialized exceptions raised by configzen."""
+"""`configzen.errors`: Specialized exceptions raised by _configzen_."""
 
 __all__ = (
     "ConfigurationError",
@@ -11,7 +11,7 @@ __all__ = (
 
 
 class ConfigurationError(Exception):
-    """Base class for all errors related to configuration management with configzen."""
+    """Base class for all errors related to _configzen_."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message)

@@ -1,4 +1,4 @@
-"""The YAML data format."""
+"""`configzen.formats.yaml`: The YAML data format."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Literal

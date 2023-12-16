@@ -1,4 +1,4 @@
-"""The JSON data format."""
+"""`configzen.formats.std_json`: The JSON data format."""
 from __future__ import annotations
 
 from json import JSONDecoder, JSONEncoder, dump, load

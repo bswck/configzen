@@ -1,4 +1,4 @@
-"""Route creation and parsing."""
+"""`configzen.route`: Routes creation and parsing."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ RouteLike: TypeAlias = Union[
 
 class Step:
     """
-    A route step.
+    A configuration route step.
 
     Do not use this class directly. Use GetAttr or GetItem instead.
     """

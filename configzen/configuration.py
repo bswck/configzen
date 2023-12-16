@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
 from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
 
 from anyio.to_thread import run_sync
@@ -122,7 +123,7 @@ class BaseConfigurationMetaclass(ModelMetaclass):
         # Shoutout to Micael Jarniac for the suggestion.
         #
         # TODO(bswck): Create a LinkedRoute class that will allow us to write
-        # more complex routes, such as `Conf.foo.bar[0].baz`.
+        # more complex routes with validation, such as `Conf.foo.bar[0].baz`.
         # https://github.com/bswck/configzen/issues/25
 
         def __getattr__(self, name: str) -> Any:
@@ -339,6 +340,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     @classmethod
     @copy_context_on_await
+    @wraps(configuration_load)
     async def configuration_load_async(
         cls: type[Configuration],
         source: object | None = None,
@@ -387,6 +389,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self
 
     @classmethod
+    @wraps(configuration_load_async)
     async def load_async(
         cls: type[Configuration],
         source: object | None = None,
@@ -424,6 +427,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
         return self
 
+    @wraps(configuration_reload)
     def reload(self: Self) -> Self:
         """Do the same as `configuration_reload`."""
         return self.configuration_reload()
@@ -456,6 +460,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
         return self
 
+    @wraps(configuration_reload_async)
     async def reload_async(self: Self) -> Self:
         """Do the same as `configuration_reload_async`."""
         return await self.configuration_reload_async()
@@ -518,6 +523,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         configuration_source.dump(data)
         return self
 
+    @wraps(configuration_save)
     def save(self, destination: object | None = None) -> Self:
         """Do the same as `configuration_save`."""
         return self.configuration_save(destination)
@@ -543,6 +549,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         await configuration_source.dump_async(data)
         return self
 
+    @wraps(configuration_save_async)
     async def save_async(self, destination: object | None = None) -> Self:
         """Do the same as `configuration_save_async`."""
         return await self.configuration_save_async(destination)
@@ -554,6 +561,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
             configuration=self,
         )
 
+    @wraps(configuration_at)
     def at(self, *routes: RouteLike) -> Item:
         """Do the same as `configuration_at`."""
         return self.configuration_at(*routes)
@@ -562,6 +570,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         """Return a dictionary representation of the configuration."""
         return super().model_dump()
 
+    @wraps(configuration_dump)
     def dump(self) -> dict[str, object]:
         """Do the same as `configuration_dump`."""
         return self.configuration_dump()

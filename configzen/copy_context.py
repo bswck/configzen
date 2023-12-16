@@ -1,4 +1,4 @@
-"""An internal module to isolate the library context from the user context."""
+"""`configzen.copy_context`: Isolate the library context from the user context."""
 from __future__ import annotations
 
 import asyncio
