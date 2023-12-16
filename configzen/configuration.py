@@ -1,4 +1,4 @@
-"""Core interface of configzen -- the base configuration model, `BaseConfiguration`."""
+"""`configzen.configuration`: the base configuration model, `BaseConfiguration`."""
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
@@ -115,11 +115,15 @@ class BaseConfigurationMetaclass(ModelMetaclass):
 
     if not TYPE_CHECKING:
         # Allow type-safe route declaration instead of using strings.
-        # Instead of writing configuration.configuration_at("foo"),
-        # we can write configuration.configuration_at(Configuration.foo)
+        # Instead of writing conf.configuration_at("foo"),
+        # we can write conf.configuration_at(Conf.foo)
         # to ensure full type safety backed by a membership check at runtime.
         #
         # Shoutout to Micael Jarniac for the suggestion.
+        #
+        # TODO(bswck): Create a LinkedRoute class that will allow us to write
+        # more complex routes, such as `Conf.foo.bar[0].baz`.
+        # https://github.com/bswck/configzen/issues/25
 
         def __getattr__(self, name: str) -> Any:
             if not name.startswith("_") and (
