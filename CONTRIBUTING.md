@@ -1,7 +1,7 @@
 <!--
-This file was generated from bswck/skeleton@4089ffe.
+This file was generated from bswck/skeleton@01e08d2.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/4089ffe/fragments/contributing.md
+https://github.com/bswck/skeleton/tree/01e08d2/fragments/contributing.md
 -->
 # Contributing to [configzen](https://github.com/bswck/configzen) 🎉
 Contributions are very welcome. 🚀
@@ -45,9 +45,9 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
 
 
 <!--
-This section was generated from bswck/skeleton@4089ffe.
+This section was generated from bswck/skeleton@01e08d2.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/4089ffe/fragments/guide.md
+https://github.com/bswck/skeleton/tree/01e08d2/fragments/guide.md
 -->
 
 > [!Note]

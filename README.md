@@ -246,11 +246,9 @@ The following table shows the supported file formats, their requirements, file e
 
 
 # Installation
-If you want to…
 
 
 
-## …use this tool in your project 💻
 You might simply install it with pip:
 
 ```shell
@@ -263,12 +261,12 @@ If you use [Poetry](https://python-poetry.org/), then run:
 poetry add configzen
 ```
 
-## …contribute to [configzen](https://github.com/bswck/configzen) 🚀
+## For contributors
 
 <!--
-This section was generated from bswck/skeleton@4089ffe.
+This section was generated from bswck/skeleton@01e08d2.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/4089ffe/fragments/guide.md
+https://github.com/bswck/skeleton/tree/01e08d2/fragments/guide.md
 -->
 
 > [!Note]
