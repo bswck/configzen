@@ -1,4 +1,11 @@
 """`configzen.errors`: Specialized exceptions raised by _configzen_."""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from configzen.configuration import BaseConfiguration
+
 
 __all__ = (
     "ConfigurationError",
@@ -33,8 +40,12 @@ class NotAMappingError(ConfigurationLoadError, TypeError):
     """Raised when the configuration being loaded is not a mapping."""
 
 
-class RouteError(ConfigurationError, ValueError):
+class BaseRouteError(ConfigurationError, ValueError):
     """Raised when a configuration item route is invalid."""
+
+
+class RouteError(BaseRouteError):
+    """Raised when a configuration item route is invalid at a specific index."""
 
     def __init__(self, message: str, route: str, index: int) -> None:
         self.message = message
@@ -44,3 +55,21 @@ class RouteError(ConfigurationError, ValueError):
     def __str__(self) -> str:
         """Return a string representation of the route error."""
         return f"{self.message} ({self.route}:{self.index})"
+
+
+class LinkedRouteError(BaseRouteError):
+    """Raised when a configuration item route is invalid."""
+
+    def __init__(
+        self,
+        message: str,
+        route: str,
+        configuration_class: type[BaseConfiguration],
+    ) -> None:
+        self.message = message
+        self.route = route
+        self.configuration_class = configuration_class
+
+    def __str__(self) -> str:
+        """Return a string representation of the route error."""
+        return f"{self.message} ({self.configuration_class.__name__}.{self.route})"

@@ -17,7 +17,15 @@ from pydantic_settings.main import SettingsConfigDict
 from configzen.copy_context import copy_context_on_await, copy_context_on_call
 from configzen.data import roundtrip_update_mapping
 from configzen.replacements import ReplacementParser
-from configzen.route import EMPTY_ROUTE, GetAttr, GetItem, Route, RouteLike
+from configzen.routes import (
+    EMPTY_ROUTE,
+    GetAttr,
+    GetItem,
+    LinkedRoute,
+    Route,
+    RouteLike,
+    advance_linked_route,
+)
 from configzen.sources import ConfigurationSource, get_configuration_source
 
 if TYPE_CHECKING:
@@ -27,6 +35,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
 
     from configzen.data import Data
+    from configzen.routes import Step
     from configzen.typedefs import Configuration
 
 
@@ -41,7 +50,7 @@ class ModelConfig(SettingsConfigDict, total=False):
     parser_factory: Callable[..., ReplacementParser]
 
 
-pydantic_config_keys |= set(ModelConfig.__annotations__.keys())
+pydantic_config_keys |= set(ModelConfig.__annotations__)
 owner_lookup: ContextVar[BaseConfiguration] = ContextVar("owner")
 
 
@@ -116,22 +125,14 @@ class BaseConfigurationMetaclass(ModelMetaclass):
 
     if not TYPE_CHECKING:
         # Allow type-safe route declaration instead of using strings.
-        # Instead of writing conf.configuration_at("foo"),
-        # we can write conf.configuration_at(Conf.foo)
+        # Instead of writing conf.at("foo"), we can write conf.at(Conf.foo)
         # to ensure full type safety backed by a membership check at runtime.
         #
         # Shoutout to Micael Jarniac for the suggestion.
-        #
-        # TODO(bswck): Create a LinkedRoute class that will allow us to write
-        # more complex routes with validation, such as `Conf.foo.bar[0].baz`.
-        # https://github.com/bswck/configzen/issues/25
 
         def __getattr__(self, name: str) -> Any:
-            if not name.startswith("_") and (
-                name in self.__annotations__
-                or self.model_config.get("extra") == "allow"
-            ):
-                return Route(GetAttr(name))
+            if name in self.model_fields:
+                return LinkedRoute(self, GetAttr(name))
             raise AttributeError(name)
 
 
@@ -593,10 +594,23 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         super().__init_subclass__(**cast("BaseConfigDict", kwargs))
 
     model_config: ClassVar[ModelConfig] = ModelConfig(
+        # Be lenient about forward references.
         rebuild_on_load=True,
+        # Keep the configuration valid & fail-proof for the whole time.
         validate_assignment=True,
+        # Make it easier to spot typos.
         extra="forbid",
     )
+
+
+@advance_linked_route.register(BaseConfiguration)
+def configuration_step(
+    owner: type[BaseConfiguration],
+    __annotation: Any,
+    step: Step[Any],
+) -> Any:
+    """Return the value of a configuration attribute."""
+    return owner.model_fields[step.key].annotation
 
 
 @dataclass
