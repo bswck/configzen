@@ -1,4 +1,4 @@
-_commit: 01e08d2
+_commit: fe6ed23
 _src_path: gh:bswck/skeleton
 author_username: bswck
 docs: true
@@ -14,6 +14,6 @@ pypi_project_description: An advanced configuration library for Python.
 pypi_project_name: configzen
 python_version: '3.8'
 repo_name: configzen
-test_suite: true
+tests: true
 use_precommit: true
 visibility: public

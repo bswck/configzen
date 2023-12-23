@@ -1,10 +1,12 @@
 
-# configzen [![Package version](https://img.shields.io/pypi/v/configzen?label=PyPI)](https://pypi.org/project/configzen/) [![Supported Python versions](https://img.shields.io/pypi/pyversions/configzen.svg?logo=python&label=Python)](https://pypi.org/project/configzen/)
+# configzen [![skeleton](https://img.shields.io/badge/fe6ed23-skeleton?label=%F0%9F%92%80%20bswck/skeleton&labelColor=black&color=grey&link=https%3A//github.com/bswck/skeleton)](https://github.com/bswck/skeleton/tree/fe6ed23)
+[![Package version](https://img.shields.io/pypi/v/configzen?label=PyPI)](https://pypi.org/project/configzen/)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/configzen.svg?logo=python&label=Python)](https://pypi.org/project/configzen/)
+
 [![Tests](https://github.com/bswck/configzen/actions/workflows/test.yml/badge.svg)](https://github.com/bswck/configzen/actions/workflows/test.yml)
 [![Coverage](https://coverage-badge.samuelcolvin.workers.dev/bswck/configzen.svg)](https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Code style](https://img.shields.io/badge/code%20style-black-000000.svg?label=Code%20style)](https://github.com/psf/black)
 [![License](https://img.shields.io/github/license/bswck/configzen.svg?label=License)](https://github.com/bswck/configzen/blob/HEAD/LICENSE)
 [![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
@@ -264,9 +266,9 @@ poetry add configzen
 ## For contributors
 
 <!--
-This section was generated from bswck/skeleton@01e08d2.
+This section was generated from bswck/skeleton@fe6ed23.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/01e08d2/fragments/guide.md
+https://github.com/bswck/skeleton/tree/fe6ed23/project/README.md.jinja
 -->
 
 > [!Note]

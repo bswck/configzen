@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# This file was generated from bswck/skeleton@01e08d2.
+# This file was generated from bswck/skeleton@fe6ed23.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/01e08d2/project/scripts/release.py.jinja
+# https://github.com/bswck/skeleton/tree/fe6ed23/project/scripts/release.py.jinja
 #
 """
 Automate the release process by updating local files, creating and pushing a new tag.
@@ -60,14 +60,21 @@ def _setup_logging() -> None:
     _LOGGER.addHandler(_logger_handler)
 
 
+def _command(prompt: str, /) -> str:
+    data = subprocess.check_output(prompt, shell=True, text=True)
+    if data[-1:] == "\n":
+        data = data[:-1]
+    return data
+
+
+def _run(*prompt: str) -> None:
+    """Run a command, allowing it to take over the terminal."""
+    subprocess.run([*prompt], check=True)
+
+
 def release(version: str, /) -> None:
     """Release a semver version."""
-    command, run = (
-        subprocess.getoutput,
-        lambda prompt: subprocess.run(*prompt, check=True),
-    )
-
-    changed_files = command("git status --porcelain")
+    changed_files = _command("git status --porcelain")
 
     if changed_files:
         do_continue = _ask_for_confirmation(
@@ -87,20 +94,20 @@ def release(version: str, /) -> None:
     )
 
     if not do_release:
-        _abort(f"You said no when prompted to bump to the {version!r} version.")
+        _abort(f"You said no when prompted to upgrade to the {version!r} version.")
 
     _LOGGER.info("Bumping to the %r version", version)
-    run("poetry", "version", version)
+    _run("poetry", "version", version)
 
-    new_version = "v" + command("poetry version --short").strip()
-    default_release_notes = command(
+    new_version = "v" + _command("poetry version --short").strip()
+    default_release_notes = _command(
         f"towncrier build --draft --yes --version={new_version}"
     )
-    command(f"towncrier build --yes --version={new_version}")
+    _command(f"towncrier build --yes --version={new_version}")
 
-    changed_for_release = command("git status --porcelain")
+    changed_for_release = _command("git status --porcelain")
     if changed_for_release:
-        run("git", "diff")
+        _run("git", "diff")
 
         do_commit = _ask_for_confirmation(
             "You are about to commit and push auto-changed files due "
@@ -110,8 +117,8 @@ def release(version: str, /) -> None:
         )
 
         if do_commit:
-            run("git", "commit", "-am", f"Release {new_version}")
-            run("git", "push")
+            _run("git", "commit", "-am", f"Release {new_version}")
+            _run("git", "push")
         else:
             _abort(
                 "Changes made uncommitted. "
@@ -121,12 +128,12 @@ def release(version: str, /) -> None:
     _LOGGER.info("Creating %s tag...", new_version)
 
     try:
-        run("git", "tag", "-sa", new_version, "-m", f"Release {new_version}")
+        _run("git", "tag", "-sa", new_version, "-m", f"Release {new_version}")
     except subprocess.CalledProcessError:
         _abort(f"Failed to create {new_version} tag, probably already exists.")
     else:
         _LOGGER.info("Pushing local tags...")
-        run("git", "push", "--tags")
+        _run("git", "push", "--tags")
 
     do_release = _ask_for_confirmation(
         "Create a GitHub release now? GitHub CLI required.",
@@ -147,8 +154,8 @@ def release(version: str, /) -> None:
             temp_file.close()
 
             while not notes_complete:
-                run(_EDITOR, temp_file.name)
-                release_notes = Path(temp_file.name).read_text()
+                _run(_EDITOR, temp_file.name)
+                release_notes = Path(temp_file.name).read_text().strip()
                 print("Release notes:")
                 print(release_notes)
                 print()
@@ -157,13 +164,13 @@ def release(version: str, /) -> None:
                     default=True,
                 )
 
-            run(
+            _run(
                 "gh", "release", "create", new_version, "--generate-notes",
                 "--notes-file", temp_file.name,
             )
             os.unlink(temp_file.name)
         else:
-            run("gh", "release", "create", new_version, "--generate-notes")
+            _run("gh", "release", "create", new_version, "--generate-notes")
 
 
 def main(argv: list[str] | None = None) -> None:
