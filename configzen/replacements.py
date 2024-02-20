@@ -193,6 +193,7 @@ class ReplacementParser:
         force
             Whether to forcibly parse the original data even if it was already parsed.
             Default is False.
+
         """
         if force or self.__data is None:
             self.__data = self._get_data_with_replacements(
@@ -216,6 +217,7 @@ class Replacement:
         The value of the item before alteration.
     content
         The value to unpack in place of the alteration key.
+
     """
 
     key: str

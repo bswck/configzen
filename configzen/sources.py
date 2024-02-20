@@ -170,6 +170,7 @@ class FileConfigurationSource(
     ----------
     source
         The path to the configuration source file.
+
     """
 
     def __init__(self, source: str | bytes | PathLike[str] | PathLike[bytes]) -> None:
@@ -203,6 +204,7 @@ class FileConfigurationSource(
         ----------
         data_format
             The data format to use when loading the data.
+
         """
         return self.data_format.load(self._stream_class(self.read()))
 
@@ -216,6 +218,7 @@ class FileConfigurationSource(
         ----------
         data_format
             The data format to use when loading the data.
+
         """
         return self.data_format.load(self._stream_class(await self.read_async()))
 
@@ -231,6 +234,7 @@ class FileConfigurationSource(
             The data to dump to the configuration source.
         data_format
             The data format to use when dumping the data.
+
         """
         stream = self._stream_class()
         self.data_format.dump(data, stream)
@@ -248,6 +252,7 @@ class FileConfigurationSource(
             The data to dump to the configuration source.
         data_format
             The data format to use when dumping the data.
+
         """
         stream = self._stream_class()
         self.data_format.dump(data, stream)
@@ -273,6 +278,7 @@ class FileConfigurationSource(
         ----------
         content
             The content to write to the configuration source.
+
         """
         if self.is_binary():
             return self.source.write_bytes(content)
@@ -288,6 +294,7 @@ class FileConfigurationSource(
         ----------
         content
             The content to write to the configuration source.
+
         """
         if self.is_binary():
             return await AsyncPath(self.source).write_bytes(content)

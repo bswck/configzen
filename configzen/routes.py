@@ -72,7 +72,7 @@ class Step(Generic[_KT]):
         """Perform a get operation."""
         raise NotImplementedError
 
-    def set(self, _: Any, __: object, /) -> None:  # noqa: A003
+    def set(self, _: Any, __: object, /) -> None:
         """Perform a set operation."""
         raise NotImplementedError
 
@@ -96,7 +96,7 @@ class GetAttr(Step[str]):
         """Get an attribute from an object."""
         return getattr(target, self.key)
 
-    def set(self, target: Any, value: object, /) -> None:  # noqa: A003
+    def set(self, target: Any, value: object, /) -> None:
         """Set an attribute in an object."""
         setattr(target, self.key, value)
 
@@ -127,7 +127,7 @@ class GetItem(Step[Union[int, str]]):
         """Get an item from an object."""
         return target[self.key]
 
-    def set(self, target: Any, value: object, /) -> None:  # noqa: A003
+    def set(self, target: Any, value: object, /) -> None:
         """Set an item in an object."""
         target[self.key] = value
 
@@ -168,6 +168,7 @@ def _route_decompose(  # noqa: C901, PLR0912, PLR0915
     Returns
     -------
     List of steps.
+
     """
     if not route.endswith(dot):
         route += dot
@@ -257,6 +258,7 @@ class Route:
         A route to parse.
     allow_empty
         Whether to allow empty routes.
+
     """
 
     TOKEN_DOT: ClassVar[str] = "."
@@ -305,6 +307,7 @@ class Route:
         Returns
         -------
         List of steps.
+
         """
         if isinstance(route, Step):
             return [route]
@@ -342,6 +345,7 @@ class Route:
         Returns
         -------
         List of steps.
+
         """
         if not route:
             return []
@@ -376,6 +380,7 @@ class Route:
         ----------
         subroute
             A subroute to enter.
+
         """
         return type(self)(self.steps + self.parse(subroute))
 
@@ -391,10 +396,11 @@ class Route:
         Returns
         -------
         The result of visiting the object.
+
         """
         return reduce(lambda obj, step: step(obj), self.__steps, obj)
 
-    def set(self, obj: Any, value: object, /) -> None:  # noqa: A003
+    def set(self, obj: Any, value: object, /) -> None:
         """
         Set an object pointed to by this route.
 
@@ -409,6 +415,7 @@ class Route:
         Returns
         -------
         The result of visiting the object.
+
         """
         steps = self.steps
         last_step = steps.pop()
@@ -425,6 +432,7 @@ class Route:
         ----------
         other
             Another route to compare to.
+
         """
         if isinstance(other, Route):
             return self.steps == other.steps

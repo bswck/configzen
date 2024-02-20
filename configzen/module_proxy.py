@@ -36,6 +36,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         The configuration model to use for type validation.
     module_namespace
         The module namespace to wrap.
+
     """
 
     __configuration__: Configuration
@@ -129,6 +130,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         Returns
         -------
         The wrapped module.
+
         """
         from configzen.configuration import BaseConfiguration
 
@@ -182,6 +184,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             The config class to use for type validation.
         values
             Values used to initialize the config.
+
         """
         current_frame = inspect.currentframe()
         if current_frame is None:

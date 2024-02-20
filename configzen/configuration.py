@@ -294,6 +294,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         Returns
         -------
         self
+
         """
         if cls.model_config["rebuild_on_load"]:
             # Frame 1: copy_context_and_call.<locals>.copy()
@@ -366,6 +367,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         Returns
         -------
         self
+
         """
         # Intentionally not using `run_sync(configuration_load)` here.
         # We want to keep every user-end object handled by the same thread.
@@ -519,6 +521,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
             to a TOML text file source. Keep in mind, however, that for binary formats
             such as non-XML Plist you must specify its format type to binary, so in
             that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
+
         """
         configuration_source, data = self._configuration_data_save(destination)
         configuration_source.dump(data)
@@ -545,6 +548,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
             to a TOML text file source. Keep in mind, however, that for binary formats
             such as non-XML Plist you must specify its format type to binary, so in
             that case just create `BinaryFileConfigurationSource("plist_file.plist")`.
+
         """
         configuration_source, data = self._configuration_data_save(destination)
         await configuration_source.dump_async(data)

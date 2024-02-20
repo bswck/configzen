@@ -150,6 +150,7 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
             The data to be updated. Stores the original structure, comments etc.
         mergeable_data
             The new values to be merged into the loaded data.
+
         """
         return roundtrip_update_mapping(
             roundtrip_data,
