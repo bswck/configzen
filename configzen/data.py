@@ -18,7 +18,7 @@ from typing import (
     overload,
 )
 
-from runtime_generics import generic_isinstance, runtime_generic
+from runtime_generics import get_parents, runtime_generic
 
 if TYPE_CHECKING:
     from typing import IO, ClassVar
@@ -77,7 +77,7 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
 
     def is_binary(self) -> bool:
         """Return whether the data format is bitwise."""
-        return generic_isinstance(self, BinaryDataFormat)
+        return BinaryDataFormat in get_parents(self)
 
     # Unpack[DataFormatOptionsType] cannot be used here,
     # because this functionality is not supported by mypy yet.

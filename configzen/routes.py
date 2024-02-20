@@ -250,7 +250,9 @@ class Route:
     --------
     >>> route = Route("a.b.c")
     >>> route
-    Route([GetAttr('a'), GetAttr('b'), GetAttr('c')])
+    <Route 'a.b.c'>
+    >>> route.steps
+    [GetAttr('a'), GetAttr('b'), GetAttr('c')]
 
     Parameters
     ----------
