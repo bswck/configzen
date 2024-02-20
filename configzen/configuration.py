@@ -240,9 +240,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
             msg = f"No config source provided when loading {cls.__name__}"
             raise ValueError(msg)
         if not isinstance(source, ConfigurationSource):
-            source = get_configuration_source(
-                source,
-            )
+            source = get_configuration_source(source)
             if source is None:
                 msg = (
                     f"Could not create a config source from {source!r} "
