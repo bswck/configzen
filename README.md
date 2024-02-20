@@ -1,24 +1,16 @@
-
-# configzen [![skeleton](https://img.shields.io/badge/fe6ed23-skeleton?label=%F0%9F%92%80%20bswck/skeleton&labelColor=black&color=grey&link=https%3A//github.com/bswck/skeleton)](https://github.com/bswck/skeleton/tree/fe6ed23)
-[![Package version](https://img.shields.io/pypi/v/configzen?label=PyPI)](https://pypi.org/project/configzen/)
-[![Supported Python versions](https://img.shields.io/pypi/pyversions/configzen.svg?logo=python&label=Python)](https://pypi.org/project/configzen/)
+# configzen [![skeleton](https://img.shields.io/badge/0.0.2rc–150–gf81555e-skeleton?label=%F0%9F%92%80%20bswck/skeleton&labelColor=black&color=grey&link=https%3A//github.com/bswck/skeleton)](https://github.com/bswck/skeleton/tree/0.0.2rc-150-gf81555e) [![Supported Python versions](https://img.shields.io/pypi/pyversions/configzen.svg?logo=python&label=Python)](https://pypi.org/project/configzen/) [![Package version](https://img.shields.io/pypi/v/configzen?label=PyPI)](https://pypi.org/project/configzen/)
 
 [![Tests](https://github.com/bswck/configzen/actions/workflows/test.yml/badge.svg)](https://github.com/bswck/configzen/actions/workflows/test.yml)
 [![Coverage](https://coverage-badge.samuelcolvin.workers.dev/bswck/configzen.svg)](https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen)
-[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![License](https://img.shields.io/github/license/bswck/configzen.svg?label=License)](https://github.com/bswck/configzen/blob/HEAD/LICENSE)
-[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Documentation Status](https://readthedocs.org/projects/configzen/badge/?version=latest)](https://configzen.readthedocs.io/en/latest/?badge=latest)
 
-An advanced configuration library for Python.
+Manage configuration with pydantic.
 
 > [!Warning]
 > _configzen_ is currently under huge refactoring to work with pydantic v2.
 > The API is subject to change.
 
-_configzen_ – easily create and maintain complex, statically-typed configurations with validation in Python.
-
-It's important to keep your configuration safe and consistent. Give a shot to _configzen_ 🚀
+It's important to keep your configuration safe and consistent. Give a shot to _configzen_, because it:
 
 ⭐ Supports **Python 3.8 or above**,<br>
 ⭐ Is **fully typed**,<br>
@@ -28,9 +20,9 @@ It's important to keep your configuration safe and consistent. Give a shot to _c
 ⭐ Supports **synchronous and asynchronous file operations**,<br>
 ⭐ Supports loading configuration from **environment variables and secret files**.<br>
 
-While being built on top of [pydantic](https://docs.pydantic.dev/1.10/), _configzen_ inherits most of its features, including
-[data validation](https://docs.pydantic.dev/1.10/usage/validators/), [schema generation](https://docs.pydantic.dev/1.10/usage/schema/),
-[custom data types](https://docs.pydantic.dev/1.10/usage/types/#arbitrary-types-allowed), good integration with [Rich](https://docs.pydantic.dev/1.10/usage/rich/), and more.
+While being built on top of [pydantic](https://docs.pydantic.dev/2.6/), _configzen_ inherits most of its features, including
+[data validation](https://docs.pydantic.dev/2.6/concepts/models/#validation), [schema generation](https://docs.pydantic.dev/2.6/api/base_model/#pydantic.BaseModel.model_json_schema),
+[custom data types](https://docs.pydantic.dev/2.6/api/config/#pydantic.config.ConfigDict.arbitrary_types_allowed), good integration with [Rich](https://docs.pydantic.dev/2.6/integrations/rich/), and more.
 
 Learn more below.
 
@@ -244,38 +236,32 @@ The following table shows the supported file formats, their requirements, file e
 | [JSON](https://en.wikipedia.org/wiki/JSON)    | -                | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                  |
 | [TOML](https://en.wikipedia.org/wiki/TOML)    | -                | `toml`, `ini`, `cfg`, `conf` | [tomlkit](https://pypi.python.org/pypi/tomlkit)                                                               |
 | [YAML](https://yaml.org)                      | -                | `yaml`, `yml`                | [ruamel.yaml](https://pypi.python.org/pypi/ruamel.yaml) |
-| [Plist](https://en.wikipedia.org/wiki/XML)    | -                | `xml`                        | [xml](https://docs.python.org/3/library/xml.html) (standard library)                                    |
-
+| [Plist](https://en.wikipedia.org/wiki/XML)    | -                | `xml`                        | [plistlib](https://docs.python.org/3/library/plistlib.html) (standard library)                                    |
 
 # Installation
-
-
-
 You might simply install it with pip:
 
 ```shell
 pip install configzen
 ```
 
-If you use [Poetry](https://python-poetry.org/), then run:
+If you use [Poetry](https://python-poetry.org/), then you might want to run:
 
 ```shell
 poetry add configzen
 ```
 
 ## For contributors
-
+[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 <!--
-This section was generated from bswck/skeleton@fe6ed23.
+This section was generated from bswck/skeleton@0.0.2rc-150-gf81555e.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/bswck/skeleton/tree/fe6ed23/project/README.md.jinja
+https://github.com/bswck/skeleton/tree/0.0.2rc-150-gf81555e/project/README.md.jinja
 -->
-
 > [!Note]
 > If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
-
-
-
 1.  Fork the [configzen repository](https://github.com/bswck/configzen) on GitHub.
 
 1.  [Install Poetry](https://python-poetry.org/docs/#installation).<br/>
@@ -307,13 +293,12 @@ https://github.com/bswck/skeleton/tree/fe6ed23/project/README.md.jinja
 
     ```shell
     poetry shell
-    pre-commit install --hook-type pre-commit --hook-type pre-push
+    pre-commit install
     ```
 
 For more information on how to contribute, check out [CONTRIBUTING.md](https://github.com/bswck/configzen/blob/HEAD/CONTRIBUTING.md).<br/>
 Always happy to accept contributions! ❤️
 
-
 # Legal info
 © Copyright by Bartosz Sławecki ([@bswck](https://github.com/bswck)).
-<br />This software is licensed under the terms of [MIT License](https://github.com/bswck/configzen/blob/HEAD/LICENSE).
+<br />This software is licensed under the terms of [GPL-3.0 License](https://github.com/bswck/configzen/blob/HEAD/LICENSE).

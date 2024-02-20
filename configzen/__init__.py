@@ -1,9 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0
+# (C) 2024-present Bartosz Sławecki (bswck)
 """
-configzen.
+`configzen`.
 
-An advanced configuration library for Python.
-
-(C) 2023-present Bartosz Sławecki (bswck)
+Manage configuration with pydantic.
 """
 
 from pydantic import Field

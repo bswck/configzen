@@ -1,13 +1,13 @@
-# This file was generated from bswck/skeleton@fe6ed23.
+# This file was generated from bswck/skeleton@0.0.2rc-150-gf81555e.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/fe6ed23/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/0.0.2rc-150-gf81555e/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
 version = "0.0.0"
-description = "An advanced configuration library for Python."
+description = "Manage configuration with pydantic."
 authors = ["bswck <bswck.dev@gmail.com>"]
-license = "MIT"
+license = "GPL-3.0"
 readme = "README.md"
 packages = [{ include = "configzen/" }]
 homepage = "https://github.com/bswck/configzen"
@@ -19,7 +19,7 @@ Distribution = "https://pypi.org/project/configzen/"
 Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<=3.12"
+python = ">=3.8,<4.0"
 runtime-generics = "^2.0.2"
 pydantic = "^2.5.2"
 pydantic-settings = "^2.1.0"
@@ -31,17 +31,23 @@ class-singledispatch = "^1.0.2"
 pytest-asyncio = "^0.23.2"
 
 [tool.poetry.group.dev-skeleton.dependencies]
-# This dependency group was generated from bswck/skeleton@fe6ed23.
+# This dependency group was generated from bswck/skeleton@0.0.2rc-150-gf81555e.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/fe6ed23/project/pyproject.toml.jinja
+# https://github.com/bswck/skeleton/tree/0.0.2rc-150-gf81555e/project/pyproject.toml.jinja
 mypy = "^1.7.0"
-ruff = "^0.1.2"
+ruff = "^0.2.1"
 towncrier = "^23.11.0"
-pytest = "^7.4.3"
-coverage = "^7.3.2"
+coverage = "^7.4.0"
+pytest = "^8.0.0"
+pytest-doctestplus = "^1.1.0"
+covdefaults = "^2.3.0"
 poethepoet = "^0.24.3"
 pre-commit = "^3.5.0"
 smokeshow = "^0.4.0"
+keyring = "^24.3.0"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
 
 [tool.poetry.group.docs]
 optional = true
@@ -54,7 +60,7 @@ mkdocstrings = { version = ">=0.19.0", extras = ["python"] }
 [tool.poe.tasks]
 test = "pytest -v"
 lint = "ruff check ."
-skeleton = "scripts/fe6ed23.sh"
+skeleton = "scripts/skeleton.0.0.2rc-150-gf81555e.bash"
 check = [
     { ref="test" },
     { ref="lint" },
@@ -63,30 +69,32 @@ release.script = "scripts.release:main"
 
 [tool.poe.tasks.added]
 shell = "towncrier create $TICKET.added.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.poe.tasks.changed]
 shell = "towncrier create $TICKET.changed.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.poe.tasks.fixed]
 shell = "towncrier create $TICKET.fixed.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.poe.tasks.deprecated]
 shell = "towncrier create $TICKET.deprecated.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.poe.tasks.removed]
 shell = "towncrier create $TICKET.removed.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.poe.tasks.security]
 shell = "towncrier create $TICKET.security.md --edit"
-args = [{name = "TICKET", positional = true}]
+args = [{name = "TICKET", default = "+", positional = true}]
 
 [tool.ruff]
 exclude = ["tests/", "scripts/"]
+
+[tool.ruff.lint]
 # To discuss the presented rationales, contact the author (bswck).
 select = ["ALL"]
 ignore = [
@@ -129,6 +137,9 @@ ignore = [
     "FIX002",
 ]
 
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
 [tool.mypy]
 strict = true
 
@@ -136,7 +147,7 @@ strict = true
 profile = "black"
 
 [tool.towncrier]
-directory = "changes"
+directory = "news"
 package = "configzen"
 filename = "CHANGELOG.md"
 start_string = "<!-- insertion marker -->\n"
@@ -174,17 +185,13 @@ directory = "fixed"
 name = "Fixed"
 showcontent = true
 
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source = ["configzen/"]
+relative_files = true
+
 [tool.coverage.report]
-omit = ["tests/*"]
-# fail_under = 96
-exclude_also = [
-    # Be sure to include lines that are not meant to be covered
-    # by tests or encountered by the users at runtime.
-    "raise NotImplementedError",          # Do not cover abstract methods.
-    "if ((t|typing)\\.?)?TYPE_CHECKING:", # Do not cover type checking imports.
-    "@((t|typing)\\.?)?overload",         # Do not cover overload definitions.
-    "\\(((t|typing)\\.?)?Protocol\\):$",  # Do not cover entire protocol definitions.
-]
+fail_under = 90
 
 [build-system]
 requires = ["poetry-core"]
