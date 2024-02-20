@@ -1,4 +1,4 @@
-"""`configzen.errors`: Specialized exceptions raised by _configzen_."""
+"""`configzen.errors`: Specialized exceptions raised by configzen."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -19,7 +19,7 @@ __all__ = (
 
 
 class ConfigurationError(Exception):
-    """Base class for all errors related to _configzen_."""
+    """Base class for all errors related to configzen."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message)

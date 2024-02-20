@@ -7,10 +7,10 @@
 Manage configuration with pydantic.
 
 > [!Warning]
-> _configzen_ is currently under huge refactoring to work with pydantic v2.
+> configzen is currently under huge refactoring to work with pydantic v2.
 > The API is subject to change.
 
-It's important to keep your configuration safe and consistent. Give a shot to _configzen_, because it:
+It's important to keep your configuration safe and consistent. Give a shot to configzen, because it:
 
 ⭐ Supports **Python 3.8 or above**,<br>
 ⭐ Is **fully typed**,<br>
@@ -20,7 +20,7 @@ It's important to keep your configuration safe and consistent. Give a shot to _c
 ⭐ Supports **synchronous and asynchronous file operations**,<br>
 ⭐ Supports loading configuration from **environment variables and secret files**.<br>
 
-While being built on top of [pydantic](https://docs.pydantic.dev/2.6/), _configzen_ inherits most of its features, including
+While being built on top of [pydantic](https://docs.pydantic.dev/2.6/), configzen inherits most of its features, including
 [data validation](https://docs.pydantic.dev/2.6/concepts/models/#validation), [schema generation](https://docs.pydantic.dev/2.6/api/base_model/#pydantic.BaseModel.model_json_schema),
 [custom data types](https://docs.pydantic.dev/2.6/api/config/#pydantic.config.ConfigDict.arbitrary_types_allowed), good integration with [Rich](https://docs.pydantic.dev/2.6/integrations/rich/), and more.
 
@@ -39,7 +39,7 @@ port: 5432
 user: postgres
 ```
 
-You can create a _configzen_ configuration model for it like this:
+You can create a configzen configuration model for it like this:
 
 ```python
 # model.py
@@ -75,7 +75,7 @@ for more information.
 Configuration models inherit from the `pydantic.BaseSettings` class, so you can use all of its features:
 schema generation, type conversion, validation, etc.
 
-There are additional features brought to you by _configzen_ worth checking out, though.
+There are additional features brought to you by configzen worth checking out, though.
 
 You can use the `db_config` object defined above to access the configuration values:
 
