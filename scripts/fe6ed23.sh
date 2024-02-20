@@ -83,7 +83,7 @@ run_update_algorithm() {
     SKELETON_COMMAND="${1:-"upgrade"}"
     if test "$SKELETON_COMMAND" = "upgrade"
     then
-        copier update --trust --vcs-ref "${2:-"HEAD"}" --defaults || return 1
+        copier update --trust --vcs-ref "${2:-"HEAD"}" || return 1
     elif test "$SKELETON_COMMAND" = "patch"
     then
         # shellcheck disable=SC2068
