@@ -14,6 +14,7 @@ __all__ = (
     "ConfigurationSaveError",
     "NotAMappingError",
     "RouteError",
+    "LinkedRouteError",
 )
 
 
