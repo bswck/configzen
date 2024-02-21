@@ -121,8 +121,7 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     @classmethod
     def register_file_extensions(cls) -> None:
         """Register the file extensions supported by this data format."""
-        for file_extension in cls.file_extensions:
-            cls.extension_registry[file_extension] = cls
+        cls.extension_registry.update(dict.fromkeys(cls.file_extensions, cls))
 
     def validate_source(self, source: ConfigurationSource[Any, AnyStr]) -> None:
         """Validate the config source."""
