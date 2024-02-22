@@ -23,7 +23,7 @@ __all__ = (
 
 
 YAMLVersion: TypeAlias = "list[int] | str | tuple[int, int]"
-YAMLTyp = Literal["rt", "rtsc", "safe", "unsafe", "base"]
+YAMLTyp: TypeAlias = Literal["rt", "rtsc", "safe", "unsafe", "base"]
 
 
 class YAMLOptions(DataFormatOptions, total=False):
