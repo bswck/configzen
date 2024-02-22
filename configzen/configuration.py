@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
     from configzen.data import Data
     from configzen.routes import Step
-    from configzen.typedefs import Configuration
 
 
 __all__ = ("BaseConfiguration", "ModelConfig")
@@ -183,9 +182,9 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     @property
     def configuration_parser(self) -> ReplacementParser:
         """
-        Current state of the configuration.
+        Current replacement parser.
 
-        Stores the initial data used when loading the configuration,
+        Parser stores the initial data used when loading the configuration,
         resolves macros etc.
         """
         if self._configuration_root is None:
@@ -216,10 +215,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     find_routes = configuration_find_routes
 
-    def configuration_find_route(
-        self,
-        subconfiguration: BaseConfiguration,
-    ) -> Route:
+    def configuration_find_route(self, subconfiguration: BaseConfiguration) -> Route:
         """Locate exactly one (closest) route to the given subconfiguration."""
         all_routes = self.configuration_find_routes(subconfiguration)
         if not all_routes:
@@ -266,11 +262,11 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     @classmethod
     @copy_context_on_call
     def configuration_load(
-        cls: type[Configuration],
+        cls,
         source: object | None = None,
         *,
         parser_factory: Callable[..., ReplacementParser] | None = None,
-    ) -> Configuration:
+    ) -> Self:
         """
         Load this configuration from a given source.
 
@@ -330,11 +326,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self
 
     @classmethod
-    def load(
-        cls: type[Configuration],
-        source: object | None = None,
-        **kwargs: Any,
-    ) -> Configuration:
+    def load(cls, source: object | None = None, **kwargs: Any) -> Self:
         """Do the same as `configuration_load`."""
         return cls.configuration_load(source, **kwargs)
 
@@ -342,11 +334,11 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     @copy_context_on_await
     @wraps(configuration_load)
     async def configuration_load_async(
-        cls: type[Configuration],
+        cls,
         source: object | None = None,
         *,
         parser_factory: Callable[..., ReplacementParser] | None = None,
-    ) -> Configuration:
+    ) -> Self:
         """
         Do the same as `configuration_load`, but asynchronously (no I/O blocking).
 
@@ -382,7 +374,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         parser = make_parser(await configuration_source.load_async())
 
         # Since `parser.get_processed_data()` operates on primitive data types,
-        # we can safely use run_sync here to run in a separate worker thread.
+        # we can safely use run_sync here to run in a worker thread.
         self = cls(**await run_sync(parser.get_data_with_replacements))
 
         self._configuration_parser = parser
@@ -391,15 +383,11 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     @classmethod
     @wraps(configuration_load_async)
-    async def load_async(
-        cls: type[Configuration],
-        source: object | None = None,
-        **kwargs: Any,
-    ) -> Configuration:
+    async def load_async(cls, source: object | None = None, **kwargs: Any) -> Self:
         """Do the same as `configuration_load_async`."""
         return await cls.configuration_load_async(source, **kwargs)
 
-    def configuration_reload(self: Self) -> Self:
+    def configuration_reload(self) -> Self:
         """Reload the configuration from the same source."""
         source = self.configuration_source
 
@@ -413,7 +401,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         parser = root.configuration_parser.create_parser(source.load())
 
         # Construct a new configuration instance.
-        # Respect __class__ attribute in cse root might be a proxy (from proxyvars).
+        # Respect __class__ attribute in case root might be a proxy (from proxyvars).
         new_root = root.__class__(**parser.get_data_with_replacements())
 
         # Copy values from the freshly loaded configuration into our instance.
@@ -429,11 +417,11 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self
 
     @wraps(configuration_reload)
-    def reload(self: Self) -> Self:
+    def reload(self) -> Self:
         """Do the same as `configuration_reload`."""
         return self.configuration_reload()
 
-    async def configuration_reload_async(self: Self) -> Self:
+    async def configuration_reload_async(self) -> Self:
         """Do the same as `configuration_reload` asynchronously (no I/O blocking)."""
         source = self.configuration_source
 
@@ -462,7 +450,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         return self
 
     @wraps(configuration_reload_async)
-    async def reload_async(self: Self) -> Self:
+    async def reload_async(self) -> Self:
         """Do the same as `configuration_reload_async`."""
         return await self.configuration_reload_async()
 
@@ -530,10 +518,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         """Do the same as `configuration_save`."""
         return self.configuration_save(destination)
 
-    async def configuration_save_async(
-        self,
-        destination: object | None = None,
-    ) -> Self:
+    async def configuration_save_async(self, destination: object | None = None) -> Self:
         """
         Do the same as `configuration_save`, but asynchronously (no I/O blocking).
 
@@ -559,10 +544,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
 
     def configuration_at(self, *routes: RouteLike) -> Item:
         """Return a configuration item at the given set of routes."""
-        return Item(
-            routes=set(map(Route, routes)),
-            configuration=self,
-        )
+        return Item(routes=set(map(Route, routes)), configuration=self)
 
     @wraps(configuration_at)
     def at(self, *routes: RouteLike) -> Item:
@@ -578,10 +560,7 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         """Do the same as `configuration_dump`."""
         return self.configuration_dump()
 
-    def __getitem__(
-        self,
-        routes: RouteLike | tuple[RouteLike, ...],
-    ) -> Item:
+    def __getitem__(self, routes: RouteLike | tuple[RouteLike, ...]) -> Item:
         """Return a configuration item at the given set of routes."""
         if isinstance(routes, tuple):
             return self.configuration_at(*routes)
