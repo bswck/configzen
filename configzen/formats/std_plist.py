@@ -4,6 +4,8 @@ from __future__ import annotations
 from plistlib import PlistFormat, dump, load
 from typing import IO, TYPE_CHECKING, Any, ClassVar
 
+from runtime_generics import runtime_generic
+
 from configzen.data import BinaryDataFormat, DataFormatOptions
 
 if TYPE_CHECKING:
@@ -29,6 +31,7 @@ class PlistOptions(DataFormatOptions, total=False):
     skipkeys: bool
 
 
+@runtime_generic
 class PlistDataFormat(BinaryDataFormat[PlistOptions]):
     """The Plist data format."""
 

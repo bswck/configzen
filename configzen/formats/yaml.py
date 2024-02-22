@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from runtime_generics import runtime_generic
 
 from configzen.data import DataFormatOptions, TextDataFormat
 
@@ -49,6 +50,7 @@ class YAMLOptions(DataFormatOptions, total=False):
     """Indentation for nested block sequences."""
 
 
+@runtime_generic
 class YAMLDataFormat(TextDataFormat[YAMLOptions]):
     """The YAML data format."""
 

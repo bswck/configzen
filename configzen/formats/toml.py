@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import IO, TYPE_CHECKING, ClassVar
 
+from runtime_generics import runtime_generic
 from tomlkit.api import dump, load, register_encoder, unregister_encoder
 
 from configzen.data import DataFormatOptions, TextDataFormat
@@ -38,6 +39,7 @@ class TOMLOptions(DataFormatOptions, total=False):
     """
 
 
+@runtime_generic
 class TOMLDataFormat(TextDataFormat[TOMLOptions]):
     """The TOML data format."""
 

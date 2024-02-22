@@ -4,6 +4,8 @@ from __future__ import annotations
 from json import JSONDecoder, JSONEncoder, dump, load
 from typing import IO, TYPE_CHECKING, ClassVar, cast
 
+from runtime_generics import runtime_generic
+
 from configzen.data import DataFormatOptions, TextDataFormat
 
 if TYPE_CHECKING:
@@ -43,6 +45,7 @@ class JSONOptions(DataFormatOptions, total=False):
     default: Callable[..., object] | None  # JSONEncoder
 
 
+@runtime_generic
 class JSONDataFormat(TextDataFormat[JSONOptions]):
     """The JSON data format."""
 
