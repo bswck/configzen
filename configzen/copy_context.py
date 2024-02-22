@@ -36,7 +36,7 @@ def copy_context_on_call(func: Callable[_P, _T]) -> Callable[_P, _T]:
         return type(func)(copy_context_on_call(func.__func__))
 
     @wraps(func)
-    def copy(*args: object, **kwargs: object) -> _T:
+    def copy(*args: _P.args, **kwargs: _P.kwargs) -> _T:
         return copy_and_run(func, *args, **kwargs)
 
     return copy
@@ -56,22 +56,22 @@ def copy_context_on_await(
         return type(func)(copy_context_on_await(func.__func__))
 
     @wraps(func)
-    async def copy_async(*args: object, **kwargs: object) -> _T:
+    async def copy_async(*args: _P.args, **kwargs: _P.kwargs) -> _T:
         return await copy_and_await(func, *args, **kwargs)
 
     return copy_async
 
 
-def copy_and_run(func: Callable[..., _T], *args: object, **kwargs: object) -> _T:
+def copy_and_run(func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
     """Run a function in an isolated context."""
     context = contextvars.copy_context()
     return context.run(func, *args, **kwargs)
 
 
 def copy_and_await(
-    func: Callable[..., Coroutine[object, object, _T]],
-    *args: object,
-    **kwargs: object,
+    func: Callable[_P, Coroutine[object, object, _T]],
+    *args: _P.args,
+    **kwargs: _P.kwargs,
 ) -> asyncio.Task[_T]:
     """Await a coroutine in an isolated context."""
     return asyncio.create_task(func(*args, **kwargs))
