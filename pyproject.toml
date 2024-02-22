@@ -24,7 +24,7 @@ pydantic = "^2.5.2"
 pydantic-settings = "^2.1.0"
 tomlkit = "^0.12.3"
 ruamel-yaml = "^0.18.5"
-runtime-generics = "^3.0.1"
+runtime-generics = "^3.0.2"
 class-singledispatch = "^1.0.3"
 
 [tool.poetry.group.dev.dependencies]
