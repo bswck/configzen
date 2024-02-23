@@ -80,7 +80,7 @@ class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
 
     def find_replacement(
         self,
-        key: str,
+        key: str | None,
         value: object,
     ) -> Replacement | None:
         """
@@ -90,6 +90,9 @@ class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
         """
         macro_prefix = self.options["macro_prefix"]
         update_prefix = self.options["update_prefix"]
+
+        if not key:
+            return None
 
         if key.startswith(macro_prefix):
             return Replacement(
