@@ -63,8 +63,8 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     file_extensions: ClassVar[set[str]]
     option_name: ClassVar[str]
 
-    def __init__(self, options: DataFormatOptionsType) -> None:
-        self.configure(**options)
+    def __init__(self, options: DataFormatOptionsType | None = None) -> None:
+        self.configure(**(options or {}))
 
     @overload
     def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]:
