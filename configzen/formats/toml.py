@@ -44,14 +44,12 @@ class TOMLDataFormat(TextDataFormat[TOMLOptions]):
     """The TOML data format."""
 
     option_name: ClassVar[str] = "toml"
-    toml_options: TOMLOptions
+
+    # Subclass and override for global effect.
+    toml_options: TOMLOptions = TOMLOptions()
 
     default_extension: ClassVar[str] = "toml"
     file_extensions: ClassVar[set[str]] = {"ini", "conf"}
-
-    def __init__(self, options: TOMLOptions) -> None:
-        self.toml_options = options
-        super().__init__(options)
 
     def configure(self, **options: Unpack[TOMLOptions]) -> None:
         """For the documentation of the options, see the TOMLOptions class."""

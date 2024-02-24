@@ -55,7 +55,9 @@ class YAMLDataFormat(TextDataFormat[YAMLOptions]):
     """The YAML data format."""
 
     option_name: ClassVar[str] = "yaml"
-    yaml: YAML
+
+    # Subclass and override for global effect.
+    yaml: YAML = YAML()
 
     default_extension: ClassVar[str] = "yml"
     file_extensions: ClassVar[set[str]] = {"yaml"}
@@ -64,7 +66,7 @@ class YAMLDataFormat(TextDataFormat[YAMLOptions]):
         """For the documentation of the options, see the YAMLOptions class."""
         yaml_classes = options.pop("classes", None) or []
 
-        old_yaml = getattr(self, "yaml", None) or YAML()
+        old_yaml = self.yaml
         yaml_version = options.pop("version", None) or old_yaml.version
         yaml_indent = options.pop("indent", None) or old_yaml.old_indent
         yaml_block_seq_indent = (

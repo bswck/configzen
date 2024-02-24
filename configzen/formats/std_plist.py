@@ -36,7 +36,9 @@ class PlistDataFormat(BinaryDataFormat[PlistOptions]):
     """The Plist data format."""
 
     option_name: ClassVar[str] = "plist"
-    plist_options: PlistOptions
+
+    # Subclass and override for global effect.
+    plist_options: PlistOptions = PlistOptions()
 
     default_extension: ClassVar[str] = "plist"
 

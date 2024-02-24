@@ -50,15 +50,12 @@ class JSONDataFormat(TextDataFormat[JSONOptions]):
     """The JSON data format."""
 
     option_name: ClassVar[str] = "json"
-    json_encoder: JSONEncoder
-    json_decoder: JSONDecoder
+
+    # Subclass and override for global effect.
+    json_encoder: JSONEncoder = JSONEncoder()
+    json_decoder: JSONDecoder = JSONDecoder()
 
     default_extension: ClassVar[str] = "json"
-
-    def __init__(self, options: JSONOptions) -> None:
-        self.json_encoder = JSONEncoder()
-        self.json_decoder = JSONDecoder()
-        super().__init__(options)
 
     def configure(self, **options: Unpack[JSONOptions]) -> None:
         """For the documentation of the options, see the JSONOptions class."""
