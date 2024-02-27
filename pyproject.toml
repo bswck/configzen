@@ -22,7 +22,7 @@ Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/confi
 python = ">=3.8,<4.0"
 pydantic = "^2.6.2"
 pydantic-settings = "^2.1.0"
-tomlkit = "^0.12.3"
+tomlkit = "^0.12.4"
 ruamel-yaml = "^0.18.5"
 runtime-generics = "^3.0.4"
 class-singledispatch = "^1.0.3"
