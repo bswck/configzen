@@ -20,7 +20,7 @@ Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/confi
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-pydantic = "^2.6.2"
+pydantic = "^2.6.4"
 pydantic-settings = "^2.1.0"
 tomlkit = "^0.12.3"
 ruamel-yaml = "^0.18.5"
