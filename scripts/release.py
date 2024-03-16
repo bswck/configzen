@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# This file was generated from bswck/skeleton@0.0.2rc-161-g1ae7659.
+# This file was generated from bswck/skeleton@0.0.2rc-180-g2a2d737.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/0.0.2rc-161-g1ae7659/project/scripts/release.py.jinja
+# https://github.com/bswck/skeleton/tree/0.0.2rc-180-g2a2d737/project/scripts/release.py.jinja
 #
 """
 Automate the release process by updating local files, creating and pushing a new tag.
@@ -72,12 +72,12 @@ def _run(*prompt: str) -> None:
 
 def release(version: str, /, next_version: str = "patch") -> None:
     """Release a semver version."""
-    print(welcome_msg := "Simple release utility.")
-    print("-" * len(welcome_msg) + "\n")
-    print(f"Release version: {version}")
-    print(f"Post-release version: {next_version}")
-    print()
+    print(welcome_msg := "Simple release utility.".title())
+    print("-" * len(welcome_msg))
+    _LOGGER.info("Release version: %s", version)
+    _LOGGER.info("Post-release version: %s", next_version)
 
+    _run("pre-commit", "run", "--all-files", "--hook-stage", "pre-push")
     changed_files = _command("git status --porcelain")
 
     if changed_files:
