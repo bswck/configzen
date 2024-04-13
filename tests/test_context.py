@@ -2,7 +2,7 @@ from contextvars import ContextVar
 
 import pytest
 
-from configzen.copy_context import (
+from configzen.context import (
     copy_and_await,
     copy_and_run,
     copy_context_on_await,

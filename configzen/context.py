@@ -1,4 +1,4 @@
-"""`configzen.copy_context`: Isolate the library context from the user context."""
+"""`configzen.context`: Isolate the library context from the user context."""
 from __future__ import annotations
 
 import asyncio

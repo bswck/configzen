@@ -14,7 +14,7 @@ from pydantic._internal._model_construction import ModelMetaclass
 from pydantic_settings import BaseSettings
 from pydantic_settings.main import SettingsConfigDict
 
-from configzen.copy_context import copy_context_on_await, copy_context_on_call
+from configzen.context import copy_context_on_await, copy_context_on_call
 from configzen.data import roundtrip_update_mapping
 from configzen.replacements import ReplacementParser
 from configzen.routes import (
