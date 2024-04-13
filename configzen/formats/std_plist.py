@@ -1,4 +1,5 @@
 """`configzen.formats.std_plist`: The Plist data format."""
+
 from __future__ import annotations
 
 from plistlib import PlistFormat, dump, load

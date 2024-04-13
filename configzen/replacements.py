@@ -5,6 +5,7 @@ Allows to tweak the configuration data programmatically before it is given
 to the model config and revert the changes back to the original data structure
 when the configuration managed by that model is saved.
 """
+
 from __future__ import annotations
 
 from collections import UserDict

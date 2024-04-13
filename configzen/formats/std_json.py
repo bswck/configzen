@@ -1,4 +1,5 @@
 """`configzen.formats.std_json`: The JSON data format."""
+
 from __future__ import annotations
 
 from json import JSONDecoder, JSONEncoder, dump, load
@@ -30,10 +31,13 @@ class JSONOptions(DataFormatOptions, total=False):
     parse_int: Callable[[str], int] | None  # JSONDecoder
     parse_constant: Callable[[str], object] | None  # JSONDecoder
     strict: bool  # JSONDecoder
-    object_pairs_hook: Callable[
-        [list[tuple[str, object]]],
-        object,
-    ] | None  # JSONDecoder
+    object_pairs_hook: (
+        Callable[
+            [list[tuple[str, object]]],
+            object,
+        ]
+        | None
+    )  # JSONDecoder
 
     skipkeys: bool  # JSONEncoder
     ensure_ascii: bool  # JSONEncoder

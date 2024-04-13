@@ -1,12 +1,12 @@
-# This file was generated from bswck/skeleton@0.0.2rc-215-g792492f.
+# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-215-g792492f.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/0.0.2rc-215-g792492f/project/pyproject.toml.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f/project/pyproject.toml.jinja
 
 [tool.poetry]
 name = "configzen"
 version = "0.0.0"
 description = "Manage configuration with pydantic."
-authors = ["bswck <bswck.dev@gmail.com>"]
+authors = ["bswck <bartoszpiotrslawecki@gmail.com>"]
 license = "GPL-3.0"
 readme = "README.md"
 packages = [{ include = "configzen/" }]
@@ -19,7 +19,7 @@ Distribution = "https://pypi.org/project/configzen/"
 Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<4.0"
+python = ">=3.8"
 pydantic = ">=2.6.2"
 pydantic-settings = ">=2.1.0"
 tomlkit = ">=0.12.3"
@@ -33,9 +33,9 @@ pytest-asyncio = "^0.23.2"
 scalene = { version = "^1.5.37", python = ">=3.8,!=3.11.0" }
 
 [tool.poetry.group.dev-skeleton.dependencies]
-# This dependency group was generated from bswck/skeleton@0.0.2rc-215-g792492f.
+# This dependency group was generated from skeleton-ci/skeleton-python@0.0.2rc-215-g792492f.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/bswck/skeleton/tree/0.0.2rc-215-g792492f/project/pyproject.toml.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f/project/pyproject.toml.jinja
 mypy = ">=1.9.0"
 ruff = ">=0.3.4"
 towncrier = ">=23.11.0"
@@ -110,7 +110,7 @@ ignore = [
     # Rationale: The `__init__` docstring is mostly redundant to the class docstring.
     "D107",
 
-    # From bswck/skeleton
+    # From skeleton-ci/skeleton-python
     # -------------------
 
     # Description: Missing type annotation for self in method

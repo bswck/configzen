@@ -67,12 +67,10 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         self.configure(**(options or {}))
 
     @overload
-    def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]:
-        ...
+    def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]: ...
 
     @overload
-    def is_binary(self: DataFormat[DataFormatOptionsType, str]) -> Literal[False]:
-        ...
+    def is_binary(self: DataFormat[DataFormatOptionsType, str]) -> Literal[False]: ...
 
     def is_binary(self) -> bool:
         """Return whether the data format is bitwise."""
