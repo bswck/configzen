@@ -50,7 +50,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         doc: str | None = None,
     ) -> None:
         object.__setattr__(self, "__configuration__", config)
-        object.__setattr__(self, "__locals__", module_namespace)
+        object.__setattr__(self, "__locals__", module_namespace or {})
         object.__setattr__(config, "__wrapped_module__", self)
 
         super().__init__(name=name, doc=doc)
@@ -144,26 +144,29 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             class ConfigurationModule(BaseConfiguration):
                 __module__ = module_name
                 __annotations__ = module_namespace["__annotations__"]
-                __temp__ = locals()
                 for key in __annotations__:
-                    __temp__[key] = module_namespace[key]
-                del __temp__
+                    locals()[key] = module_namespace[key]
 
             configuration_class = cast("type[Configuration]", ConfigurationModule)
 
         module_values = {}
+        field_names = frozenset(
+            field_info.validation_alias
+            or field_info.alias
+            or field_info.title
+            or field_name
+            for field_name, field_info in configuration_class.model_fields.items()
+        )
         for key, value in module_namespace.items():
-            if key in {
-                field.validation_alias
-                for field in configuration_class.model_fields.values()
-            }:
+            if key in field_names:
                 module_values[key] = value
+        config = configuration_class.model_validate({**module_values, **values})
 
         return cls(
-            config=configuration_class.model_validate({**module_values, **values}),
+            config=config,
             module_namespace=module_namespace,
-            name=module_namespace["__name__"],
-            doc=module_namespace["__doc__"],
+            name=module_namespace.get("__name__") or module_name,
+            doc=module_namespace.get("__doc__"),
         )
 
     @classmethod
@@ -195,7 +198,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             msg = "Could not get the frame back"
             raise RuntimeError(msg)
         return cls.wrap_module(
-            frame_back.f_globals["__name__"],
+            {**frame_back.f_globals, **frame_back.f_locals}["__name__"],
             configuration_class,
-            **values,
+            {**frame_back.f_locals, **values},
         )
