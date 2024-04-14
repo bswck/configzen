@@ -11,16 +11,6 @@ Manage configuration with pydantic.
 > configzen is currently under huge refactoring to work with pydantic v2.
 > The API is subject to change.
 
-It's important to keep your configuration safe and consistent. Give a shot to configzen, because it:
-
-⭐ Supports **Python 3.8 or above**,<br>
-⭐ Is **fully typed**,<br>
-⭐ Supports **YAML, JSON, TOML, INI and Plist**,<br>
-⭐ Supports **reading and writing configuration files**, fully or partially, with the ability to preserve the original file structure and comments,<br>
-⭐ Supports **modular configuration with type validation** (wrapping runtime Python modules in-place and outside them),<br>
-⭐ Supports **synchronous and asynchronous file operations**,<br>
-⭐ Supports loading configuration from **environment variables and secret files**.<br>
-
 While being built on top of [pydantic](https://docs.pydantic.dev/2.6/), configzen inherits most of its features, including
 [data validation](https://docs.pydantic.dev/2.6/concepts/models/#validation), [schema generation](https://docs.pydantic.dev/2.6/api/base_model/#pydantic.BaseModel.model_json_schema),
 [custom data types](https://docs.pydantic.dev/2.6/api/config/#pydantic.config.ConfigDict.arbitrary_types_allowed), good integration with [Rich](https://docs.pydantic.dev/2.6/integrations/rich/), and more.
