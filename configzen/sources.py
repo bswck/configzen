@@ -229,6 +229,7 @@ class StreamConfigurationSource(
         """
         stream = (BytesIO if self.is_binary() else StringIO)()
         self.data_format.dump(data, stream)
+        stream.seek(0)
         return self.source.write(stream.read())
 
     def dump_async(self, _data: Data) -> Never:
@@ -331,6 +332,7 @@ class FileConfigurationSource(
         """
         stream = self._stream_class()
         self.data_format.dump(data, stream)
+        stream.seek(0)
         return self.write(stream.read())
 
     async def dump_async(self, data: Data) -> int:
@@ -349,6 +351,7 @@ class FileConfigurationSource(
         """
         stream = self._stream_class()
         self.data_format.dump(data, stream)
+        stream.seek(0)
         return await self.write_async(stream.read())
 
     def read(self) -> AnyStr:
