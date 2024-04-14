@@ -16,7 +16,6 @@ from typing import (
     Literal,
     TypedDict,
     TypeVar,
-    overload,
 )
 
 from anyio import Path as AsyncPath
@@ -26,6 +25,7 @@ from configzen.data import DataFormat
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import overload
 
     from typing_extensions import Never, Unpack
 
@@ -111,12 +111,15 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
         data_format.configure(**self.options)  # type: ignore[misc]
         return data_format
 
-    #  python/mypy#9937
-    @overload
-    def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]: ...
+    if TYPE_CHECKING:
+        #  python/mypy#9937
+        @overload
+        def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]: ...
 
-    @overload
-    def is_binary(self: ConfigurationSource[SourceType, bytes]) -> Literal[True]: ...
+        @overload
+        def is_binary(
+            self: ConfigurationSource[SourceType, bytes],
+        ) -> Literal[True]: ...
 
     def is_binary(self: ConfigurationSource[SourceType, AnyStr]) -> bool:
         """Determine whether the configuration source is binary."""
