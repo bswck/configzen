@@ -20,7 +20,7 @@ from typing import (
 )
 
 from anyio import Path as AsyncPath
-from runtime_generics import get_type_arguments, runtime_generic
+from runtime_generics import runtime_generic, type_check
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -55,6 +55,7 @@ __all__ = (
 SourceType = TypeVar("SourceType")
 
 
+@runtime_generic
 class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     """
     Core interface for loading and saving configuration data.
@@ -97,8 +98,7 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
 
     def is_binary(self: ConfigurationSource[SourceType, AnyStr]) -> bool:
         """Determine whether the configuration source is binary."""
-        _, data_type = get_type_arguments(self)
-        return issubclass(data_type, bytes)
+        return not type_check(self, ConfigurationSource[Any, str])
 
     @abstractmethod
     def load(self) -> Data:
