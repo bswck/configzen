@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
-from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from anyio.to_thread import run_sync
 from pydantic import BaseModel, PrivateAttr
@@ -51,6 +51,7 @@ class ModelConfig(SettingsConfigDict, total=False):
 
 
 pydantic_config_keys |= set(ModelConfig.__annotations__)
+loading: ContextVar[bool] = ContextVar("loading", default=False)
 owner_lookup: ContextVar[BaseConfiguration] = ContextVar("owner")
 
 
@@ -142,14 +143,15 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
     _configuration_source: ConfigurationSource[Any, Any] = PrivateAttr()
     _configuration_data: Data = PrivateAttr(default_factory=dict)
     _configuration_parser: ReplacementParser = PrivateAttr()
-    _configuration_root: Union[BaseConfiguration, None] = PrivateAttr()  # noqa: UP007
+    _configuration_root: BaseConfiguration | None = PrivateAttr(default=None)
 
     def __init__(self, **data: Any) -> None:
         try:
             owner = owner_lookup.get()
         except LookupError:
             owner = None
-            owner_lookup.set(self)
+            if loading.get():
+                owner_lookup.set(self)
         super().__init__(**data)
         self._configuration_root = owner
 
@@ -189,6 +191,8 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         resolves macros etc.
         """
         if self._configuration_root is None:
+            if not hasattr(self, "_configuration_parser"):
+                return ReplacementParser(self.configuration_dump())
             return self._configuration_parser
         return self._configuration_root.configuration_parser
 
@@ -312,14 +316,20 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         # than the configuration data, by using `parser.get_processed_data()`.
         parser = make_parser(configuration_source.load())
 
-        # Processing will execute any commands that are present
-        # in the configuration data and return the final configuration
-        # data that we will use to construct an instance of the configuration model.
-        # During this process, we lose all the additional metadata that we
-        # want to keep in the configuration data.
-        # They will be added back to the exported data when the configuration
-        # is saved (`parser.revert_parser_changes()`).
-        self = cls(**parser.get_data_with_replacements())
+        # ruff: noqa: FBT003
+        try:
+            loading.set(True)
+
+            # Processing will execute any commands that are present
+            # in the configuration data and return the final configuration
+            # data that we will use to construct an instance of the configuration model.
+            # During this process, we lose all the additional metadata that we
+            # want to keep in the configuration data.
+            # They will be added back to the exported data when the configuration
+            # is saved (`parser.revert_parser_changes()`).
+            self = cls(**parser.get_data_with_replacements())
+        finally:
+            loading.set(False)
 
         # Quick setup and we're done.
         self._configuration_source = configuration_source
@@ -374,9 +384,14 @@ class BaseConfiguration(BaseSettings, metaclass=BaseConfigurationMetaclass):
         make_parser = cls._validate_parser_factory(parser_factory)
         parser = make_parser(await configuration_source.load_async())
 
-        # Since `parser.get_processed_data()` operates on primitive data types,
-        # we can safely use run_sync here to run in a worker thread.
-        self = cls(**await run_sync(parser.get_data_with_replacements))
+        try:
+            loading.set(True)
+
+            # Since `parser.get_processed_data()` operates on primitive data types,
+            # we can safely use run_sync here to run in a worker thread.
+            self = cls(**await run_sync(parser.get_data_with_replacements))
+        finally:
+            loading.set(False)
 
         self._configuration_parser = parser
         self._configuration_source = configuration_source
