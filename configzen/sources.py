@@ -204,9 +204,10 @@ class StreamConfigurationSource(
     def __init__(
         self,
         source: IO[AnyStr],
-        data_format: DataFormat[Any, AnyStr],
+        data_format: str | DataFormat[Any, AnyStr],
+        **options: Unpack[FormatOptions],
     ) -> None:
-        super().__init__(source, data_format=data_format)
+        super().__init__(source, data_format=data_format, **options)
 
     def load(self) -> Data:
         """
@@ -266,9 +267,10 @@ class FileConfigurationSource(
     def __init__(
         self,
         source: str | bytes | PathLike[str] | PathLike[bytes],
-        data_format: DataFormat[Any, Any] | None = None,
+        data_format: str | DataFormat[Any, Any] | None = None,
+        **options: Unpack[FormatOptions],
     ) -> None:
-        super().__init__(_make_path(source), data_format=data_format)
+        super().__init__(_make_path(source), data_format=data_format, **options)
         self._stream_class: Callable[..., IO[AnyStr]] = (
             BytesIO if self.is_binary() else StringIO
         )
