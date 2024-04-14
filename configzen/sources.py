@@ -25,7 +25,7 @@ from configzen.data import DataFormat
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import overload
+    from typing import ClassVar, overload
 
     from typing_extensions import Never, Unpack
 
@@ -67,6 +67,9 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     of your configuration or its model_config.
     """
 
+    # Set up temporary stream factories
+    _binary_stream_factory: ClassVar[Callable[..., IO[bytes]]] = BytesIO
+    _string_stream_factory: ClassVar[Callable[..., IO[str]]] = StringIO
     _data_format: DataFormat[Any, AnyStr]
     source: SourceType
     options: FormatOptions
@@ -77,6 +80,11 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
         data_format: str | DataFormat[Any, AnyStr] | None = None,
         **options: Unpack[FormatOptions],
     ) -> None:
+        self._temp_stream_factory: Callable[..., IO[AnyStr]] = (
+            self._binary_stream_factory
+            if self.is_binary()
+            else self._string_stream_factory
+        )
         self.source = source
         self.options = options
         self.data_format = data_format  # type: ignore[assignment]
@@ -144,21 +152,13 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def dump(self, data: Data) -> int:
-        """
-        Dump the configuration source.
-
-        Return the number of bytes written.
-        """
+    def dump(self, data: Data) -> None:
+        """Dump the configuration source."""
         raise NotImplementedError
 
     @abstractmethod
     async def dump_async(self, data: Data) -> int:
-        """
-        Dump the configuration source asynchronously.
-
-        Return the number of bytes written.
-        """
+        """Dump the configuration source asynchronously."""
         raise NotImplementedError
 
 
@@ -222,16 +222,9 @@ class StreamConfigurationSource(
         msg = "async streams are not supported for `StreamConfigurationSource`"
         raise NotImplementedError(msg)
 
-    def dump(self, data: Data) -> int:
-        """
-        Dump the configuration source.
-
-        Return the number of bytes written.
-        """
-        stream = (BytesIO if self.is_binary() else StringIO)()
-        self.data_format.dump(data, stream)
-        stream.seek(0)
-        return self.source.write(stream.read())
+    def dump(self, data: Data) -> None:
+        """Dump the configuration source."""
+        self.data_format.dump(data, self.source)
 
     def dump_async(self, _data: Data) -> Never:
         """Unsupported."""
@@ -271,9 +264,6 @@ class FileConfigurationSource(
         **options: Unpack[FormatOptions],
     ) -> None:
         super().__init__(_make_path(source), data_format=data_format, **options)
-        self._stream_class: Callable[..., IO[AnyStr]] = (
-            BytesIO if self.is_binary() else StringIO
-        )
 
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
         suffix = self.source.suffix
@@ -302,7 +292,7 @@ class FileConfigurationSource(
             The data format to use when loading the data.
 
         """
-        return self.data_format.load(self._stream_class(self.read()))
+        return self.data_format.load(self._temp_stream_factory(self.read()))
 
     async def load_async(self) -> Data:
         """
@@ -316,13 +306,11 @@ class FileConfigurationSource(
             The data format to use when loading the data.
 
         """
-        return self.data_format.load(self._stream_class(await self.read_async()))
+        return self.data_format.load(self._temp_stream_factory(await self.read_async()))
 
-    def dump(self, data: Data) -> int:
+    def dump(self, data: Data) -> None:
         """
-        Load the configuration source file asynchronously.
-
-        Return its contents as a dictionary.
+        Dump the configuration data to the source file.
 
         Parameters
         ----------
@@ -332,10 +320,10 @@ class FileConfigurationSource(
             The data format to use when dumping the data.
 
         """
-        stream = self._stream_class()
-        self.data_format.dump(data, stream)
-        stream.seek(0)
-        return self.write(stream.read())
+        temp_stream = self._temp_stream_factory()
+        self.data_format.dump(data, temp_stream)
+        temp_stream.seek(0)
+        self.write(temp_stream.read())
 
     async def dump_async(self, data: Data) -> int:
         """
@@ -351,10 +339,10 @@ class FileConfigurationSource(
             The data format to use when dumping the data.
 
         """
-        stream = self._stream_class()
-        self.data_format.dump(data, stream)
-        stream.seek(0)
-        return await self.write_async(stream.read())
+        temp_stream = self._temp_stream_factory()
+        self.data_format.dump(data, temp_stream)
+        temp_stream.seek(0)
+        return await self.write_async(temp_stream.read())
 
     def read(self) -> AnyStr:
         """Read the configuration source and return its contents."""
