@@ -1,7 +1,7 @@
 <!--
-This file was generated from skeleton-ci/skeleton-python@0.0.2rc-216-gfb1d965.
+This file was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965/fragments/contributing.md
+https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/fragments/contributing.md
 -->
 # Contributing to [configzen](https://github.com/bswck/configzen) 🎉
 Contributions are very welcome. 🚀
@@ -46,9 +46,9 @@ Ready to contribute? Here's a quick guide on how to set up configzen and make a 
 
 
 <!--
-This section was generated from skeleton-ci/skeleton-python@0.0.2rc-216-gfb1d965.
+This section was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
 Instead of changing this particular file, you might want to alter the template:
-https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965/fragments/guide.md
+https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/fragments/guide.md
 -->
 > [!Note]
 > If you use Windows, it is highly recommended to complete the installation in the way presented below through [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
