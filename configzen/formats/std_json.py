@@ -90,9 +90,12 @@ class JSONDataFormat(TextDataFormat[JSONOptions]):
 
     def load(self, stream: IO[str]) -> Data:
         """Load the JSON data from the given stream."""
-        document = load(
-            stream,
-            cls=cast("type[JSONDecoder]", lambda **_: self.json_decoder),
+        document = (
+            load(
+                stream,
+                cls=cast("type[JSONDecoder]", lambda **_: self.json_decoder),
+            )
+            or {}
         )
         if not isinstance(document, dict):
             msg = (

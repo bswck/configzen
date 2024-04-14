@@ -97,9 +97,9 @@ class YAMLDataFormat(TextDataFormat[YAMLOptions]):
 
         This method is called by the configuration model.
         """
-        data = self.yaml.load(stream)
-        if not isinstance(data, CommentedMap):
-            msg = f"Expected a CommentedMap, but got {type(data).__name__}."
+        data = self.yaml.load(stream) or CommentedMap()
+        if not isinstance(data, dict):
+            msg = f"Expected a dict, but got {type(data).__name__}."
             raise TypeError(msg)
         return data
 

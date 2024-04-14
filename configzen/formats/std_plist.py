@@ -63,10 +63,13 @@ class PlistDataFormat(BinaryDataFormat[PlistOptions]):
     def load(self, stream: IO[bytes]) -> Data:
         """Load the data from the given stream."""
         dict_class: type[MutableMapping[str, Any]] = self.plist_options["dict_type"]
-        document = load(
-            stream,
-            fmt=self.plist_options["fmt"],
-            dict_type=dict_class,
+        document = (
+            load(
+                stream,
+                fmt=self.plist_options["fmt"],
+                dict_type=dict_class,
+            )
+            or dict_class()
         )
         if not isinstance(document, dict_class):
             msg = (
