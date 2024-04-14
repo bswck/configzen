@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # (C) 2023–present Bartosz Sławecki (bswck)
 #
-# Interact with skeleton-ci/skeleton-python (current version: https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f).
+# Interact with skeleton-ci/skeleton-python (current version: https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965).
 #
-# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-215-g792492f.
+# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-216-gfb1d965.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f/project/scripts/skeleton.%7B%7Bsref%7D%7D.bash.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965/project/scripts/skeleton.%7B%7Bsref%7D%7D.bash.jinja
 #
 # Usage:
 #
@@ -141,32 +141,32 @@ make_context() {
 	)
 	export SKELETON_REF
 	SKELETON_REF=$(cat <<- 'EOF'
-		0.0.2rc-215-g792492f
+		0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export SREF
 	SREF=$(cat <<- 'EOF'
-		0.0.2rc-215-g792492f
+		0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export SKELETON_REV
 	SKELETON_REV=$(cat <<- 'EOF'
-		https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f
+		https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export SREV
 	SREV=$(cat <<- 'EOF'
-		https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-215-g792492f
+		https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export SKELETON_AND_REF
 	SKELETON_AND_REF=$(cat <<- 'EOF'
-		skeleton-ci/skeleton-python@0.0.2rc-215-g792492f
+		skeleton-ci/skeleton-python@0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export SNREF
 	SNREF=$(cat <<- 'EOF'
-		skeleton-ci/skeleton-python@0.0.2rc-215-g792492f
+		skeleton-ci/skeleton-python@0.0.2rc-216-gfb1d965
 	EOF
 	)
 	export GH_REPO_ARGS
@@ -179,7 +179,7 @@ make_context() {
 		jq -n '{"deployment_branch_policy": {"protected_branches": false,"custom_branch_policies": true}}' | gh api -H "Accept: application/vnd.github+json" -X PUT "/repos/bswck/configzen/environments/$1" --silent --input -
 	EOF
 	)
-    export LAST_REF="0.0.2rc-215-g792492f"
+    export LAST_REF="0.0.2rc-216-gfb1d965"
     export PROJECT_PATH_KEY="$$_skeleton_project_path"
     export NEW_REF_KEY="$$_skeleton_new_ref"
     export LAST_LICENSE_NAME="GPL-3.0"
