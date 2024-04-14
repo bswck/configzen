@@ -134,7 +134,7 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         if self.is_binary() and not source.is_binary():
             msg = (
                 f"{source} is not a binary source, "
-                f"but {self.__class__.__name__} is a binary data format",
+                f"but {self.__class__.__name__} is a binary data format"
             )
             raise TypeError(msg)
 
