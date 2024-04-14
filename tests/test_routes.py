@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import pytest
 
 from configzen.configuration import BaseConfiguration
-from configzen.errors import LinkedRouteError, RouteError
+from configzen.errors import LinkedRouteError
 from configzen.routes import GetAttr, GetItem, LinkedRoute, Route, Step
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ def test_linked_route() -> None:
 
     class Foo(BaseConfiguration):
         bar: Bar
-        biz: List[Bar]
+        biz: list[Bar]
 
     assert Foo.bar.baz == LinkedRoute(Foo, "bar.baz")
     assert Foo.biz == LinkedRoute(Foo, "biz")
