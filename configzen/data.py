@@ -66,6 +66,15 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
     def __init__(self, options: DataFormatOptionsType | None = None) -> None:
         self.configure(**(options or {}))
 
+    @classmethod
+    def for_extension(
+        cls,
+        extension_name: str,
+        options: DataFormatOptionsType | None = None,
+    ) -> DataFormat[Any, Any]:
+        """Create a data format instance for an extension."""
+        return cls.extension_registry[extension_name](options)
+
     @overload
     def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]: ...
 

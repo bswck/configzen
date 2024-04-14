@@ -22,12 +22,14 @@ from typing import (
 from anyio import Path as AsyncPath
 from runtime_generics import runtime_generic, type_check
 
+from configzen.data import DataFormat
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from typing_extensions import Never, Unpack
 
-    from configzen.data import Data, DataFormat
+    from configzen.data import Data
 
     # We actually depend on `option_name` of every data format at runtime,
     # but this time we pretend it doesn't exist.
@@ -65,26 +67,49 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     of your configuration or its model_config.
     """
 
-    data_format: DataFormat[Any, AnyStr]
+    _data_format: DataFormat[Any, AnyStr]
+    source: SourceType
+    options: FormatOptions
 
     def __init__(
         self,
         source: SourceType,
-        data_format: DataFormat[Any, AnyStr] | None = None,
+        data_format: str | DataFormat[Any, AnyStr] | None = None,
         **options: Unpack[FormatOptions],
     ) -> None:
         self.source = source
         self.options = options
+        self.data_format = data_format  # type: ignore[assignment]
+
+    @property
+    def data_format(self) -> DataFormat[Any, AnyStr]:
+        """The current data format for a configuration source."""
+        return self._data_format
+
+    @data_format.setter
+    def data_format(self, data_format: str | DataFormat[Any, AnyStr] | None) -> None:
         if data_format is None:
-            actual_data_format = self._guess_data_format()
+            data_format = self._guess_data_format()
         else:
-            actual_data_format = data_format
-        actual_data_format.validate_source(self)
-        self.data_format = actual_data_format
+            data_format = self._make_data_format(data_format)
+        data_format.validate_source(self)
+        self._data_format = data_format
 
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
         msg = "Cannot guess the data format of the configuration source"
         raise NotImplementedError(msg)
+
+    def _make_data_format(
+        self,
+        data_format: str | DataFormat[Any, AnyStr],
+    ) -> DataFormat[Any, AnyStr]:
+        if isinstance(data_format, str):
+            return DataFormat.for_extension(
+                data_format,
+                self.options.get(data_format),  # type: ignore[arg-type]
+            )
+        data_format.configure(**self.options)  # type: ignore[misc]
+        return data_format
 
     # This is not a property for type safety reasons.
     # https://github.com/python/mypy/issues/9937
