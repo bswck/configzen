@@ -24,8 +24,8 @@ pydantic = ">=2.6.2"
 pydantic-settings = ">=2.1.0"
 tomlkit = ">=0.12.3"
 ruamel-yaml = ">=0.18.5"
-runtime-generics = ">=3.1.0"
-class-singledispatch = ">=1.0.3"
+runtime-generics = ">=3.2.0"
+class-singledispatch = ">=1.1.0"
 eval-type-backport = ">=0.1.3"
 
 [tool.poetry.group.dev.dependencies]
