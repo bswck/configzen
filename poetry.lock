@@ -281,13 +281,13 @@ files = [
 
 [[package]]
 name = "class-singledispatch"
-version = "1.1.0"
+version = "1.1.1"
 description = "A ``singledispatch()`` for arguments that are classes annotated as specific types."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "class_singledispatch-1.1.0-py3-none-any.whl", hash = "sha256:9206733c3a398d89a4314eaf972ed8bc486c5e5bfaf9a1038c4f6bd9d6393e71"},
-    {file = "class_singledispatch-1.1.0.tar.gz", hash = "sha256:2de01f9fb49d20f59039ea6847e9ee7068b13448bff5d3666249fdbcc0e34cc5"},
+    {file = "class_singledispatch-1.1.1-py3-none-any.whl", hash = "sha256:93c20f742e0b5407c968c7c058be058178d4aa215b41f323f5b782de059cf110"},
+    {file = "class_singledispatch-1.1.1.tar.gz", hash = "sha256:af0a1385bc78e50d8401e69825f018333c5f61f09d39ee5face89d8995b734fa"},
 ]
 
 [[package]]
