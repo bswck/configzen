@@ -15,13 +15,12 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
-    overload,
 )
 
 from runtime_generics import runtime_generic, type_check
 
 if TYPE_CHECKING:
-    from typing import IO, ClassVar
+    from typing import IO, ClassVar, overload
 
     from typing_extensions import TypeAlias, Unpack
 
@@ -75,11 +74,17 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         """Create a data format instance for an extension."""
         return cls.extension_registry[extension_name](options)
 
-    @overload
-    def is_binary(self: DataFormat[DataFormatOptionsType, bytes]) -> Literal[True]: ...
+    if TYPE_CHECKING:
 
-    @overload
-    def is_binary(self: DataFormat[DataFormatOptionsType, str]) -> Literal[False]: ...
+        @overload
+        def is_binary(
+            self: DataFormat[DataFormatOptionsType, bytes],
+        ) -> Literal[True]: ...
+
+        @overload
+        def is_binary(
+            self: DataFormat[DataFormatOptionsType, str],
+        ) -> Literal[False]: ...
 
     def is_binary(self) -> bool:
         """Return whether the data format is bitwise."""
