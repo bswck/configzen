@@ -29,7 +29,7 @@ Learn more below.
 
 ## Features
 
-### Managing content
+### Managing Content
 
 Having a YAML configuration file like this:
 
@@ -138,9 +138,9 @@ or save the whole configuration:
 ```
 
 
-### Modular configuration
+### Modular Configuration
 
-#### Wrapping modules in-place
+#### Wrapping Modules In-Place
 
 You can wrap modules in-place with configuration models:
 
@@ -191,7 +191,7 @@ Traceback (most recent call last):
   ...
 ```
 
-#### Wrapping interchangeable modules
+#### Wrapping Interchangeable Modules
 
 You can wrap modules outside them with configuration models:
 
@@ -228,7 +228,7 @@ PORT: int = 443
 8000
 ```
 
-## Supported file formats
+## Supported File Formats
 
 The following table shows the supported file formats, their requirements, file extensions, and the backend libraries used to accomplish this goal.
 
@@ -237,7 +237,7 @@ The following table shows the supported file formats, their requirements, file e
 | [JSON](https://en.wikipedia.org/wiki/JSON)    | -                | `json`                       | [json](https://docs.python.org/3/library/json.html) (standard library)                                  |
 | [TOML](https://en.wikipedia.org/wiki/TOML)    | -                | `toml`, `ini`, `cfg`, `conf` | [tomlkit](https://pypi.python.org/pypi/tomlkit)                                                               |
 | [YAML](https://yaml.org)                      | -                | `yaml`, `yml`                | [ruamel.yaml](https://pypi.python.org/pypi/ruamel.yaml) |
-| [Plist](https://en.wikipedia.org/wiki/XML)    | -                | `xml`                        | [plistlib](https://docs.python.org/3/library/plistlib.html) (standard library)                                    |
+| [Plist](https://en.wikipedia.org/wiki/XML)    | -                | `plist`                      | [plistlib](https://docs.python.org/3/library/plistlib.html) (standard library)                                    |
 
 # For Enterprise
 
