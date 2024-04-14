@@ -489,7 +489,7 @@ class LinkedRoute(Generic[Configuration]):
             self.__step(step)
 
     def __type_check(self, cls: type[object]) -> bool:
-        # Can't use TypeGuard here, sorry
+        # Can't use TypeGuard/TypeIs here, sorry
         return isinstance(self.__head_class, type) and issubclass(
             self.__head_class,
             cls,
