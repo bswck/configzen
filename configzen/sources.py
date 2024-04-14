@@ -111,15 +111,12 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
         data_format.configure(**self.options)  # type: ignore[misc]
         return data_format
 
-    # This is not a property for type safety reasons.
-    # https://github.com/python/mypy/issues/9937
+    #  python/mypy#9937
     @overload
-    def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]:
-        ...
+    def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]: ...
 
     @overload
-    def is_binary(self: ConfigurationSource[SourceType, bytes]) -> Literal[True]:
-        ...
+    def is_binary(self: ConfigurationSource[SourceType, bytes]) -> Literal[True]: ...
 
     def is_binary(self: ConfigurationSource[SourceType, AnyStr]) -> bool:
         """Determine whether the configuration source is binary."""
