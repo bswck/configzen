@@ -8,4 +8,4 @@ if TYPE_CHECKING:
     from configzen.config import BaseConfig
 
 
-Config = TypeVar("Config", bound="BaseConfig")
+ConfigObject = TypeVar("ConfigObject", bound="BaseConfig")

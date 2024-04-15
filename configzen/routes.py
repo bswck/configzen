@@ -17,7 +17,7 @@ from typing import (
 from class_singledispatch import class_singledispatch
 
 from configzen.errors import LinkedRouteError, RouteError
-from configzen.typedefs import Config
+from configzen.typedefs import ConfigObject
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -474,12 +474,12 @@ class _AnyHead:
     pass
 
 
-class LinkedRoute(Generic[Config]):
+class LinkedRoute(Generic[ConfigObject]):
     __head_class: type[Any]
 
     def __init__(
         self,
-        config_class: type[Config],
+        config_class: type[ConfigObject],
         route: RouteLike,
     ) -> None:
         self.__head_class = self.__config_class = config_class

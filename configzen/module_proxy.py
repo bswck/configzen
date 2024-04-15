@@ -7,7 +7,7 @@ import sys
 import types
 from typing import Any, Generic, cast
 
-from configzen.typedefs import Config
+from configzen.typedefs import ConfigObject
 
 __all__ = ("ModuleProxy",)
 
@@ -22,7 +22,7 @@ def _is_dunder(name: str) -> bool:
     )
 
 
-class ModuleProxy(types.ModuleType, Generic[Config]):
+class ModuleProxy(types.ModuleType, Generic[ConfigObject]):
     """
     Proxy object that extends a runtime module with type validation.
 
@@ -39,13 +39,13 @@ class ModuleProxy(types.ModuleType, Generic[Config]):
 
     """
 
-    __config__: Config
+    __config__: ConfigObject
     __locals__: dict[str, Any]
 
     def __init__(
         self,
         name: str,
-        config: Config,
+        config: ConfigObject,
         module_namespace: dict[str, Any] | None = None,
         doc: str | None = None,
     ) -> None:
@@ -93,7 +93,7 @@ class ModuleProxy(types.ModuleType, Generic[Config]):
         """
         return super().__repr__().replace("module", "configuration module", 1)
 
-    def get_config(self) -> Config:
+    def get_config(self) -> ConfigObject:
         """Get the configuration model."""
         return self.__config__
 
@@ -101,11 +101,11 @@ class ModuleProxy(types.ModuleType, Generic[Config]):
     def wrap_module(
         cls,
         module_name: str,
-        config_class: type[Config] | None = None,
+        config_class: type[ConfigObject] | None = None,
         namespace: dict[str, Any] | None = None,
         /,
         **values: Any,
-    ) -> ModuleProxy[Config]:
+    ) -> ModuleProxy[ConfigObject]:
         """
         Wrap a module to ensure type validation.
 
@@ -147,7 +147,7 @@ class ModuleProxy(types.ModuleType, Generic[Config]):
                 for key in __annotations__:
                     locals()[key] = module_namespace[key]
 
-            config_class = cast("type[Config]", ConfigModule)
+            config_class = cast("type[ConfigObject]", ConfigModule)
 
         module_values = {}
         field_names = frozenset(
@@ -172,10 +172,10 @@ class ModuleProxy(types.ModuleType, Generic[Config]):
     @classmethod
     def wrap_this_module(
         cls,
-        config_class: type[Config] | None = None,
+        config_class: type[ConfigObject] | None = None,
         /,
         **values: Any,
-    ) -> ModuleProxy[Config]:
+    ) -> ModuleProxy[ConfigObject]:
         """
         Wrap the module calling this function.
 
