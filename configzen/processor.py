@@ -77,7 +77,9 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
         self.macros = macros
         self.options = options
         self.__replacements = _ProcessedReplacements()
+
         super().__init__()
+
         for key, value in data.items():
             replacement = self.find_replacement(key, value)
             if replacement is None:
@@ -166,10 +168,7 @@ class ConfigProcessor:
     Recursively resolves & applies replacements in data magically.
     """
 
-    _get_data_with_replacements: Callable[
-        ...,
-        _ProcessedData,
-    ] = _ProcessedData
+    _get_processed_data: Callable[..., _ProcessedData] = _ProcessedData
 
     macros: ClassVar[MacroDict] = {}
 
@@ -199,7 +198,7 @@ class ConfigProcessor:
         """Create a new configuration processor with identical options."""
         return type(self)(data, **self.options)
 
-    def get_data_with_replacements(
+    def get_processed_data(
         self,
         *,
         force: bool = False,
@@ -215,7 +214,7 @@ class ConfigProcessor:
 
         """
         if force or self.__data is None:
-            self.__data = self._get_data_with_replacements(
+            self.__data = self._get_processed_data(
                 data=self.__initial,
                 options=self.options,
                 macros=self.macros,

@@ -317,7 +317,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             # want to keep in the configuration data.
             # They will be added back to the exported data when the configuration
             # is saved (`processor.revert_processor_changes()`).
-            self = cls(**processor.get_data_with_replacements())
+            self = cls(**processor.get_processed_data())
         finally:
             loading.set(False)
 
@@ -374,7 +374,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
             # Since `processor.get_processed_data()` operates on primitive data types,
             # we can safely use run_sync here to run in a worker thread.
-            self = cls(**await run_sync(processor.get_data_with_replacements))
+            self = cls(**await run_sync(processor.get_processed_data))
         finally:
             loading.set(False)
 
@@ -397,7 +397,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         # Construct a new configuration instance.
         # Respect __class__ attribute in case root might be a proxy (from proxyvars).
-        new_root = root.__class__(**processor.get_data_with_replacements())
+        new_root = root.__class__(**processor.get_processed_data())
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -425,9 +425,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         processor = root.config_processor.create_processor(source.load())
 
         # Construct a new configuration instance.
-        new_root = root.__class__(
-            **await run_sync(processor.get_data_with_replacements)
-        )
+        new_root = root.__class__(**await run_sync(processor.get_processed_data))
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -467,7 +465,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         else:
             # Construct a new configuration instance.
             # Respect __class__ attribute since root might be a proxy (from proxyvars).
-            new_root = root.__class__(**processor.get_data_with_replacements())
+            new_root = root.__class__(**processor.get_processed_data())
             routes = root.config_find_routes(self)
 
             for route in routes:
@@ -475,7 +473,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
             new_data = new_root.config_dump()
 
-        parsed_data = processor.get_data_with_replacements()
+        parsed_data = processor.get_processed_data()
         roundtrip_update_mapping(roundtrip_data=parsed_data, mergeable_data=new_data)
         flat_new_data = parsed_data.revert_replacements()
 
