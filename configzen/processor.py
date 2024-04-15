@@ -110,9 +110,9 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
             macro_name = key[len(macro_prefix) :].rstrip()
             try:
                 macro = self.macros[macro_name]
-            except KeyError as e:
+            except KeyError as err:
                 msg = f"No such macro: {macro_name!r}"
-                raise ConfigProcessorError(msg) from e
+                raise ConfigProcessorError(msg) from err
             return ProcessorReplacement(
                 key=key,
                 value=value,
@@ -170,7 +170,9 @@ class ConfigProcessor:
 
     _get_processed_data: Callable[..., _ProcessedData] = _ProcessedData
 
-    macros: ClassVar[MacroDict] = {}
+    macros: ClassVar[MacroDict] = {
+        "extend": lambda x: x,
+    }
 
     def __init__(
         self,
