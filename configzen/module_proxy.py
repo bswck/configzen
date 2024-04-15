@@ -7,7 +7,7 @@ import sys
 import types
 from typing import Any, Generic, cast
 
-from configzen.typedefs import Configuration
+from configzen.typedefs import Config
 
 __all__ = ("ModuleProxy",)
 
@@ -22,7 +22,7 @@ def _is_dunder(name: str) -> bool:
     )
 
 
-class ModuleProxy(types.ModuleType, Generic[Configuration]):
+class ModuleProxy(types.ModuleType, Generic[Config]):
     """
     Proxy object that extends a runtime module with type validation.
 
@@ -39,17 +39,17 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
 
     """
 
-    __configuration__: Configuration
+    __config__: Config
     __locals__: dict[str, Any]
 
     def __init__(
         self,
         name: str,
-        config: Configuration,
+        config: Config,
         module_namespace: dict[str, Any] | None = None,
         doc: str | None = None,
     ) -> None:
-        object.__setattr__(self, "__configuration__", config)
+        object.__setattr__(self, "__config__", config)
         object.__setattr__(self, "__locals__", module_namespace or {})
         object.__setattr__(config, "__wrapped_module__", self)
 
@@ -69,7 +69,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         if _is_dunder(name):
             return object.__getattribute__(self, name)
 
-        config = self.__configuration__
+        config = self.__config__
         try:
             return getattr(config, name)
         except AttributeError:
@@ -93,19 +93,19 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         """
         return super().__repr__().replace("module", "configuration module", 1)
 
-    def get_config(self) -> Configuration:
+    def get_config(self) -> Config:
         """Get the configuration model."""
-        return self.__configuration__
+        return self.__config__
 
     @classmethod
     def wrap_module(
         cls,
         module_name: str,
-        configuration_class: type[Configuration] | None = None,
+        config_class: type[Config] | None = None,
         namespace: dict[str, Any] | None = None,
         /,
         **values: Any,
-    ) -> ModuleProxy[Configuration]:
+    ) -> ModuleProxy[Config]:
         """
         Wrap a module to ensure type validation.
 
@@ -119,7 +119,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         ----------
         module_name
             The name of the module to wrap.
-        configuration_class
+        config_class
             The config class to use for type validation.
         namespace
             The namespace of the module to wrap. If not provided, it will be
@@ -132,22 +132,22 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
         The wrapped module.
 
         """
-        from configzen.configuration import BaseConfiguration
+        from configzen.config import BaseConfig
 
         if namespace is None:
             module_namespace = vars(sys.modules[module_name])
         else:
             module_namespace = namespace
 
-        if configuration_class is None:
+        if config_class is None:
 
-            class ConfigurationModule(BaseConfiguration):
+            class ConfigModule(BaseConfig):
                 __module__ = module_name
                 __annotations__ = module_namespace["__annotations__"]
                 for key in __annotations__:
                     locals()[key] = module_namespace[key]
 
-            configuration_class = cast("type[Configuration]", ConfigurationModule)
+            config_class = cast("type[Config]", ConfigModule)
 
         module_values = {}
         field_names = frozenset(
@@ -155,12 +155,12 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             or field_info.alias
             or field_info.title
             or field_name
-            for field_name, field_info in configuration_class.model_fields.items()
+            for field_name, field_info in config_class.model_fields.items()
         )
         for key, value in module_namespace.items():
             if key in field_names:
                 module_values[key] = value
-        config = configuration_class.model_validate({**module_values, **values})
+        config = config_class.model_validate({**module_values, **values})
 
         return cls(
             config=config,
@@ -172,10 +172,10 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
     @classmethod
     def wrap_this_module(
         cls,
-        configuration_class: type[Configuration] | None = None,
+        config_class: type[Config] | None = None,
         /,
         **values: Any,
-    ) -> ModuleProxy[Configuration]:
+    ) -> ModuleProxy[Config]:
         """
         Wrap the module calling this function.
 
@@ -183,7 +183,7 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
 
         Parameters
         ----------
-        configuration_class
+        config_class
             The config class to use for type validation.
         values
             Values used to initialize the config.
@@ -199,6 +199,6 @@ class ModuleProxy(types.ModuleType, Generic[Configuration]):
             raise RuntimeError(msg)
         return cls.wrap_module(
             {**frame_back.f_globals, **frame_back.f_locals}["__name__"],
-            configuration_class,
+            config_class,
             {**frame_back.f_locals, **values},
         )

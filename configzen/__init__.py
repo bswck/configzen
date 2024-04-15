@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from . import configuration, data, errors, formats, module_proxy, routes, sources
-from .configuration import *  # noqa: F403
+from . import config, data, errors, formats, module_proxy, routes, sources
+from .config import *  # noqa: F403
 from .data import *  # noqa: F403
 from .errors import *  # noqa: F403
 from .formats import *  # noqa: F403
@@ -21,7 +21,7 @@ from .sources import *  # noqa: F403
 
 __all__ = (  # noqa: PLE0604
     "Field",
-    *configuration.__all__,
+    *config.__all__,
     *data.__all__,
     *errors.__all__,
     *formats.__all__,

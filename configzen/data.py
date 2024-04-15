@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypeAlias, Unpack
 
-    from configzen.sources import ConfigurationSource
+    from configzen.sources import ConfigSource
 
     Data: TypeAlias = MutableMapping[str, object]
 
@@ -134,7 +134,7 @@ class DataFormat(Generic[DataFormatOptionsType, AnyStr], metaclass=ABCMeta):
         """Register the file extensions supported by this data format."""
         cls.extension_registry.update(dict.fromkeys(cls.file_extensions, cls))
 
-    def validate_source(self, source: ConfigurationSource[Any, AnyStr]) -> None:
+    def validate_source(self, source: ConfigSource[Any, AnyStr]) -> None:
         """Validate the config source."""
         if self.is_binary() and not source.is_binary():
             msg = (

@@ -16,14 +16,21 @@ from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from typing import NewType
 
-    from annotated_types import Len
-    from typing_extensions import Annotated, TypeAlias
+    from typing_extensions import TypeAlias
 
     from configzen.data import Data
 
-    Char: TypeAlias = Annotated[str, Len(min_length=1, max_length=1)]
     MacroDict: TypeAlias = "dict[str, Callable[[object], dict[str, object]]]"
+    Char = NewType("Char", str)
+else:
+
+    def Char(s: str) -> str:  # noqa: N802
+        if len(s) != 1:
+            msg = "Char must be a single character"
+            raise ValueError(msg)
+        return s
 
 
 __all__ = (
@@ -162,8 +169,8 @@ class ReplacementParser:
         self,
         initial: Data,
         *,
-        macro_prefix: Char = "^",
-        update_prefix: Char = "+",
+        macro_prefix: Char = Char("^"),  # noqa: B008
+        update_prefix: Char = Char("+"),  # noqa: B008
         macros_on_top: bool = False,
     ) -> None:
         self.__initial = initial

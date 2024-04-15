@@ -5,14 +5,14 @@ import pytest
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from configzen.configuration import BaseConfiguration
+from configzen.config import BaseConfig
 from configzen.module_proxy import ModuleProxy
 
 if TYPE_CHECKING:
     from types import FrameType
 
 
-class ConfigurationMock(BaseConfiguration):
+class ConfigMock(BaseConfig):
     """Mock configuration class for testing."""
 
     field1: str = "default1"
@@ -20,27 +20,27 @@ class ConfigurationMock(BaseConfiguration):
 
 
 def test_init() -> None:
-    proxy = ModuleProxy("test_module", ConfigurationMock())
-    assert proxy.__configuration__ == ConfigurationMock()
+    proxy = ModuleProxy("test_module", ConfigMock())
+    assert proxy.__config__ == ConfigMock()
     assert proxy.__locals__ == {}
 
 
 @pytest.mark.parametrize("module_name", ["foo", "bar"])
 def test_repr(module_name: str) -> None:
-    proxy = ModuleProxy(module_name, ConfigurationMock())
+    proxy = ModuleProxy(module_name, ConfigMock())
     assert repr(proxy) == f"<configuration module {module_name!r}>"
 
 
 def test_getattribute() -> None:
-    obj = ConfigurationMock()
+    obj = ConfigMock()
     proxy = ModuleProxy("test_module", obj)
-    assert proxy.field1 == ConfigurationMock().field1
+    assert proxy.field1 == ConfigMock().field1
     obj.field1 = "value1"
     assert proxy.field1 == obj.field1
 
 
 def test_setattr() -> None:
-    proxy = ModuleProxy("test_module", ConfigurationMock())
+    proxy = ModuleProxy("test_module", ConfigMock())
     proxy.field1 = "value1"
     assert proxy.__locals__["field1"] == "value1"
 
@@ -57,8 +57,8 @@ def test_wrap_module(monkeypatch: pytest.MonkeyPatch) -> None:
             "field2": "str",
         }
     }
-    proxy = ModuleProxy.wrap_module(module_name, ConfigurationMock, module_namespace)
-    assert proxy.__configuration__ == ConfigurationMock(
+    proxy = ModuleProxy.wrap_module(module_name, ConfigMock, module_namespace)
+    assert proxy.__config__ == ConfigMock(
         field1=module_namespace["field1"],
         field2=module_namespace["field2"],
     )
@@ -87,7 +87,7 @@ def test_wrap_this_module(
 
     frame = module_frame()
     monkeypatch.setattr(sys, "_getframe", lambda _: SimpleNamespace(f_back=frame))
-    proxy = ModuleProxy.wrap_this_module(ConfigurationMock)
-    mock = ConfigurationMock(field1=field1, field2=field2)
-    assert proxy.__configuration__ == mock
+    proxy = ModuleProxy.wrap_this_module(ConfigMock)
+    mock = ConfigMock(field1=field1, field2=field2)
+    assert proxy.__config__ == mock
     assert proxy.__name__ == module_name

@@ -1,47 +1,48 @@
 """`configzen.errors`: Specialized exceptions raised by configzen."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from configzen.configuration import BaseConfiguration
+    from configzen.config import BaseConfig
 
 
 __all__ = (
-    "ConfigurationError",
-    "ConfigurationLoadError",
-    "ConfigurationReloadError",
-    "ConfigurationSaveError",
+    "ConfigError",
+    "ConfigLoadError",
+    "ConfigReloadError",
+    "ConfigSaveError",
     "NotAMappingError",
     "RouteError",
     "LinkedRouteError",
 )
 
 
-class ConfigurationError(Exception):
+class ConfigError(Exception):
     """Base class for all errors related to configzen."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
-class ConfigurationLoadError(ConfigurationError):
+class ConfigLoadError(ConfigError):
     """Raised when the configuration cannot be loaded."""
 
 
-class ConfigurationReloadError(ConfigurationLoadError):
+class ConfigReloadError(ConfigLoadError):
     """Raised when the configuration cannot be reloaded."""
 
 
-class ConfigurationSaveError(ConfigurationError):
+class ConfigSaveError(ConfigError):
     """Raised when the configuration cannot be saved."""
 
 
-class NotAMappingError(ConfigurationLoadError, TypeError):
+class NotAMappingError(ConfigLoadError, TypeError):
     """Raised when the configuration being loaded is not a mapping."""
 
 
-class BaseRouteError(ConfigurationError, ValueError):
+class BaseRouteError(ConfigError, ValueError):
     """Raised when a configuration item route is invalid."""
 
 
@@ -65,12 +66,12 @@ class LinkedRouteError(BaseRouteError):
         self,
         message: str,
         route: str,
-        configuration_class: type[BaseConfiguration],
+        config_class: type[BaseConfig],
     ) -> None:
         self.message = message
         self.route = route
-        self.configuration_class = configuration_class
+        self.config_class = config_class
 
     def __str__(self) -> str:
         """Return a string representation of the route error."""
-        return f"{self.message} ({self.configuration_class.__name__}.{self.route})"
+        return f"{self.message} ({self.config_class.__name__}.{self.route})"

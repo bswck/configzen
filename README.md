@@ -36,17 +36,17 @@ You can create a configzen configuration model for it like this:
 # model.py
 from ipaddress import IPv4Address, IPv6Address
 
-from configzen import BaseConfiguration, Field, ModelConfig
+from configzen import BaseConfig, Field, ModelConfig
 
 
-class DBConfig(BaseConfiguration):
+class DBConfig(BaseConfig):
     host: IPv4Address | IPv6Address
     port: int
     user: str
     password: str = Field(exclude=True)
 
     model_config = ModelConfig(
-        configuration_source="database.yml",
+        config_source="database.yml",
         env_prefix="DB_",
     )
 

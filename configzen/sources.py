@@ -46,24 +46,24 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "ConfigurationSource",
-    "FileConfigurationSource",
-    "StreamConfigurationSource",
-    "get_configuration_source",
-    "get_stream_configuration_source",
-    "get_file_configuration_source",
+    "ConfigSource",
+    "FileConfigSource",
+    "StreamConfigSource",
+    "get_config_source",
+    "get_stream_config_source",
+    "get_file_config_source",
 )
 
 SourceType = TypeVar("SourceType")
 
 
 @runtime_generic
-class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
+class ConfigSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     """
     Core interface for loading and saving configuration data.
 
     If you need to implement your own configuration source class,
-    implement a subclass of this class and pass in to the `.configuration_load()` method
+    implement a subclass of this class and pass in to the `.config_load()` method
     of your configuration or its model_config.
     """
 
@@ -122,16 +122,16 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
     if TYPE_CHECKING:
         #  python/mypy#9937
         @overload
-        def is_binary(self: ConfigurationSource[SourceType, str]) -> Literal[False]: ...
+        def is_binary(self: ConfigSource[SourceType, str]) -> Literal[False]: ...
 
         @overload
         def is_binary(
-            self: ConfigurationSource[SourceType, bytes],
+            self: ConfigSource[SourceType, bytes],
         ) -> Literal[True]: ...
 
-    def is_binary(self: ConfigurationSource[SourceType, AnyStr]) -> bool:
+    def is_binary(self: ConfigSource[SourceType, AnyStr]) -> bool:
         """Determine whether the configuration source is binary."""
-        return not type_check(self, ConfigurationSource[Any, str])
+        return not type_check(self, ConfigSource[Any, str])
 
     @abstractmethod
     def load(self) -> Data:
@@ -163,15 +163,15 @@ class ConfigurationSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
 
 
 @singledispatch
-def get_configuration_source(
+def get_config_source(
     source: object,
     _data_format: DataFormat[Any, AnyStr] | None = None,
-) -> ConfigurationSource[Any, Any]:
+) -> ConfigSource[Any, Any]:
     """Get a dedicated interface for a configuration source."""
     type_name = type(source).__name__
     msg = (
         f"There is no class operating on {type_name!r} configuration "
-        f"sources. Implement it by creating a subclass of ConfigurationSource."
+        f"sources. Implement it by creating a subclass of ConfigSource."
     )
     raise NotImplementedError(msg)
 
@@ -187,9 +187,9 @@ def _make_path(
 
 
 @runtime_generic
-class StreamConfigurationSource(
+class StreamConfigSource(
     Generic[AnyStr],
-    ConfigurationSource[IO[Any], Any],
+    ConfigSource[IO[Any], Any],
 ):
     """
     A configuration source that is a stream.
@@ -219,7 +219,7 @@ class StreamConfigurationSource(
 
     def load_async(self) -> Never:
         """Unsupported."""
-        msg = "async streams are not supported for `StreamConfigurationSource`"
+        msg = "async streams are not supported for `StreamConfigSource`"
         raise NotImplementedError(msg)
 
     def dump(self, data: Data) -> None:
@@ -228,24 +228,24 @@ class StreamConfigurationSource(
 
     def dump_async(self, _data: Data) -> Never:
         """Unsupported."""
-        msg = "async streams are not supported for `StreamConfigurationSource`"
+        msg = "async streams are not supported for `StreamConfigSource`"
         raise NotImplementedError(msg)
 
 
-@get_configuration_source.register(BytesIO)
-@get_configuration_source.register(StringIO)
-def get_stream_configuration_source(
+@get_config_source.register(BytesIO)
+@get_config_source.register(StringIO)
+def get_stream_config_source(
     source: IO[bytes] | IO[str],
     data_format: DataFormat[Any, Any],
-) -> StreamConfigurationSource[str] | StreamConfigurationSource[bytes]:
+) -> StreamConfigSource[str] | StreamConfigSource[bytes]:
     """Get a dedicated interface for a configuration source stream."""
-    return StreamConfigurationSource(source, data_format=data_format)
+    return StreamConfigSource(source, data_format=data_format)
 
 
 @runtime_generic
-class FileConfigurationSource(
+class FileConfigSource(
     Generic[AnyStr],
-    ConfigurationSource[Path, AnyStr],
+    ConfigSource[Path, AnyStr],
 ):
     """
     A configuration source that is a file.
@@ -387,12 +387,12 @@ class FileConfigurationSource(
         return await AsyncPath(self.source).write_text(content)
 
 
-@get_configuration_source.register(str)
-@get_configuration_source.register(bytes)
-@get_configuration_source.register(PathLike)
-def get_file_configuration_source(
+@get_config_source.register(str)
+@get_config_source.register(bytes)
+@get_config_source.register(PathLike)
+def get_file_config_source(
     source: str | bytes | PathLike[str] | PathLike[bytes],
     data_format: DataFormat[Any, AnyStr] | None = None,
-) -> FileConfigurationSource[str] | FileConfigurationSource[bytes]:
+) -> FileConfigSource[str] | FileConfigSource[bytes]:
     """Get a dedicated interface for a configuration source file."""
-    return FileConfigurationSource(source, data_format=data_format)
+    return FileConfigSource(source, data_format=data_format)

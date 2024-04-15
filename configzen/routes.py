@@ -17,7 +17,7 @@ from typing import (
 from class_singledispatch import class_singledispatch
 
 from configzen.errors import LinkedRouteError, RouteError
-from configzen.typedefs import Configuration
+from configzen.typedefs import Config
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -474,15 +474,15 @@ class _AnyHead:
     pass
 
 
-class LinkedRoute(Generic[Configuration]):
+class LinkedRoute(Generic[Config]):
     __head_class: type[Any]
 
     def __init__(
         self,
-        configuration_class: type[Configuration],
+        config_class: type[Config],
         route: RouteLike,
     ) -> None:
-        self.__head_class = self.__configuration_class = configuration_class
+        self.__head_class = self.__config_class = config_class
         self.__annotation = None
         self.__route = EMPTY_ROUTE
         for step in Route(route):
@@ -501,12 +501,12 @@ class LinkedRoute(Generic[Configuration]):
 
     @__step.register
     def __getattr(self, step: GetAttr) -> None:
-        from configzen.configuration import BaseConfiguration
+        from configzen.config import BaseConfig
 
         head = self.__head_class
 
         if (
-            self.__type_check(BaseConfiguration)
+            self.__type_check(BaseConfig)
             and step.key not in head.model_fields
             and head is not _AnyHead
         ):
@@ -516,7 +516,7 @@ class LinkedRoute(Generic[Configuration]):
             msg = f"Cannot use {step!r} on {self.__head_class.__name__!r}"
             raise LinkedRouteError(
                 msg,
-                configuration_class=self.__configuration_class,
+                config_class=self.__config_class,
                 route=str(self.__route),
             )
 
@@ -530,13 +530,13 @@ class LinkedRoute(Generic[Configuration]):
 
     @__step.register
     def __getitem(self, step: GetItem) -> None:
-        from configzen.configuration import BaseConfiguration
+        from configzen.config import BaseConfig
 
-        if self.__type_check(BaseConfiguration):
+        if self.__type_check(BaseConfig):
             msg = f"Cannot use {step!r} on a configuration class"
             raise LinkedRouteError(
                 msg,
-                configuration_class=self.__configuration_class,
+                config_class=self.__config_class,
                 route=str(self.__route),
             )
 
@@ -544,7 +544,7 @@ class LinkedRoute(Generic[Configuration]):
             msg = f"Cannot use {step!r} on {self.__head_class.__name__!r}"
             raise LinkedRouteError(
                 msg,
-                configuration_class=self.__configuration_class,
+                config_class=self.__config_class,
                 route=str(self.__route),
             )
 
@@ -559,7 +559,7 @@ class LinkedRoute(Generic[Configuration]):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, LinkedRoute):
             return (
-                self.__configuration_class is other.__configuration_class
+                self.__config_class is other.__config_class
                 and self.__route == other.__route
             )
         return NotImplemented

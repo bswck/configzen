@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from configzen.configuration import BaseConfiguration
+from configzen.config import BaseConfig
 from configzen.errors import LinkedRouteError
 from configzen.routes import GetAttr, GetItem, LinkedRoute, Route, Step
 
@@ -37,10 +37,10 @@ def test_route_compose(route: Route, expected: str) -> None:
 
 
 def test_linked_route() -> None:
-    class Bar(BaseConfiguration):
+    class Bar(BaseConfig):
         baz: str
 
-    class Foo(BaseConfiguration):
+    class Foo(BaseConfig):
         bar: Bar
         biz: list[Bar]
 
