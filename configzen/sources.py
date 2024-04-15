@@ -120,7 +120,7 @@ class ConfigSource(Generic[SourceType, AnyStr], metaclass=ABCMeta):
         return data_format
 
     if TYPE_CHECKING:
-        #  python/mypy#9937
+        # python/mypy#9937
         @overload
         def is_binary(self: ConfigSource[SourceType, str]) -> Literal[False]: ...
 
