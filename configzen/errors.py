@@ -14,6 +14,7 @@ __all__ = (
     "ConfigReloadError",
     "ConfigSaveError",
     "NotAMappingError",
+    "ConfigProcessorError",
     "RouteError",
     "LinkedRouteError",
 )
@@ -42,6 +43,10 @@ class NotAMappingError(ConfigLoadError, TypeError):
     """Raised when the configuration being loaded is not a mapping."""
 
 
+class ConfigProcessorError(ConfigError):
+    """Raised when a configuration replacement processor error occurs."""
+
+
 class BaseRouteError(ConfigError, ValueError):
     """Raised when a configuration item route is invalid."""
 
@@ -60,7 +65,7 @@ class RouteError(BaseRouteError):
 
 
 class LinkedRouteError(BaseRouteError):
-    """Raised when a configuration item route is invalid."""
+    """Raised when a declared configuration item route is invalid."""
 
     def __init__(
         self,

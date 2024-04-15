@@ -1,5 +1,5 @@
 """
-`configzen.replacements`: Replacement API parser for configuration data.
+`configzen.replacements`: Replacement API processor for configuration data.
 
 Allows to tweak the configuration data programmatically before it is given
 to the model config and revert the changes back to the original data structure
@@ -13,6 +13,8 @@ from collections.abc import Mapping, MutableMapping, MutableSequence, Sequence
 from copy import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, TypedDict
+
+from configzen.errors import ConfigProcessorError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -34,28 +36,28 @@ else:
 
 
 __all__ = (
-    "ReplacementParser",
-    "ReplacementOptions",
-    "Replacement",
+    "ConfigProcessor",
+    "ProcessorOptions",
+    "ProcessorReplacement",
 )
 
 
-class ReplacementOptions(TypedDict):
-    """Prototype of the allowed options for the ReplacementParser class."""
+class ProcessorOptions(TypedDict):
+    """Prototype of the allowed options for the ConfigProcessor class."""
 
     macro_prefix: Char
     update_prefix: Char
     macros_on_top: bool
 
 
-class _Replacements:
+class _ProcessedReplacements:
     def __init__(self) -> None:
-        self.__replacements: dict[str, Replacement] = {}
+        self.__replacements: dict[str, ProcessorReplacement] = {}
 
-    def items(self) -> Iterator[tuple[str, Replacement]]:
+    def items(self) -> Iterator[tuple[str, ProcessorReplacement]]:
         yield from self.__replacements.items()
 
-    def update(self, substitute: dict[str, Replacement]) -> None:
+    def update(self, substitute: dict[str, ProcessorReplacement]) -> None:
         replacements = self.__replacements
         if set(replacements) & set(substitute):  # what then?
             msg = "Replacement collision"
@@ -63,18 +65,18 @@ class _Replacements:
         replacements.update(substitute)
 
 
-# Note: add generic type params for 3.9+
-class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
+# Note: Add generic type params for 3.9+
+class _ProcessedData(UserDict):  # type: ignore[type-arg]
     def __init__(
         self,
         *,
         data: MutableMapping[str, object],
-        options: ReplacementOptions,
-        macros: dict[str, Callable[[object], dict[str, object]]],
+        options: ProcessorOptions,
+        macros: MacroDict,
     ) -> None:
         self.macros = macros
         self.options = options
-        self.__replacements = _Replacements()
+        self.__replacements = _ProcessedReplacements()
         super().__init__()
         for key, value in data.items():
             replacement = self.find_replacement(key, value)
@@ -90,7 +92,7 @@ class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
         self,
         key: str | None,
         value: object,
-    ) -> Replacement | None:
+    ) -> ProcessorReplacement | None:
         """
         Find a replacement for a single item, for programmatic use.
 
@@ -103,16 +105,22 @@ class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
             return None
 
         if key.startswith(macro_prefix):
-            return Replacement(
+            macro_name = key[len(macro_prefix) :].rstrip()
+            try:
+                macro = self.macros[macro_name]
+            except KeyError as e:
+                msg = f"No such macro: {macro_name!r}"
+                raise ConfigProcessorError(msg) from e
+            return ProcessorReplacement(
                 key=key,
                 value=value,
                 # Note: Use str.removeprefix() for 3.9+
-                content=self.macros[key[len(macro_prefix) :].rstrip()](value),
+                content=macro(value),
             )
 
         if key.startswith(update_prefix):
             update_key = key[len(update_prefix) :].rstrip()
-            return Replacement(
+            return ProcessorReplacement(
                 key=key,
                 value=value,
                 content={update_key: self.update_existing(update_key, value)},
@@ -151,17 +159,17 @@ class _DataWithReplacements(UserDict):  # type: ignore[type-arg]
         return before_replacements
 
 
-class ReplacementParser:
+class ConfigProcessor:
     """
-    A class that takes in configuration data and evaluates it.
+    A class that takes in configuration data and processes it.
 
-    Recursively resolves & applies replacements for programmatic use.
+    Recursively resolves & applies replacements in data magically.
     """
 
     _get_data_with_replacements: Callable[
         ...,
-        _DataWithReplacements,
-    ] = _DataWithReplacements
+        _ProcessedData,
+    ] = _ProcessedData
 
     macros: ClassVar[MacroDict] = {}
 
@@ -174,9 +182,9 @@ class ReplacementParser:
         macros_on_top: bool = False,
     ) -> None:
         self.__initial = initial
-        self.__data: _DataWithReplacements = None  # type: ignore[assignment]
+        self.__data: _ProcessedData = None  # type: ignore[assignment]
 
-        self.options = ReplacementOptions(
+        self.options = ProcessorOptions(
             macro_prefix=macro_prefix,
             update_prefix=update_prefix,
             macros_on_top=macros_on_top,
@@ -184,18 +192,18 @@ class ReplacementParser:
 
     @property
     def roundtrip_initial(self) -> Data:
-        """The initial configuration data that the parser was given."""
+        """The initial configuration data that the processor was given."""
         return self.__initial
 
-    def create_parser(self, data: Data) -> ReplacementParser:
-        """Create a new configuration parser, but with identical options applicable."""
+    def create_processor(self, data: Data) -> ConfigProcessor:
+        """Create a new configuration processor with identical options."""
         return type(self)(data, **self.options)
 
     def get_data_with_replacements(
         self,
         *,
         force: bool = False,
-    ) -> _DataWithReplacements:
+    ) -> _ProcessedData:
         """
         Create the data with replacements or return the one already cached.
 
@@ -216,9 +224,9 @@ class ReplacementParser:
 
 
 @dataclass
-class Replacement:
+class ProcessorReplacement:
     """
-    A change that was made to the configuration data during parsing.
+    A change that was made to the configuration data during processing.
 
     Attributes
     ----------

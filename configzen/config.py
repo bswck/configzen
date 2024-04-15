@@ -17,7 +17,7 @@ from pydantic_settings.main import SettingsConfigDict
 
 from configzen.context import copy_context_on_await, copy_context_on_call
 from configzen.data import roundtrip_update_mapping
-from configzen.replacements import ReplacementParser
+from configzen.processor import ConfigProcessor
 from configzen.routes import (
     EMPTY_ROUTE,
     GetAttr,
@@ -45,9 +45,9 @@ __all__ = ("BaseConfig", "ModelConfig")
 class ModelConfig(SettingsConfigDict, total=False):
     """Meta-configuration for configzen models."""
 
-    config_source: ConfigSource[Any, Any]
+    config_source: str | ConfigSource[Any, Any]
     rebuild_on_load: bool
-    parser_factory: Callable[..., ReplacementParser]
+    processor_factory: Callable[..., ConfigProcessor]
 
 
 pydantic_config_keys |= set(ModelConfig.__annotations__)
@@ -142,7 +142,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
     _config_source: ConfigSource[Any, Any] = PrivateAttr()
     _config_data: Data = PrivateAttr(default_factory=dict)
-    _config_parser: ReplacementParser = PrivateAttr()
+    _config_processor: ConfigProcessor = PrivateAttr()
     _config_root: BaseConfig | None = PrivateAttr(default=None)
 
     def __init__(self, **data: Any) -> None:
@@ -183,18 +183,18 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         return self._config_root.config_data
 
     @property
-    def config_parser(self) -> ReplacementParser:
+    def config_processor(self) -> ConfigProcessor:
         """
-        Current replacement parser.
+        Current configuration processor.
 
-        Parser stores the initial data used when loading the configuration,
+        Processor stores the initial data used when loading the configuration,
         resolves macros etc.
         """
         if self._config_root is None:
-            if not hasattr(self, "_config_parser"):
-                return ReplacementParser(self.config_dump())
-            return self._config_parser
-        return self._config_root.config_parser
+            if not hasattr(self, "_config_processor"):
+                return ConfigProcessor(self.config_dump())
+            return self._config_processor
+        return self._config_root.config_processor
 
     def config_find_routes(
         self,
@@ -212,8 +212,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             _locate_in_mapping(vars(self), subconfig, attribute_access=True),
         )
 
-    find_routes = config_find_routes
-
     def config_find_route(self, subconfig: BaseConfig) -> Route:
         """Locate exactly one (closest) route to the given subconfiguration."""
         all_routes = self.config_find_routes(subconfig)
@@ -221,8 +219,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             msg = f"Unable to locate subconfiguration {subconfig}"
             raise LookupError(msg)
         return next(iter(all_routes))
-
-    find_route = config_find_route
 
     @classmethod
     def _validate_config_source(
@@ -245,17 +241,17 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         return source
 
     @classmethod
-    def _validate_parser_factory(
+    def _validate_processor_factory(
         cls,
-        parser_factory: Callable[..., ReplacementParser] | None = None,
-    ) -> Callable[..., ReplacementParser]:
+        processor_factory: Callable[..., ConfigProcessor] | None = None,
+    ) -> Callable[..., ConfigProcessor]:
         return (
-            parser_factory
+            processor_factory
             or cast(
-                "Callable[..., ReplacementParser] | None",
-                cls.model_config.get("config_parser_factory"),
+                "Callable[..., ConfigProcessor] | None",
+                cls.model_config.get("config_processor_factory"),
             )
-            or ReplacementParser
+            or ConfigProcessor
         )
 
     @classmethod
@@ -264,7 +260,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         cls,
         source: object | None = None,
         *,
-        parser_factory: Callable[..., ReplacementParser] | None = None,
+        processor_factory: Callable[..., ConfigProcessor] | None = None,
     ) -> Self:
         """
         Load this configuration from a given source.
@@ -281,7 +277,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         context
             The context to use during model validation.
             See also https://docs.pydantic.dev/latest/api/base_model @ `model_validate`.
-        parser_factory
+        processor_factory
             The state factory to use to parse the newly loaded configuration data.
 
         Returns
@@ -299,16 +295,16 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         # Validate the source we load our configuration from.
         config_source = cls._validate_config_source(source)
 
-        # Validate the parser we use to parse the loaded configuration data.
-        make_parser = cls._validate_parser_factory(parser_factory)
+        # Validate the processor we use to parse the loaded configuration data.
+        make_processor = cls._validate_processor_factory(processor_factory)
 
         # Load the configuration data from the sanitized source.
         # Keep in mind the loaded data object keeps all the additional
         # metadata that we want to keep.
-        # Then we pass it to the parser factory to process the configuration data
+        # Then we pass it to the processor factory to process the configuration data
         # into a bare dictionary that does not hold anything else
-        # than the configuration data, by using `parser.get_processed_data()`.
-        parser = make_parser(config_source.load())
+        # than the configuration data, by using `processor.get_processed_data()`.
+        processor = make_processor(config_source.load())
 
         # ruff: noqa: FBT003
         try:
@@ -320,20 +316,15 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             # During this process, we lose all the additional metadata that we
             # want to keep in the configuration data.
             # They will be added back to the exported data when the configuration
-            # is saved (`parser.revert_parser_changes()`).
-            self = cls(**parser.get_data_with_replacements())
+            # is saved (`processor.revert_processor_changes()`).
+            self = cls(**processor.get_data_with_replacements())
         finally:
             loading.set(False)
 
         # Quick setup and we're done.
         self._config_source = config_source
-        self._config_parser = parser
+        self._config_processor = processor
         return self
-
-    @classmethod
-    def load(cls, source: object | None = None, **kwargs: Any) -> Self:
-        """Do the same as `config_load`."""
-        return cls.config_load(source, **kwargs)
 
     @classmethod
     @copy_context_on_await
@@ -342,7 +333,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         cls,
         source: object | None = None,
         *,
-        parser_factory: Callable[..., ReplacementParser] | None = None,
+        processor_factory: Callable[..., ConfigProcessor] | None = None,
     ) -> Self:
         """
         Do the same as `config_load`, but asynchronously (no I/O blocking).
@@ -356,7 +347,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             to a TOML text file source. Keep in mind, however, that for binary formats
             such as non-XML Plist you must specify its format type to binary, so in
             that case just create `BinaryFileConfig"plist_file.plist")`.
-        parser_factory
+        processor_factory
             The state factory to use to parse the newly loaded configuration data.
 
         Returns
@@ -375,27 +366,21 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             cls.model_rebuild(_parent_namespace_depth=4)
 
         config_source = cls._validate_config_source(source)
-        make_parser = cls._validate_parser_factory(parser_factory)
-        parser = make_parser(await config_source.load_async())
+        make_processor = cls._validate_processor_factory(processor_factory)
+        processor = make_processor(await config_source.load_async())
 
         try:
             loading.set(True)
 
-            # Since `parser.get_processed_data()` operates on primitive data types,
+            # Since `processor.get_processed_data()` operates on primitive data types,
             # we can safely use run_sync here to run in a worker thread.
-            self = cls(**await run_sync(parser.get_data_with_replacements))
+            self = cls(**await run_sync(processor.get_data_with_replacements))
         finally:
             loading.set(False)
 
-        self._config_parser = parser
+        self._config_processor = processor
         self._config_source = config_source
         return self
-
-    @classmethod
-    @wraps(config_load_async)
-    async def load_async(cls, source: object | None = None, **kwargs: Any) -> Self:
-        """Do the same as `config_load_async`."""
-        return await cls.config_load_async(source, **kwargs)
 
     def config_reload(self) -> Self:
         """Reload the configuration from the same source."""
@@ -407,12 +392,12 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         root = self.config_root
 
-        # Create a new parser with the same options as the current one.
-        parser = root.config_parser.create_parser(source.load())
+        # Create a new processor with the same options as the current one.
+        processor = root.config_processor.create_processor(source.load())
 
         # Construct a new configuration instance.
         # Respect __class__ attribute in case root might be a proxy (from proxyvars).
-        new_root = root.__class__(**parser.get_data_with_replacements())
+        new_root = root.__class__(**processor.get_data_with_replacements())
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -426,11 +411,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         return self
 
-    @wraps(config_reload)
-    def reload(self) -> Self:
-        """Do the same as `config_reload`."""
-        return self.config_reload()
-
     async def config_reload_async(self) -> Self:
         """Do the same as `config_reload` asynchronously (no I/O blocking)."""
         source = self.config_source
@@ -441,11 +421,13 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         root = self.config_root
 
-        # Create a new state parser the same options as the current one.
-        parser = root.config_parser.create_parser(source.load())
+        # Create a new state processor the same options as the current one.
+        processor = root.config_processor.create_processor(source.load())
 
         # Construct a new configuration instance.
-        new_root = root.__class__(**await run_sync(parser.get_data_with_replacements))
+        new_root = root.__class__(
+            **await run_sync(processor.get_data_with_replacements)
+        )
 
         # Copy values from the freshly loaded configuration into our instance.
         if root is self:
@@ -478,14 +460,14 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             raise RuntimeError(msg)
 
         root = self.config_root
-        parser = self.config_parser
+        processor = self.config_processor
 
         if root is self:
             new_data = self.config_dump()
         else:
             # Construct a new configuration instance.
             # Respect __class__ attribute since root might be a proxy (from proxyvars).
-            new_root = root.__class__(**parser.get_data_with_replacements())
+            new_root = root.__class__(**processor.get_data_with_replacements())
             routes = root.config_find_routes(self)
 
             for route in routes:
@@ -493,11 +475,11 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
             new_data = new_root.config_dump()
 
-        parsed_data = parser.get_data_with_replacements()
+        parsed_data = processor.get_data_with_replacements()
         roundtrip_update_mapping(roundtrip_data=parsed_data, mergeable_data=new_data)
         flat_new_data = parsed_data.revert_replacements()
 
-        data = parser.roundtrip_initial
+        data = processor.roundtrip_initial
         config_destination.data_format.roundtrip_update_mapping(
             roundtrip_data=data,
             mergeable_data=flat_new_data,
@@ -523,11 +505,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         config_source.dump(data)
         return self
 
-    @wraps(config_save)
-    def save(self, destination: object | None = None) -> Self:
-        """Do the same as `config_save`."""
-        return self.config_save(destination)
-
     async def config_save_async(self, destination: object | None = None) -> Self:
         """
         Do the same as `config_save`, but asynchronously (no I/O blocking).
@@ -547,28 +524,13 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         await config_source.dump_async(data)
         return self
 
-    @wraps(config_save_async)
-    async def save_async(self, destination: object | None = None) -> Self:
-        """Do the same as `config_save_async`."""
-        return await self.config_save_async(destination)
-
     def config_at(self, *routes: RouteLike) -> Item:
         """Return a configuration item at the given set of routes."""
         return Item(routes=set(map(Route, routes)), config=self)
 
-    @wraps(config_at)
-    def at(self, *routes: RouteLike) -> Item:
-        """Do the same as `config_at`."""
-        return self.config_at(*routes)
-
     def config_dump(self) -> dict[str, object]:
         """Return a dictionary representation of the configuration."""
         return super().model_dump()
-
-    @wraps(config_dump)
-    def dump(self) -> dict[str, object]:
-        """Do the same as `config_dump`."""
-        return self.config_dump()
 
     def __getitem__(self, routes: RouteLike | tuple[RouteLike, ...]) -> Item:
         """Return a configuration item at the given set of routes."""
