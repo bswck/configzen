@@ -281,14 +281,17 @@ files = [
 
 [[package]]
 name = "class-singledispatch"
-version = "1.1.1"
+version = "1.2.3.post2"
 description = "A ``singledispatch()`` for arguments that are classes annotated as specific types."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "class_singledispatch-1.1.1-py3-none-any.whl", hash = "sha256:93c20f742e0b5407c968c7c058be058178d4aa215b41f323f5b782de059cf110"},
-    {file = "class_singledispatch-1.1.1.tar.gz", hash = "sha256:af0a1385bc78e50d8401e69825f018333c5f61f09d39ee5face89d8995b734fa"},
+    {file = "class_singledispatch-1.2.3.post2-py3-none-any.whl", hash = "sha256:a806473af00ad02cb34120b953074f3390e3a119dee872e1c251ed271c2b28ca"},
+    {file = "class_singledispatch-1.2.3.post2.tar.gz", hash = "sha256:19a80f7c2a530e8f1909172a7b8544c552332f0194136e4bebdd725ffa104dc5"},
 ]
+
+[package.extras]
+modern-type-hints = ["eval-type-backport (>=0.2.0)"]
 
 [[package]]
 name = "click"
@@ -471,13 +474,13 @@ files = [
 
 [[package]]
 name = "eval-type-backport"
-version = "0.1.3"
+version = "0.2.0"
 description = "Like `typing._eval_type`, but lets older Python versions use newer typing features."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "eval_type_backport-0.1.3-py3-none-any.whl", hash = "sha256:519d2a993b3da286df9f90e17f503f66435106ad870cf26620c5720e2158ddf2"},
-    {file = "eval_type_backport-0.1.3.tar.gz", hash = "sha256:d83ee225331dfa009493cec1f3608a71550b515ee4749abe78da14e3c5e314f5"},
+    {file = "eval_type_backport-0.2.0-py3-none-any.whl", hash = "sha256:ac2f73d30d40c5a30a80b8739a789d6bb5e49fdffa66d7912667e2015d9c9933"},
+    {file = "eval_type_backport-0.2.0.tar.gz", hash = "sha256:68796cfbc7371ebf923f03bdf7bef415f3ec098aeced24e054b253a0e78f7b37"},
 ]
 
 [package.extras]
