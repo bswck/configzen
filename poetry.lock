@@ -1953,27 +1953,31 @@ typing-extensions = ">=4.9.0"
 
 [[package]]
 name = "scalene"
-version = "1.5.38"
+version = "1.5.40"
 description = "Scalene: A high-resolution, low-overhead CPU, GPU, and memory profiler for Python with AI-powered optimization suggestions"
 optional = false
 python-versions = "!=3.11.0,>=3.8"
 files = [
-    {file = "scalene-1.5.38-cp310-cp310-macosx_12_0_universal2.whl", hash = "sha256:8e8f7468be3f8c30cdc3ca97a46717a81337dafdad003d1b800e954fd00530eb"},
-    {file = "scalene-1.5.38-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e1bc516b5749330151987b187bb89fc362011e2e52b73d304c5e0fbfea12e190"},
-    {file = "scalene-1.5.38-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0024e1c2205ed6bf8696bd5a1483c61d0b434cb479cbdc45d7549bcedda26557"},
-    {file = "scalene-1.5.38-cp310-cp310-win_amd64.whl", hash = "sha256:228293a23393d2d64fe4b316b0b2419f39748de1a18b25c3baa34c96efc31b25"},
-    {file = "scalene-1.5.38-cp311-cp311-macosx_12_0_universal2.whl", hash = "sha256:aa678fdc7c4b1a777a88e82252202199d68fd694556626fde3163f3d33cbad53"},
-    {file = "scalene-1.5.38-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3b36f839ebcc61c634232b2d09d06b8b0931ebea75843b7b8b9377b3c6502a3e"},
-    {file = "scalene-1.5.38-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c665df7c3449b9ec720d600b4b6a83fc7b84234deb161f50315a199620790844"},
-    {file = "scalene-1.5.38-cp38-cp38-macosx_12_0_universal2.whl", hash = "sha256:e7ceedb4e961ad926052c16fb6ebedaba1b6d03adcfa37eec929234c8c20f760"},
-    {file = "scalene-1.5.38-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e2406a618941deb640170aa5502b9eed23476accd584ababafbcb5a52c89b48b"},
-    {file = "scalene-1.5.38-cp38-cp38-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0c1168e7c0e30ae002b2e3e91ea4eceb4f9c606554b15530b438d1e98bcf4750"},
-    {file = "scalene-1.5.38-cp38-cp38-win_amd64.whl", hash = "sha256:2f7a7050b9cdb4e255a97bdec7ce322fd68bc0ee2534abc0ca03692c7452581d"},
-    {file = "scalene-1.5.38-cp39-cp39-macosx_12_0_universal2.whl", hash = "sha256:4abd42862c8b065b0988a7471b41f69a0832a5757bb10ca62fc777555e8ac3e3"},
-    {file = "scalene-1.5.38-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1be4bceaf963a96e64cd1c5e3b2a545a899ef8d20ebcff144e5d833ab85d918d"},
-    {file = "scalene-1.5.38-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:aeae550535cc81b7d9e1e61b2a924827decbe777b661bd85d65d0be6760ac067"},
-    {file = "scalene-1.5.38-cp39-cp39-win_amd64.whl", hash = "sha256:a8d4875b7ec2115a6798d89eb2f5a4ce4d5693e70a9dac94e696977e0f7cdbbe"},
-    {file = "scalene-1.5.38.tar.gz", hash = "sha256:2d1d5ebe49f69ba14d06626751426e6deb3120f7871ba44380b1411c3bb17b7f"},
+    {file = "scalene-1.5.40-cp310-cp310-macosx_14_0_universal2.whl", hash = "sha256:2542d6df6a726600c1547f90ba7a452b9e693b0c033bf36aac0c6c47b88c38e8"},
+    {file = "scalene-1.5.40-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9168e29550412d28c0a637f69c1db2e11f87bcab343e9563b39ee79f7e1a6246"},
+    {file = "scalene-1.5.40-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4716804d9902f9a563007100689b98af7b0c94372c5c7f420592bf0084a11387"},
+    {file = "scalene-1.5.40-cp310-cp310-win_amd64.whl", hash = "sha256:963f7e9e98b642c7ee7f1cc6df8237d03ae58e6700b7d16e82b7cf8ab384058a"},
+    {file = "scalene-1.5.40-cp311-cp311-macosx_14_0_universal2.whl", hash = "sha256:6c4932f6b34387029fe9f3e943d32b7c303e13d161d3402473f0f188207aeaf8"},
+    {file = "scalene-1.5.40-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:93cc2b90a6337cb5e1765283bc36a098d81d819816d15888801858af742258a5"},
+    {file = "scalene-1.5.40-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f65ca1a7a296fef32689d861a3ec57a6c30c7e629f823fbb94db99212e26c35d"},
+    {file = "scalene-1.5.40-cp312-cp312-macosx_14_0_universal2.whl", hash = "sha256:14f3904fbd1f541d2009eea5d563757a75293b436bc6e7bba9aa85e524d51905"},
+    {file = "scalene-1.5.40-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:054ce78eb77efcbc048fb5902748b92e87c4c65b12f5e762b57e5d118fdb27c8"},
+    {file = "scalene-1.5.40-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8aff1ba99cdaa44735059ebe6ab9849f2cd1ebfe44de36d4e141963474f051b5"},
+    {file = "scalene-1.5.40-cp312-cp312-win_amd64.whl", hash = "sha256:c0fb1954bfff4e781823182915f7be3eef971262d87c74cca0ff7dba6e00e6b8"},
+    {file = "scalene-1.5.40-cp38-cp38-macosx_14_0_universal2.whl", hash = "sha256:0c3bc6dff2ef3d1c94df648111e226b075dda346ce310617e425e71e4f356bc7"},
+    {file = "scalene-1.5.40-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aed89ddc1a9694e154b86a067e547a1f29911922090d052229c8fbcf25ddfe74"},
+    {file = "scalene-1.5.40-cp38-cp38-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:edff83159dd330a470fa82449059e0aa2b588e3b707dfd04ee74f66ff544c73a"},
+    {file = "scalene-1.5.40-cp38-cp38-win_amd64.whl", hash = "sha256:7b9efaed1bbf40352256a86bff7df97425c97da303740ef6d0a7ce8a19982774"},
+    {file = "scalene-1.5.40-cp39-cp39-macosx_14_0_universal2.whl", hash = "sha256:41e2554ad312bb358eead31e26f9b158eecd085c3ae458732a91bd6f1c5cb109"},
+    {file = "scalene-1.5.40-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:007c85e2b1844dca629b39b6b4ef2315710367202f35fd419a6abf119e7b5a41"},
+    {file = "scalene-1.5.40-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a843cdfddf05d6957df0839bca881de6493557c2b6d2f080923d20fd0ff4d12f"},
+    {file = "scalene-1.5.40-cp39-cp39-win_amd64.whl", hash = "sha256:9c4b374101bb8b6c015f5316005e440bca6af9458542a169e05976689ae1067e"},
+    {file = "scalene-1.5.40.tar.gz", hash = "sha256:838df363b1767e15dac6dd704a98eda6901cc35b7d9b28fdd8d35c738b07bff6"},
 ]
 
 [package.dependencies]
@@ -2258,4 +2262,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8"
-content-hash = "c5233904acbd6fe2382efc757347ec62cac8d80a8d737d6f30308d408774ac01"
+content-hash = "3c5d0ef59d91cb1e5f4f495b0611e78daad4d6a456a4b9beda4e6a8e2afae59b"
