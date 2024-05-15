@@ -7,3 +7,10 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 <!-- insertion marker -->
 
+## [v1.0.0.alpha.0](https://github.com/bswck/configzen/tree/v1.0.0.alpha.0) (2024-05-15)
+
+
+### Changed
+
+- Refactored to work with Pydantic 2. Rewritten the core and introduced countless breaking
+  changes.

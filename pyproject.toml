@@ -8,7 +8,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "configzen"
-version = "0.0.0"
+version = "1.0.0.alpha.0"
 description = "Manage configuration with pydantic."
 authors = ["bswck <bartoszpiotrslawecki@gmail.com>"]
 license = "GPL-3.0"
