@@ -1,6 +1,10 @@
-# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
+# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-245-g8c04714.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/project/pyproject.toml.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-245-g8c04714/project/pyproject.toml.jinja
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "configzen"
@@ -13,7 +17,7 @@ packages = [{ include = "configzen/" }]
 homepage = "https://github.com/bswck/configzen"
 
 [tool.poetry.urls]
-Documentation = "https://configzen.readthedocs.io/en/latest/"
+Documentation = "https://bswck.github.io/configzen"
 Issues = "https://github.com/bswck/configzen/issues"
 Distribution = "https://pypi.org/project/configzen/"
 Coverage = "https://coverage-badge.samuelcolvin.workers.dev/redirect/bswck/configzen"
@@ -33,9 +37,9 @@ pytest-asyncio = "^0.23.2"
 scalene = { version = "^1.5.37", python = ">=3.8,!=3.11.0" }
 
 [tool.poetry.group.dev-skeleton.dependencies]
-# This dependency group was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
+# This dependency group was generated from skeleton-ci/skeleton-python@0.0.2rc-245-g8c04714.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/project/pyproject.toml.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-245-g8c04714/project/pyproject.toml.jinja
 mypy = ">=1.9.0"
 ruff = ">=0.3.4"
 towncrier = ">=23.11.0"
@@ -63,7 +67,7 @@ mkdocstrings = { version = ">=0.19.0", extras = ["python"] }
 [tool.poe.tasks]
 test = "pytest -v"
 lint = "ruff check ."
-skeleton = "scripts/skeleton.0.0.2rc-218-g8123b8a.bash"
+skeleton = "scripts/skeleton.0.0.2rc-245-g8c04714.bash"
 check = [
     { ref="test" },
     { ref="lint" },
@@ -200,7 +204,3 @@ relative_files = true
 
 [tool.coverage.report]
 fail_under = 90
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

@@ -1,4 +1,4 @@
-_commit: 0.0.2rc-218-g8123b8a
+_commit: 0.0.2rc-245-g8c04714
 _src_path: gh:skeleton-ci/skeleton-python
 author: bswck
 cli: false
@@ -17,7 +17,6 @@ pypy: true
 python: '3.8'
 python_until: ''
 repo: configzen
-rtd: configzen
 tests: true
 tidelift: true
 visibility: public

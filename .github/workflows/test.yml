@@ -1,6 +1,6 @@
-# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
+# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-245-g8c04714.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/project/.github/workflows/%23%25%20if%20tests%20%25%23test.yml%23%25%20endif%20%25%23.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-245-g8c04714/project/.github/workflows/%23%25%20if%20tests%20%25%23test.yml%23%25%20endif%20%25%23.jinja
 
 # IMPORTANT!
 # Pinned versions of actions and Poetry are managed in a different repository.
@@ -24,8 +24,9 @@ jobs:
         - "3.12"
         platform:
         - "ubuntu"
-        - "macos"
         - "windows"
+        # https://github.com/actions/setup-python/issues/696
+        # - "macos"
         include:
         - python: "3.9"
           platform: "ubuntu"
@@ -47,8 +48,9 @@ jobs:
       with:
         python-version: "${{matrix.python}}"
         cache: "poetry"
+        architecture: "x64"
     - name: "Install the project"
-      run: "poetry install"
+      run: "poetry install --all-extras"
     - name: "Run tests"
       env:
         PY_COLORS: 1  # Thanks @zanieb!

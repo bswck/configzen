@@ -1,6 +1,6 @@
-# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-218-g8123b8a.
+# This file was generated from skeleton-ci/skeleton-python@0.0.2rc-245-g8c04714.
 # Instead of changing this particular file, you might want to alter the template:
-# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-218-g8123b8a/project/.github/workflows/mypy.yml.jinja
+# https://github.com/skeleton-ci/skeleton-python/tree/0.0.2rc-245-g8c04714/project/.github/workflows/mypy.yml.jinja
 
 # IMPORTANT!
 # Pinned versions of actions and Poetry are managed in a different repository.
@@ -23,7 +23,7 @@ jobs:
       with:
         cache: "poetry"
     - name: "Install the project"
-      run: "poetry install"
+      run: "poetry install --all-extras"
     - name: "Type-check with mypy"
       run: >
         poetry run mypy . --strict
