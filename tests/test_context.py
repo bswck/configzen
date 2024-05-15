@@ -3,10 +3,10 @@ from contextvars import ContextVar
 import pytest
 
 from configzen.context import (
-    copy_and_await,
-    copy_and_run,
-    copy_context_on_await,
-    copy_context_on_call,
+    async_run_isolated,
+    run_isolated,
+    isolated_context_coroutine,
+    isolated_context_function,
 )
 
 
@@ -14,7 +14,7 @@ def test_copy_context_on_call() -> None:
     cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
-    @copy_context_on_call
+    @isolated_context_function
     def func() -> int:
         cv.set(2)
         return cv.get()
@@ -25,13 +25,13 @@ def test_copy_context_on_call() -> None:
     cv.set(5)
 
     class Foo:
-        @copy_context_on_call
+        @isolated_context_function
         @staticmethod
         def static_method() -> int:
             cv.set(3)
             return cv.get()
 
-        @copy_context_on_call
+        @isolated_context_function
         @classmethod
         def class_method(cls) -> int:
             cv.set(4)
@@ -44,11 +44,11 @@ def test_copy_context_on_call() -> None:
 
 
 @pytest.mark.asyncio
-async def test_copy_context_on_await() -> None:
+async def test_isolated_context_coroutine() -> None:
     cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
-    @copy_context_on_await
+    @isolated_context_coroutine
     async def func() -> int:
         cv.set(2)
         return cv.get()
@@ -59,13 +59,13 @@ async def test_copy_context_on_await() -> None:
     cv.set(5)
 
     class Foo:
-        @copy_context_on_await
+        @isolated_context_coroutine
         @staticmethod
         async def static_method() -> int:
             cv.set(3)
             return cv.get()
 
-        @copy_context_on_await
+        @isolated_context_coroutine
         @classmethod
         async def class_method(cls) -> int:
             cv.set(4)
@@ -77,7 +77,7 @@ async def test_copy_context_on_await() -> None:
     assert cv.get() == 5
 
 
-def test_copy_and_run() -> None:
+def test_run_isolated() -> None:
     cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
@@ -85,12 +85,12 @@ def test_copy_and_run() -> None:
         cv.set(2)
         return cv.get()
 
-    assert copy_and_run(func) == 2
+    assert run_isolated(func) == 2
     assert cv.get() == 1
 
 
 @pytest.mark.asyncio
-async def test_copy_and_await() -> None:
+async def test_async_run_isolated() -> None:
     cv: ContextVar[int] = ContextVar("cv")
     cv.set(1)
 
@@ -98,5 +98,5 @@ async def test_copy_and_await() -> None:
         cv.set(2)
         return cv.get()
 
-    assert await copy_and_await(func) == 2
+    assert await async_run_isolated(func) == 2
     assert cv.get() == 1

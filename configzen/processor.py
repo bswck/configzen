@@ -10,21 +10,26 @@ from __future__ import annotations
 
 from collections import UserDict
 from collections.abc import Mapping, MutableMapping, MutableSequence, Sequence
+from contextvars import copy_context
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, TypedDict
+from functools import partial
+from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
 
 from configzen.errors import ConfigProcessorError
+from configzen.sources import get_config_source
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
-    from typing import NewType
+    from typing import NewType, TypeVar, overload
 
     from typing_extensions import TypeAlias
 
     from configzen.data import Data
 
-    MacroDict: TypeAlias = "dict[str, Callable[[object], dict[str, object]]]"
+    Macro: TypeAlias = "Callable[..., Data]"
+    MacroT = TypeVar("MacroT", bound=Macro)
+    MacroDict: TypeAlias = "dict[str, Macro]"
     Char = NewType("Char", str)
 else:
 
@@ -41,13 +46,16 @@ __all__ = (
     "ProcessorReplacement",
 )
 
+MACRO_FUNC: str = "__configzen_macro_func__"
 
-class ProcessorOptions(TypedDict):
+
+class ProcessorOptions(TypedDict, total=False):
     """Prototype of the allowed options for the ConfigProcessor class."""
 
     macro_prefix: Char
     update_prefix: Char
     macros_on_top: bool
+    lenient: bool
 
 
 class _ProcessedReplacements:
@@ -76,17 +84,21 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
     ) -> None:
         self.macros = macros
         self.options = options
+        self._context = copy_context()
         self.__replacements = _ProcessedReplacements()
 
         super().__init__()
 
         for key, value in data.items():
-            replacement = self.find_replacement(key, value)
+            replacement = self.find_replacement(
+                key,
+                value,
+                lenient=self.options.get("lenient", True),
+            )
             if replacement is None:
                 self.data[key] = value
                 continue
             substitute = replacement.content
-            self.data.pop(key)
             self.data.update(substitute)
             self.__replacements.update(dict.fromkeys(substitute, replacement))
 
@@ -94,6 +106,8 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
         self,
         key: str | None,
         value: object,
+        *,
+        lenient: bool = True,
     ) -> ProcessorReplacement | None:
         """
         Find a replacement for a single item, for programmatic use.
@@ -106,22 +120,24 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
         if not key:
             return None
 
+        # Note: Use str.removeprefix() for 3.9+
         if key.startswith(macro_prefix):
-            macro_name = key[len(macro_prefix) :].rstrip()
+            macro_name = key[len(macro_prefix) :]
             try:
                 macro = self.macros[macro_name]
             except KeyError as err:
+                if lenient:
+                    return None
                 msg = f"No such macro: {macro_name!r}"
                 raise ConfigProcessorError(msg) from err
             return ProcessorReplacement(
                 key=key,
                 value=value,
-                # Note: Use str.removeprefix() for 3.9+
-                content=macro(value),
+                content=self._context.run(macro, value),
             )
 
         if key.startswith(update_prefix):
-            update_key = key[len(update_prefix) :].rstrip()
+            update_key = key[len(update_prefix) :]
             return ProcessorReplacement(
                 key=key,
                 value=value,
@@ -151,10 +167,10 @@ class _ProcessedData(UserDict):  # type: ignore[type-arg]
     def revert_replacements(self) -> Data:
         """Revert all replacements and return the original data structure."""
         before_replacements = {}
-        skip_keys = []
+        skip_keys = set()
         for key, replacement in self.__replacements.items():
             before_replacements[replacement.key] = replacement.value
-            skip_keys.append(key)
+            skip_keys.add(key)
         for key, value in self.data.items():
             if key not in skip_keys:
                 before_replacements[key] = value
@@ -170,17 +186,16 @@ class ConfigProcessor:
 
     _get_processed_data: Callable[..., _ProcessedData] = _ProcessedData
 
-    macros: ClassVar[MacroDict] = {
-        "extend": lambda x: x,
-    }
+    _macros: ClassVar[MacroDict]
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         initial: Data,
         *,
         macro_prefix: Char = Char("^"),  # noqa: B008
         update_prefix: Char = Char("+"),  # noqa: B008
         macros_on_top: bool = False,
+        lenient: bool = True,
     ) -> None:
         self.__initial = initial
         self.__data: _ProcessedData = None  # type: ignore[assignment]
@@ -189,7 +204,16 @@ class ConfigProcessor:
             macro_prefix=macro_prefix,
             update_prefix=update_prefix,
             macros_on_top=macros_on_top,
+            lenient=lenient,
         )
+
+    @property
+    def macros(self) -> MacroDict:
+        """Get macros bound to this processor."""
+        return {
+            macro_name: macro.__get__(self, type(self))
+            for macro_name, macro in self._macros.items()
+        }
 
     @property
     def roundtrip_initial(self) -> Data:
@@ -223,6 +247,60 @@ class ConfigProcessor:
             )
         return self.__data
 
+    def __init_subclass__(cls) -> None:
+        """Merge macro registries on subclass."""
+        macros_from_class_dict = {
+            macro_name: func
+            for func in vars(cls).values()
+            if (macro_name := getattr(func, MACRO_FUNC, None))
+        }
+        try:
+            macros = {**getattr(cls.__base__, "_macros", {}), **macros_from_class_dict}
+        except AttributeError:
+            macros = {}
+        cls._macros = macros
+
+    @staticmethod
+    def sanitize_macro_name(name: str) -> str:
+        """Ensure a uniform name of every macro."""
+        return name.strip().casefold()
+
+    @classmethod
+    def macro(cls, name: str, macro: MacroT) -> MacroT:
+        """Override a macro."""
+        name = cls.sanitize_macro_name(name)
+        cls._macros[name] = macro
+        return macro
+
+
+ConfigProcessor.__init_subclass__()
+
+
+if TYPE_CHECKING:
+
+    @overload
+    def macro(func_or_name: MacroT, func: None = None) -> MacroT: ...
+    @overload
+    def macro(func_or_name: str, func: MacroT) -> MacroT: ...
+    @overload
+    def macro(func_or_name: str, func: None = None) -> Callable[[MacroT], MacroT]: ...
+
+
+def macro(
+    func_or_name: MacroT | str,
+    func: MacroT | None = None,
+) -> MacroT | Callable[[MacroT], MacroT]:
+    if callable(func_or_name):
+        if func is None:
+            func = cast("MacroT", func_or_name)
+            return macro(func.__name__, func)
+        msg = "Invalid macro() usage"
+        raise ValueError(msg)
+    if func is None:
+        return partial(macro, func_or_name)
+    setattr(func, MACRO_FUNC, func_or_name)
+    return func
+
 
 @dataclass
 class ProcessorReplacement:
@@ -242,4 +320,23 @@ class ProcessorReplacement:
 
     key: str
     value: object
-    content: dict[str, object]
+    content: Data
+
+
+class FileSystemAwareConfigProcessor(ConfigProcessor):
+    """
+    Config processor that is aware of the file system.
+
+    Can handle requests for transcluding other configuration files
+    to achieve a sense of extendability.
+    """
+
+    @macro
+    def extend(self, sources: str | dict[str, str]) -> Data:
+        """Transclude a config in this config."""
+        if isinstance(sources, str):
+            source = get_config_source(sources)
+            return source.load()
+        return {
+            key: get_config_source(source).load() for key, source in sources.items()
+        }

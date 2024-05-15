@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "copy_context_on_call",
-    "copy_context_on_await",
-    "copy_and_run",
-    "copy_and_await",
+    "isolated_context_function",
+    "isolated_context_coroutine",
+    "run_isolated",
+    "async_run_isolated",
 )
 
 
-def copy_context_on_call(func: Callable[_P, _T]) -> Callable[_P, _T]:
+def isolated_context_function(func: Callable[_P, _T]) -> Callable[_P, _T]:
     """
     Copy the context automatically on function call.
 
@@ -34,16 +34,16 @@ def copy_context_on_call(func: Callable[_P, _T]) -> Callable[_P, _T]:
     Used as a decorator.
     """
     if isinstance(func, (classmethod, staticmethod)):
-        return type(func)(copy_context_on_call(func.__func__))
+        return type(func)(isolated_context_function(func.__func__))
 
     @wraps(func)
     def copy(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        return copy_and_run(func, *args, **kwargs)
+        return run_isolated(func, *args, **kwargs)
 
     return copy
 
 
-def copy_context_on_await(
+def isolated_context_coroutine(
     func: Callable[_P, Coroutine[object, object, _T]],
 ) -> Callable[_P, Coroutine[object, object, _T]]:
     """
@@ -54,22 +54,22 @@ def copy_context_on_await(
     Used as a decorator.
     """
     if isinstance(func, (classmethod, staticmethod)):
-        return type(func)(copy_context_on_await(func.__func__))
+        return type(func)(isolated_context_coroutine(func.__func__))
 
     @wraps(func)
     async def copy_async(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        return await copy_and_await(func, *args, **kwargs)
+        return await async_run_isolated(func, *args, **kwargs)
 
     return copy_async
 
 
-def copy_and_run(func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
+def run_isolated(func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
     """Run a function in an isolated context."""
     context = contextvars.copy_context()
     return context.run(func, *args, **kwargs)
 
 
-def copy_and_await(
+def async_run_isolated(
     func: Callable[_P, Coroutine[object, object, _T]],
     *args: _P.args,
     **kwargs: _P.kwargs,

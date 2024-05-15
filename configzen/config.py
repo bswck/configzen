@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
-from functools import wraps
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, cast
 
 from anyio.to_thread import run_sync
 from pydantic import BaseModel, PrivateAttr
@@ -15,9 +15,9 @@ from pydantic._internal._model_construction import ModelMetaclass
 from pydantic_settings import BaseSettings
 from pydantic_settings.main import SettingsConfigDict
 
-from configzen.context import copy_context_on_await, copy_context_on_call
+from configzen.context import isolated_context_coroutine, isolated_context_function
 from configzen.data import roundtrip_update_mapping
-from configzen.processor import ConfigProcessor
+from configzen.processor import ConfigProcessor, FileSystemAwareConfigProcessor
 from configzen.routes import (
     EMPTY_ROUTE,
     GetAttr,
@@ -51,8 +51,18 @@ class ModelConfig(SettingsConfigDict, total=False):
 
 
 pydantic_config_keys |= set(ModelConfig.__annotations__)
-loading: ContextVar[bool] = ContextVar("loading", default=False)
+processing: ContextVar[ProcessingContext | None] = ContextVar(
+    "processing",
+    default=None,
+)
 owner_lookup: ContextVar[BaseConfig] = ContextVar("owner")
+
+
+class ProcessingContext(NamedTuple):
+    model_class: type[BaseConfig]
+    processor: ConfigProcessor
+    # We keep it mainly to make path resolution smarter.
+    trace: list[ConfigSource]
 
 
 def _locate(
@@ -150,7 +160,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             owner = owner_lookup.get()
         except LookupError:
             owner = None
-            if loading.get():
+            if processing.get():
                 owner_lookup.set(self)
         super().__init__(**data)
         self._config_root = owner
@@ -192,7 +202,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         """
         if self._config_root is None:
             if not hasattr(self, "_config_processor"):
-                return ConfigProcessor(self.config_dump())
+                return FileSystemAwareConfigProcessor(self.config_dump())
             return self._config_processor
         return self._config_root.config_processor
 
@@ -251,11 +261,29 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
                 "Callable[..., ConfigProcessor] | None",
                 cls.model_config.get("config_processor_factory"),
             )
-            or ConfigProcessor
+            or FileSystemAwareConfigProcessor
         )
 
     @classmethod
-    @copy_context_on_call
+    def _try_rebuild_model(cls) -> None:
+        # Possible scenarios:
+        # (sync) Frame 1: <class>.config_load()
+        # (sync) Frame 2: isolated_context_function.<locals>.copy()
+        # (sync) Frame 3: run_isolated()
+        # (sync) Frame 4: <class>.config_load()
+        # (sync) Frame 5: <class>.model_rebuild()
+        #
+        # (async) Frame 1: <class>.config_load_async()
+        # (async) Frame 2: isolated_context_function.<locals>.copy()
+        # (async) Frame 3: run_isolated()
+        # (async) Frame 4: <class>.config_load()
+        # (async) Frame 5: <class>.model_rebuild()
+        if cls.model_config["rebuild_on_load"]:
+            with suppress(Exception):
+                cls.model_rebuild(_parent_namespace_depth=5)
+
+    @classmethod
+    @isolated_context_function
     def config_load(
         cls,
         source: object | None = None,
@@ -276,7 +304,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             that case just create `BinaryFileConfigSource("plist_file.plist")`.
         context
             The context to use during model validation.
-            See also https://docs.pydantic.dev/latest/api/base_model @ `model_validate`.
+            See also [`model_validate`][pydantic.BaseModel.model_validate].
         processor_factory
             The state factory to use to parse the newly loaded configuration data.
 
@@ -285,12 +313,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         self
 
         """
-        if cls.model_config["rebuild_on_load"]:
-            # Frame 1: copy_context_and_call.<locals>.copy()
-            # Frame 2: copy_and_run()
-            # Frame 3: <class>.config_load()
-            # Frame 4: <class>.model_rebuild()
-            cls.model_rebuild(_parent_namespace_depth=4)
+        cls._try_rebuild_model()
 
         # Validate the source we load our configuration from.
         config_source = cls._validate_config_source(source)
@@ -308,7 +331,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         # ruff: noqa: FBT003
         try:
-            loading.set(True)
+            processing.set(ProcessingContext(cls, processor, trace=[config_source]))
 
             # Processing will execute any commands that are present
             # in the configuration data and return the final configuration
@@ -319,7 +342,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             # is saved (`processor.revert_processor_changes()`).
             self = cls(**processor.get_processed_data())
         finally:
-            loading.set(False)
+            processing.set(None)
 
         # Quick setup and we're done.
         self._config_source = config_source
@@ -327,8 +350,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         return self
 
     @classmethod
-    @copy_context_on_await
-    @wraps(config_load)
+    @isolated_context_coroutine
     async def config_load_async(
         cls,
         source: object | None = None,
@@ -355,28 +377,22 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         self
 
         """
-        # Intentionally not using `run_sync(config_load)` here.
-        # We want to keep every user-end object handled by the same thread.
+        cls._try_rebuild_model()
 
-        if cls.model_config["rebuild_on_load"]:
-            # Frame 1: copy_context_on_await.<locals>.copy_async()
-            # Frame 2: copy_and_await()
-            # Frame 3: <class>.config_load_async()
-            # Frame 4: <class>.model_rebuild()
-            cls.model_rebuild(_parent_namespace_depth=4)
+        # Intentionally not using `run_sync(config_load)` here.
+        # We want to keep make the set up instructions blocking to avoid running
+        # into mutexes.
 
         config_source = cls._validate_config_source(source)
         make_processor = cls._validate_processor_factory(processor_factory)
         processor = make_processor(await config_source.load_async())
 
         try:
-            loading.set(True)
+            processing.set(ProcessingContext(cls, processor, trace=[config_source]))
 
-            # Since `processor.get_processed_data()` operates on primitive data types,
-            # we can safely use run_sync here to run in a worker thread.
             self = cls(**await run_sync(processor.get_processed_data))
         finally:
-            loading.set(False)
+            processing.set(None)
 
         self._config_processor = processor
         self._config_source = config_source
@@ -439,11 +455,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
 
         return self
 
-    @wraps(config_reload_async)
-    async def reload_async(self) -> Self:
-        """Do the same as `config_reload_async`."""
-        return await self.config_reload_async()
-
     def _config_data_save(
         self,
         destination: object | None = None,
@@ -464,7 +475,7 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             new_data = self.config_dump()
         else:
             # Construct a new configuration instance.
-            # Respect __class__ attribute since root might be a proxy (from proxyvars).
+            # Respect `__class__` attribute: root might be a proxy, e.g. from proxyvars.
             new_root = root.__class__(**processor.get_processed_data())
             routes = root.config_find_routes(self)
 
@@ -499,8 +510,8 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             that case just create `BinaryFileConfigSource("plist_file.plist")`.
 
         """
-        config_source, data = self._config_data_save(destination)
-        config_source.dump(data)
+        config_destination, data = self._config_data_save(destination)
+        config_destination.dump(data)
         return self
 
     async def config_save_async(self, destination: object | None = None) -> Self:
@@ -518,8 +529,8 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             that case just create `BinaryFileConfigSource("plist_file.plist")`.
 
         """
-        config_source, data = self._config_data_save(destination)
-        await config_source.dump_async(data)
+        config_destination, data = self._config_data_save(destination)
+        await config_destination.dump_async(data)
         return self
 
     def config_at(self, *routes: RouteLike) -> Item:

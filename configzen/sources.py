@@ -261,9 +261,29 @@ class FileConfigSource(
         self,
         source: str | bytes | PathLike[str] | PathLike[bytes],
         data_format: str | DataFormat[Any, Any] | None = None,
+        *,
+        use_processing_trace: bool = True,
         **options: Unpack[FormatOptions],
     ) -> None:
         super().__init__(_make_path(source), data_format=data_format, **options)
+        self._use_processing_trace = use_processing_trace
+
+    @property
+    def paths(self) -> list[Path]:
+        """List possible path variants basing on the processing context trace."""
+        from configzen.config import processing
+
+        if (
+            not self.source.is_absolute()
+            and self._use_processing_trace
+            and (processing_context := processing.get())
+        ):
+            return [
+                _make_path(source).parent / self.source
+                for config_source in processing_context.trace
+                if isinstance(source := config_source.source, (str, bytes, PathLike))
+            ]
+        return [self.source]  # in current working dir
 
     def _guess_data_format(self) -> DataFormat[Any, AnyStr]:
         suffix = self.source.suffix
@@ -346,15 +366,27 @@ class FileConfigSource(
 
     def read(self) -> AnyStr:
         """Read the configuration source and return its contents."""
-        if self.is_binary():
-            return self.source.read_bytes()
-        return self.source.read_text()
+        errors = []
+        reader = Path.read_bytes if self.is_binary() else Path.read_text
+        for path in self.paths:
+            try:
+                return reader(path)
+            except FileNotFoundError as e:  # noqa: PERF203
+                errors.append(e)
+                continue
+        raise FileNotFoundError(errors)
 
     async def read_async(self) -> AnyStr:
         """Read the configuration source file asynchronously and return its contents."""
-        if self.is_binary():
-            return await AsyncPath(self.source).read_bytes()
-        return await AsyncPath(self.source).read_text()
+        errors = []
+        reader = AsyncPath.read_bytes if self.is_binary() else AsyncPath.read_text
+        for path in map(AsyncPath, self.paths):
+            try:
+                return await reader(path)
+            except FileNotFoundError as e:  # noqa: PERF203
+                errors.append(e)
+                continue
+        raise FileNotFoundError(errors)
 
     def write(self, content: AnyStr) -> int:
         """
