@@ -304,13 +304,9 @@ class FileConfigSource(
 
     def load(self) -> Data:
         """
-        Load the configuration source file and return its contents as a dictionary.
+        Load the configuration source file.
 
-        Parameters
-        ----------
-        data_format
-            The data format to use when loading the data.
-
+        Return its contents as a dictionary.
         """
         return self.data_format.load(self._temp_stream_factory(self.read()))
 
@@ -319,12 +315,6 @@ class FileConfigSource(
         Load the configuration source file asynchronously.
 
         Return its contents as a dictionary.
-
-        Parameters
-        ----------
-        data_format
-            The data format to use when loading the data.
-
         """
         return self.data_format.load(self._temp_stream_factory(await self.read_async()))
 
@@ -336,8 +326,6 @@ class FileConfigSource(
         ----------
         data
             The data to dump to the configuration source.
-        data_format
-            The data format to use when dumping the data.
 
         """
         temp_stream = self._temp_stream_factory()
@@ -355,8 +343,6 @@ class FileConfigSource(
         ----------
         data
             The data to dump to the configuration source.
-        data_format
-            The data format to use when dumping the data.
 
         """
         temp_stream = self._temp_stream_factory()

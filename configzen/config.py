@@ -302,9 +302,6 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
             to a TOML text file source. Keep in mind, however, that for binary formats
             such as non-XML Plist you must specify its format type to binary, so in
             that case just create `BinaryFileConfigSource("plist_file.plist")`.
-        context
-            The context to use during model validation.
-            See also [`model_validate`][pydantic.BaseModel.model_validate].
         processor_factory
             The state factory to use to parse the newly loaded configuration data.
 
