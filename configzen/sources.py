@@ -302,13 +302,22 @@ class FileConfigSource(
         )
         raise NotImplementedError(msg)
 
+    def _after_load(self) -> None:
+        from configzen.config import processing
+
+        processing_context = processing.get()
+        if processing_context:
+            processing_context.trace.append(self)
+
     def load(self) -> Data:
         """
         Load the configuration source file.
 
         Return its contents as a dictionary.
         """
-        return self.data_format.load(self._temp_stream_factory(self.read()))
+        data = self.data_format.load(self._temp_stream_factory(self.read()))
+        self._after_load()
+        return data
 
     async def load_async(self) -> Data:
         """
@@ -316,7 +325,9 @@ class FileConfigSource(
 
         Return its contents as a dictionary.
         """
-        return self.data_format.load(self._temp_stream_factory(await self.read_async()))
+        data = self.data_format.load(self._temp_stream_factory(await self.read_async()))
+        self._after_load()
+        return data
 
     def dump(self, data: Data) -> None:
         """

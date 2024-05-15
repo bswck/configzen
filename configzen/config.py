@@ -62,7 +62,7 @@ class ProcessingContext(NamedTuple):
     model_class: type[BaseConfig]
     processor: ConfigProcessor
     # We keep it mainly to make path resolution smarter.
-    trace: list[ConfigSource]
+    trace: list[ConfigSource[Any, Any]]
 
 
 def _locate(
@@ -326,10 +326,10 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         # than the configuration data, by using `processor.get_processed_data()`.
         processor = make_processor(config_source.load())
 
+        processing_context = ProcessingContext(cls, processor, trace=[config_source])
+        processing.set(processing_context)
         # ruff: noqa: FBT003
         try:
-            processing.set(ProcessingContext(cls, processor, trace=[config_source]))
-
             # Processing will execute any commands that are present
             # in the configuration data and return the final configuration
             # data that we will use to construct an instance of the configuration model.
@@ -384,9 +384,9 @@ class BaseConfig(BaseSettings, metaclass=BaseConfigMetaclass):
         make_processor = cls._validate_processor_factory(processor_factory)
         processor = make_processor(await config_source.load_async())
 
+        processing_context = ProcessingContext(cls, processor, trace=[config_source])
+        processing.set(processing_context)
         try:
-            processing.set(ProcessingContext(cls, processor, trace=[config_source]))
-
             self = cls(**await run_sync(processor.get_processed_data))
         finally:
             processing.set(None)
