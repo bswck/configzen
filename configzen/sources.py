@@ -1,4 +1,4 @@
-"""`configzen.sources`: Sources and destinations that hold the configuration data."""
+"""Sources and destinations that hold the configuration data."""
 
 from __future__ import annotations
 

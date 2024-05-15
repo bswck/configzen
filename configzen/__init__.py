@@ -1,10 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0
 # (C) 2024-present Bartosz Sławecki (bswck)
-"""
-`configzen`.
-
-Manage configuration with pydantic.
-"""
+"""Manage configuration with pydantic."""
 
 from __future__ import annotations
 

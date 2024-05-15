@@ -1,5 +1,5 @@
 """
-`configzen.replacements`: Replacement API processor for configuration data.
+Replacement API processor for configuration data.
 
 Allows to tweak the configuration data programmatically before it is given
 to the model config and revert the changes back to the original data structure

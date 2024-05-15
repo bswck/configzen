@@ -1,4 +1,4 @@
-"""`configzen.module_proxy`: Runtime modules wrapping with attribute type validation."""
+"""Runtime modules with attribute type validation."""
 
 from __future__ import annotations
 

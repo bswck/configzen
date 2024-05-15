@@ -1,4 +1,4 @@
-"""`configzen.data`: Encapsulate configuring and using data formats within configzen."""
+"""Interfaces for encapsulation of configuring and using data formats."""
 
 from __future__ import annotations
 

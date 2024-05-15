@@ -1,4 +1,4 @@
-"""`configzen.context`: Isolate the library context from the user context."""
+"""Facilities for [contextual][contextvars] processing."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""`configzen.errors`: Specialized exceptions raised by configzen."""
+"""Specialized exceptions raised by configzen."""
 
 from __future__ import annotations
 

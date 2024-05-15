@@ -1,4 +1,4 @@
-"""`configzen.config`: the base configuration model, `BaseConfig`."""
+"""The base configuration model class [`BaseConfig`][configzen.config.BaseConfig]."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""`configzen.typedefs`: Miscellaneous type definitions for configzen."""
+"""Miscellaneous type definitions for configzen."""
 
 from __future__ import annotations
 

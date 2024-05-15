@@ -1,4 +1,4 @@
-"""`configzen.route`: Routes creation and parsing."""
+"""Routes creation and parsing."""
 
 from __future__ import annotations
 
